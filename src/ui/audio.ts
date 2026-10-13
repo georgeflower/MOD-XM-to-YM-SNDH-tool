@@ -46,9 +46,10 @@ export class Preview {
   setSource(s: Source) { this.source = s; this.applySource(); }
 
   /** load the original module for the "original" side of the A/B switch */
-  loadOriginal(bytes: Uint8Array) {
+  loadOriginal(bytes: Uint8Array | null) {
     this.stop();
-    this.modBytes = bytes.slice().buffer;
+    this.modBytes = bytes ? bytes.slice().buffer : null;
+    if (!bytes) return;
     if (!this.orig && !this.origLoading && location.protocol !== 'file:') {
       this.origLoading = true;
       createOrigPlayer(this.ctx).then((p) => {

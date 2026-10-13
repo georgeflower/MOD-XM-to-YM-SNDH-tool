@@ -10,6 +10,9 @@ import { replayerHeader } from '../export/replayer';
 import { renderYm } from '../export/ymemu';
 import { encodeWav } from '../export/wav';
 import { zip } from '../export/zip';
+import { parseYm, isYm } from '../import/ym';
+import { parseSndh, isSndh, type SndhInfo } from '../import/sndh';
+import type { AyTune } from '../import/tune';
 import { Preview, type Source } from './audio';
 import { download } from './download';
 import { AyRoll } from './AyRoll';
@@ -39,6 +42,9 @@ export function App() {
   const [fileName, setFileName] = useState('');
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
   const [mod, setMod] = useState<Module | null>(null);
+  const [tune, setTune] = useState<(AyTune & { info?: SndhInfo }) | null>(null);
+  const [subtune, setSubtune] = useState(1);
+  const [secOverride, setSecOverride] = useState(0);   // SNDH: 0 = use the TIME tag
   const [error, setError] = useState('');
   const [opts, setOpts] = useState<Opts>(DEFAULT_OPTS);
   const [prio, setPrio] = useState<Record<number, number>>({});
@@ -54,17 +60,47 @@ export function App() {
   const preview = () => (previewRef.current ??= new Preview());
   const dropRef = useRef<HTMLDivElement>(null);
 
-  // ---- loading
+  // ---- loading: modules are converted, .sndh/.ym are register dumps that are played/imported as they are
   const loadBytes = useCallback((name: string, data: Uint8Array) => {
     try {
+      setError(''); setFileName(name); setBytes(data);
+      setPrio({}); setDrumClass({}); setOpts(DEFAULT_OPTS); setSubtune(1); setSecOverride(0);
+      if (isSndh(data) || isYm(data)) {
+        setMod(null); setRes(null);
+        setBusy(isSndh(data) ? 'Running the SNDH in the 68000 emulator…' : 'Reading the YM file…');
+        preview().stop(); setPlaying(false); setPos(0);
+        setTimeout(() => {
+          try {
+            const t = isSndh(data) ? parseSndh(data, { subtune: 1 }) : parseYm(data);
+            setTune(t);
+            setAuthor(t.author);
+            preview().setSource('ay'); setSource('ay');
+            preview().loadOriginal(null);
+            preview().setAy(renderYm(t.regs, t.nframes));
+          } catch (e) { setError(String((e as Error).message ?? e)); setTune(null); }
+          setBusy('');
+        }, 30);
+        return;
+      }
       const m = loadModule(data);
-      setError(''); setFileName(name); setBytes(data); setMod(m);
-      setPrio({}); setDrumClass({}); setOpts(DEFAULT_OPTS);
+      setTune(null); setMod(m);
       preview().loadOriginal(data);
     } catch (e) {
       setError(String((e as Error).message ?? e));
     }
   }, []);
+  /** re-run an SNDH with another subtune / length */
+  const rerunSndh = (sub: number, secs: number) => {
+    if (!bytes) return;
+    setBusy('Running the SNDH in the 68000 emulator…');
+    setTimeout(() => {
+      try {
+        const t = parseSndh(bytes, { subtune: sub, seconds: secs || undefined });
+        setTune(t); preview().setAy(renderYm(t.regs, t.nframes)); setPos(0);
+      } catch (e) { setError(String((e as Error).message ?? e)); }
+      setBusy('');
+    }, 30);
+  };
   const loadFile = async (f: File) => loadBytes(f.name, new Uint8Array(await f.arrayBuffer()));
   const loadDemo = async () => {
     const r = await fetch(demoUrl); // embedded data: URL, works from file:// too
@@ -120,14 +156,16 @@ export function App() {
   });
 
   // ---- exports
-  const base = slug(mod?.title || fileName);
-  const title = (mod?.title || base).slice(0, 32);
-  const packed = useMemo(() => (res ? packStream(res.regs, res.nframes, res.loopFrame) : null), [res]);
+  const out: { regs: Uint8Array; nframes: number; loopFrame: number } | null = mod ? res : tune;
+  const base = slug((mod ? mod.title : tune?.title) || fileName);
+  const title = ((mod ? mod.title : tune?.title) || base).slice(0, 32);
+  const packed = useMemo(() => (out ? packStream(out.regs, out.nframes, out.loopFrame) : null), [out]);
   const meta = { title, author: author || 'unknown' };
   const exp = {
-    sndh: () => res && download(`${base}.sndh`, writeSndh(res.regs, res.nframes, res.loopFrame, meta)),
-    ym: () => res && download(`${base}.ym`, writeYm5(res.regs, res.nframes, res.loopFrame, title, meta.author, `converted from ${fileName}`)),
+    sndh: () => out && download(`${base}.sndh`, writeSndh(out.regs, out.nframes, out.loopFrame, meta)),
+    ym: () => out && download(`${base}.ym`, writeYm5(out.regs, out.nframes, out.loopFrame, title, meta.author, `${mod ? 'converted' : 'imported'} from ${fileName}`)),
     game: () => {
+      const res = out;
       if (!res || !packed) return;
       download(`${base}_gamekit.zip`, zip([
         { name: `${base}.h`, data: writeCHeader(base, packed.data, res.nframes, res.loopFrame, packed.loopOffset) },
@@ -135,9 +173,9 @@ export function App() {
         { name: 'README.txt', data: `Packed YM2149 stream, ${res.nframes} frames @ 50 Hz, ${packed.data.length} bytes.\nSee the comment at the top of ymplay.h.\n` },
       ]), 'application/zip');
     },
-    regs: () => res && download(`${base}.regs`, res.regs),
-    wav: () => res && download(`${base}_ym.wav`, encodeWav(renderYm(res.regs, res.nframes), 44100), 'audio/wav'),
-    log: () => res && download(`${base}_report.txt`, res.report.join('\n') + '\n', 'text/plain'),
+    regs: () => out && download(`${base}.regs`, out.regs),
+    wav: () => out && download(`${base}_ym.wav`, encodeWav(renderYm(out.regs, out.nframes), 44100), 'audio/wav'),
+    log: () => { const r = mod ? res?.report : tune && [`${tune.source.toUpperCase()} import: ${fileName}`, tune.title && `title: ${tune.title}`, tune.author && `author: ${tune.author}`, `${tune.nframes} frames, loop at ${tune.loopFrame}`, ...tune.warnings.map((w) => 'warning: ' + w)].filter(Boolean) as string[]; if (r) download(`${base}_report.txt`, r.join('\n') + '\n', 'text/plain'); },
   };
 
   // ---- drag & drop
@@ -148,7 +186,7 @@ export function App() {
     return () => { window.removeEventListener('dragover', prevent); window.removeEventListener('drop', drop); };
   }, []);
 
-  const seconds = res ? res.nframes / 50 : 0;
+  const seconds = out ? out.nframes / 50 : 0;
   const instRows = res?.instruments ?? [];
 
   return (
@@ -156,8 +194,8 @@ export function App() {
       <header className="titlebar">
         <h1>MOD/XM <span>→</span> YM2149 <small>Atari ST · SNDH · game stream</small></h1>
         <div className="actions">
-          <label className="btn">Load MOD / XM…
-            <input type="file" accept=".mod,.xm,.MOD,.XM" hidden onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
+          <label className="btn">Load MOD / XM / SNDH / YM…
+            <input type="file" accept=".mod,.xm,.sndh,.snd,.ym,.MOD,.XM,.SNDH,.SND,.YM" hidden onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
           </label>
           <button className="btn" onClick={loadDemo}>Demo: back_in_town_again</button>
         </div>
@@ -165,21 +203,57 @@ export function App() {
 
       {error && <div className="panel err">{error}</div>}
 
-      {!mod && (
+      {!mod && !tune && (
         <section className="panel welcome">
           <h2>Start here</h2>
           <ol>
-            <li>Load a <b>.MOD</b> or <b>.XM</b> file (or drop it anywhere on this page) — or press <b>Demo</b>.</li>
+            <li>Load a <b>.MOD</b> or <b>.XM</b> file (or drop it anywhere on this page) — or press <b>Demo</b>. <b>.SNDH</b> and <b>.YM</b> files load too: they are played, shown and re-exported as they are.</li>
             <li>The tool reduces it to <b>one YM2149 chip (3 voices + noise)</b> at 50 Hz and lets you listen to both: <kbd>Tab</kbd> flips between original and YM.</li>
             <li>Fine-tune with the options, then export an <b>SNDH</b>, a <b>.YM</b> or a <b>game kit</b> (C header + 30-line replayer).</li>
           </ol>
         </section>
       )}
 
-      {mod && (
+      {(mod || tune) && (
         <>
           <div className="grid3">
-            <section className="panel">
+            {tune && (
+              <section className="panel">
+                <h2>Loaded {tune.source === 'sndh' ? 'SNDH' : 'YM'} tune</h2>
+                <dl className="kv">
+                  <dt>File</dt><dd>{fileName}</dd>
+                  <dt>Title</dt><dd>{tune.title || '—'}</dd>
+                  <dt>Author</dt><dd>{tune.author || '—'}</dd>
+                  {tune.comment && <><dt>Comment</dt><dd>{tune.comment}</dd></>}
+                  <dt>Length</dt><dd>{fmtTime(seconds)} · {tune.nframes} frames @ 50 Hz</dd>
+                  <dt>Loop</dt><dd>{tune.loopFrame > 0 || tune.source === 'ym' ? `from frame ${tune.loopFrame}` : 'none detected (plays once)'}</dd>
+                  {tune.info && <><dt>Timer</dt><dd>{tune.info.timer === 'vbl' ? 'VBL' : 'Timer ' + tune.info.timer} · {tune.info.rateHz} Hz{tune.info.rateHz !== 50 ? ' (resampled to 50 Hz)' : ''}</dd></>}
+                </dl>
+                {tune.info && tune.info.subtunes > 1 && (
+                  <label className="row"><span className="lbl">Subtune</span>
+                    <select value={subtune} onChange={(e) => { const v = +e.target.value; setSubtune(v); rerunSndh(v, secOverride); }}>
+                      {Array.from({ length: tune.info.subtunes }, (_, i) => (
+                        <option key={i} value={i + 1}>{i + 1}{tune.info!.subtuneNames[i] ? ' — ' + tune.info!.subtuneNames[i] : ''}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {tune.info && (
+                  <label className="row" title="0 = use the length from the file's TIME tag">
+                    <span className="lbl">Seconds</span>
+                    <input type="number" className="txt" min={0} max={1200} value={secOverride}
+                      onChange={(e) => setSecOverride(Math.max(0, Math.min(1200, +e.target.value || 0)))}
+                      onBlur={() => rerunSndh(subtune, secOverride)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') rerunSndh(subtune, secOverride); }} />
+                  </label>
+                )}
+                <label className="row"><span className="lbl">Composer</span>
+                  <input type="text" className="txt" value={author} maxLength={40} onChange={(e) => setAuthor(e.target.value)} />
+                </label>
+                {tune.warnings.length > 0 && <pre className="log">{tune.warnings.map((w) => 'warning: ' + w).join('\n')}</pre>}
+              </section>
+            )}
+            {mod && <section className="panel">
               <h2>Module</h2>
               <dl className="kv">
                 <dt>File</dt><dd>{fileName}</dd>
@@ -192,9 +266,9 @@ export function App() {
               <label className="row"><span className="lbl">Composer</span>
                 <input type="text" className="txt" value={author} placeholder="written to SNDH / YM" maxLength={40} onChange={(e) => setAuthor(e.target.value)} />
               </label>
-            </section>
+            </section>}
 
-            <section className="panel">
+            {mod && <section className="panel">
               <h2>Conversion</h2>
               <Slider label="Level" value={opts.gainDb} min={-12} max={12} step={0.5} unit=" dB" onChange={(v) => setOpts({ ...opts, gainDb: v })}
                 hint="Overall loudness mapped onto the 16 YM volume steps" />
@@ -210,20 +284,20 @@ export function App() {
                 </select>
               </label>
               <button className="btn small" onClick={() => { setOpts(DEFAULT_OPTS); setPrio({}); setDrumClass({}); }}>Reset to auto</button>
-            </section>
+            </section>}
 
             <section className="panel">
               <h2>Export</h2>
               <div className="btns">
-                <button className="btn primary" disabled={!res} onClick={exp.sndh} title="Playable in any SNDH player (68000 player included, 50 Hz)">SNDH (.sndh)</button>
-                <button className="btn" disabled={!res} onClick={exp.ym} title="YM5! register dump — ST-Sound, Atari players">YM (.ym)</button>
-                <button className="btn" disabled={!res} onClick={exp.game} title="C header with the packed stream + ymplay.h replayer">Game kit (.zip)</button>
-                <button className="btn" disabled={!res} onClick={exp.wav}>Preview (.wav)</button>
-                <button className="btn" disabled={!res} onClick={exp.regs}>Raw regs (.regs)</button>
-                <button className="btn" disabled={!res} onClick={exp.log}>Report (.txt)</button>
+                <button className="btn primary" disabled={!out} onClick={exp.sndh} title="Playable in any SNDH player (68000 player included, 50 Hz)">SNDH (.sndh)</button>
+                <button className="btn" disabled={!out} onClick={exp.ym} title="YM5! register dump — ST-Sound, Atari players">YM (.ym)</button>
+                <button className="btn" disabled={!out} onClick={exp.game} title="C header with the packed stream + ymplay.h replayer">Game kit (.zip)</button>
+                <button className="btn" disabled={!out} onClick={exp.wav}>Preview (.wav)</button>
+                <button className="btn" disabled={!out} onClick={exp.regs}>Raw regs (.regs)</button>
+                <button className="btn" disabled={!out} onClick={exp.log}>Report (.txt)</button>
               </div>
-              {packed && res && (
-                <p className="note">Packed stream: <b>{packed.data.length.toLocaleString()}</b> bytes ({(packed.data.length / (res.nframes / 50)).toFixed(0)} B/s). SNDH adds a 220-byte player.</p>
+              {packed && out && (
+                <p className="note">Packed stream: <b>{packed.data.length.toLocaleString()}</b> bytes ({(packed.data.length / (out.nframes / 50)).toFixed(0)} B/s). SNDH adds a 220-byte player.</p>
               )}
               <p className="note soft">Furnace · Arkos · Maxymiser export: coming next.</p>
             </section>
@@ -232,22 +306,22 @@ export function App() {
           <section className="panel">
             <h2>Preview <small>space = play/stop · tab = original ⇄ YM</small></h2>
             <div className="transport">
-              <button className="btn" onClick={rewind} disabled={!res}>⏮</button>
-              <button className="btn primary" onClick={togglePlay} disabled={!res || !!busy}>{playing ? '■ Stop' : '▶ Play'}</button>
+              <button className="btn" onClick={rewind} disabled={!out}>⏮</button>
+              <button className="btn primary" onClick={togglePlay} disabled={!out || !!busy}>{playing ? '■ Stop' : '▶ Play'}</button>
               <div className="ab" role="group" aria-label="Source">
-                <button className={source === 'orig' ? 'on' : ''} disabled={!origOk} onClick={() => pickSource('orig')}
-                  title={origOk ? '' : 'Needs the page to be served over http(s) — not available when index.html is opened from disk'}>A · Original</button>
+                <button className={source === 'orig' ? 'on' : ''} disabled={!origOk || !mod} onClick={() => pickSource('orig')}
+                  title={!mod ? 'Only for loaded modules' : origOk ? '' : 'Needs the page to be served over http(s) — not available when index.html is opened from disk'}>A · Original</button>
                 <button className={source === 'ay' ? 'on' : ''} onClick={() => pickSource('ay')}>B · YM2149</button>
               </div>
               <span className="time">{fmtTime(pos)} / {fmtTime(seconds)}</span>
               {busy && <span className="busy">{busy}</span>}
-              {!origOk && <span className="note">Original-module playback needs http(s) hosting (browsers block it for files opened from disk).</span>}
+              {mod && !origOk && <span className="note">Original-module playback needs http(s) hosting (browsers block it for files opened from disk).</span>}
             </div>
-            {res && <AyRoll regs={res.regs} nframes={res.nframes} position={pos} />}
+            {out && <AyRoll regs={out.regs} nframes={out.nframes} position={pos} />}
             <div className="legend"><i style={{ background: '#ff5555' }} />voice A <i style={{ background: '#55dd55' }} />voice B <i style={{ background: '#5599ff' }} />voice C <i style={{ background: '#ffaa33' }} />noise · vertical = pitch, brightness = volume</div>
           </section>
 
-          <div className="grid2">
+          {mod && <div className="grid2">
             <section className="panel">
               <h2>Instruments → AY role</h2>
               <table>
@@ -302,12 +376,12 @@ export function App() {
               </table>
               <p className="note soft">A module has more channels than the YM has voices; the converter picks the 3 most important events every 20 ms. Raise a channel's priority to protect it.</p>
             </section>
-          </div>
+          </div>}
 
-          <section className="panel">
+          {mod && <section className="panel">
             <h2>Conversion report</h2>
             <pre className="log">{res ? [...res.report, ...res.warnings.map((w) => 'warning: ' + w)].join('\n') : ''}</pre>
-          </section>
+          </section>}
         </>
       )}
       <footer>Runs entirely in your browser — files never leave your computer.</footer>

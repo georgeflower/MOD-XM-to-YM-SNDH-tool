@@ -19,9 +19,18 @@ loop detection) into per-frame channel states; sample pitch is measured from the
 samples become kick/snare/hat macros (falling tone / noise bursts), and every 20 ms the 3 most important events win a
 voice (stickiness avoids voice jumping, one noise generator is shared, volumes map to the YM's ≈3 dB steps).
 
+## Loading .sndh and .ym
+
+Besides modules the page loads **`.ym`** (YM2!/3!/3b/5!/6!, also LHA-packed) and **`.sndh`** (also ICE!-packed).
+They are not converted: a `.ym` is read as the register dump it is, a `.sndh` is *run* in a built-in 68000 emulator
+(init + play routine, YM writes captured per tick, resampled to 50 Hz, loop detected). You get the piano-roll view, the
+YM preview and all exports (SNDH / YM5 / game kit / WAV / regs). SNDH subtunes and the rendered length can be chosen.
+Limitation: tunes that need MFP timer interrupts *within* a frame (SID voice, sync-buzzer, digidrums) are captured at
+frame granularity only. The emulator was checked against the Musashi core in `psgplay` (see `tools/verify`).
+
 ## Using it
 
-1. Open the page, **Load MOD / XM…** (or drop a file anywhere) — or press **Demo**.
+1. Open the page, **Load MOD / XM / SNDH / YM…** (or drop a file anywhere) — or press **Demo**.
 2. **Tab** flips between the original (libopenmpt) and the YM version, **Space** plays/stops.
 3. Tweak *Level / Drum priority / Voice stickiness / Arpeggio order*, per-instrument **AY role** (kick/snare/hat) and
    per-channel **priority**; the preview re-renders automatically.
