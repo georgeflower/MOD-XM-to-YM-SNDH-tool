@@ -13,6 +13,7 @@ import { renderYm } from '../export/ymemu';
 import { encodeWav } from '../export/wav';
 import { zip } from '../export/zip';
 import { songToMaxymiser, instrumentToMyi } from '../maxymiser/convert';
+import { maxymiserToSong, myiToInstrument } from '../maxymiser/import';
 import { download } from './download';
 import { NumField, TextField } from './fields';
 import { InstrumentEditor } from './InstrumentEditor';
@@ -252,6 +253,23 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
       ed.loadSong(await decodeYmt(b), f.name);
     } catch (e) { onError(String((e as Error).message ?? e)); }
   };
+  /** .mys (+ .myv) opens as a song, a lone .myi replaces the selected instrument */
+  const loadMaxymiser = async (files: File[]) => {
+    try {
+      const ext = (f: File) => f.name.toLowerCase().replace(/^.*\./, '');
+      const bytes = async (f: File) => new Uint8Array(await f.arrayBuffer());
+      const mys = files.find((f) => ext(f) === 'mys'), myv = files.find((f) => ext(f) === 'myv'), myi = files.find((f) => ext(f) === 'myi');
+      if (mys) {
+        const r = maxymiserToSong(await bytes(mys), myv ? await bytes(myv) : null, mys.name);
+        ed.loadSong(r.song, mys.name);
+        if (r.warnings.length) onError(r.warnings.join('; '));
+      } else if (myi) {
+        const r = myiToInstrument(await bytes(myi));
+        ed.replaceInstrument({ ...r.inst, name: r.inst.name || myi.name.replace(/\.[^.]*$/, '') });
+        if (r.warnings.length) onError(r.warnings.join('; '));
+      } else throw new Error('Pick a .mys song (with its .myv voice bank) or a .myi instrument');
+    } catch (e) { onError(String((e as Error).message ?? e)); }
+  };
   const meta = { title: song.name.slice(0, 32), author: song.author || 'unknown' };
   const base = slug(song.name);
   const withRender = (fn: (r: ReturnType<Editor['renderForExport']>) => void) => () => {
@@ -319,6 +337,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
         <div className="tk-line">
           <button className="btn" onClick={() => { if (!ed.dirty || confirm('Discard the current song?')) ed.newSong(); }}>New</button>
           <label className="btn">Load .ymt…<input type="file" accept=".ymt,.YMT" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadYmt(f); e.target.value = ''; }} /></label>
+          <label className="btn" title="maxYMiser song (.mys, with its .myv voice bank selected too) or a single instrument (.myi)">Load maxYMiser…<input type="file" multiple accept=".mys,.MYS,.myv,.MYV,.myi,.MYI" hidden onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) void loadMaxymiser(fs); e.target.value = ''; }} /></label>
           <button className="btn" onClick={() => void saveYmt()} title="Ctrl+S">Save .ymt</button>
           <span className="sep" />
           <button className="btn" disabled={!ed.canUndo} onClick={() => ed.undo()} title="Ctrl+Z">Undo</button>

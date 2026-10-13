@@ -58,6 +58,19 @@ export function fxParamHz(p: number): number {
   return 20 * Math.pow(2, (p & 15) + ((p >> 4) & 15) / 16);
 }
 
+/** the Q/S/U parameter whose timer rate is nearest to `hz` (0 when there is none in range) */
+export function fxParamForHz(hz: number): number {
+  if (!(hz > 0)) return 0;
+  let best = 0, bestErr = Infinity;
+  for (let p = 1; p < 256; p++) {
+    const h = fxParamHz(p);
+    if (h > MAX_FX_HZ) continue;
+    const e = Math.abs(Math.log(h / hz));
+    if (e < bestErr) { bestErr = e; best = p; }
+  }
+  return best;
+}
+
 export interface FxSetting {
   kind: FxKind;
   voice: number;
