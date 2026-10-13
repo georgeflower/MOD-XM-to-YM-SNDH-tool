@@ -78,3 +78,46 @@ describe('digidrums in the pattern renderer', () => {
     expect(renderSong(s).warnings.join()).toMatch(/no digidrum 20/);
   });
 });
+
+import { readFileSync } from 'node:fs';
+import { loadModule } from '../src/core/load';
+import { moduleToSong } from '../src/tracker/fromModule';
+import { encodeYmt, decodeYmt } from '../src/tracker/ymt';
+import { hasDrums } from '../src/core/drums';
+
+describe('module -> patterns with a digidrum channel', () => {
+  const m = loadModule(new Uint8Array(readFileSync(new URL('../fixtures/OLGIENG.XM', import.meta.url))));
+  const plain = moduleToSong(m, {});
+  const r = moduleToSong(m, { digiDrums: true });
+  it('adds a 4th column with drum notes and a bank instrument', () => {
+    expect(plain.song.channelCount).toBe(3);
+    expect(plain.song.drumChannel).toBe(-1);
+    expect(r.song.channelCount).toBe(4);
+    expect(r.song.drumChannel).toBe(3);
+    for (const p of r.song.patterns) for (const row of p.cells) expect(row.length).toBe(4);
+    let hits = 0, bank = -1;
+    for (const o of new Set(r.song.order)) for (const row of r.song.patterns[o].cells) { const c = row[3]; if (c.note) { hits++; bank = c.instrument; } }
+    expect(hits).toBeGreaterThan(20);
+    expect(r.song.instruments[bank].digiDrums!.length).toBeGreaterThan(0);
+    expect(r.report.some((l) => l.startsWith('digidrums:'))).toBe(true);
+  });
+  it('renders to a dump with drum triggers; tone voices stay intact outside drums', () => {
+    const a = renderSong(r.song);
+    expect(hasDrums(a.drums)).toBe(true);
+    const trigs = Array.from(a.drums!.trig).filter(Boolean).length;
+    expect(trigs).toBeGreaterThan(20);
+    // length is unchanged by the drum channel
+    expect(a.nframes).toBe(renderSong(plain.song).nframes);
+  });
+  it('survives a .ymt round trip', async () => {
+    const back = await decodeYmt(await encodeYmt(r.song, { gzip: true }));
+    expect(back.channelCount).toBe(4);
+    expect(back.drumChannel).toBe(3);
+    const bank = back.instruments.find((i) => (i.digiDrums?.length ?? 0) > 0)!;
+    const orig = r.song.instruments.find((i) => (i.digiDrums?.length ?? 0) > 0)!;
+    expect(bank.digiDrums!.length).toBe(orig.digiDrums!.length);
+    expect(Array.from(bank.digiDrums![0].pcm)).toEqual(Array.from(orig.digiDrums![0].pcm));
+    const b = renderSong(back);
+    expect(Array.from(b.drums!.trig)).toEqual(Array.from(renderSong(r.song).drums!.trig));
+  });
+});

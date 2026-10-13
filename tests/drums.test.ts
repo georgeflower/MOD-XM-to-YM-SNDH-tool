@@ -58,3 +58,45 @@ describe('digidrum core', () => {
     expect(c.trig[1]).toBe(trigCode(0, 0)); expect(c.trig[5]).toBe(trigCode(2, 1)); expect(c.trig[8]).toBe(trigCode(0, 0));
   });
 });
+
+import { readFileSync } from 'node:fs';
+import { loadModule } from '../src/core/load';
+import { convert } from '../src/core/convert';
+import { trigDrum, trigVoice, TRIG_STOP, hasDrums } from '../src/core/drums';
+const fxb = (n: string) => new Uint8Array(readFileSync(new URL(`../fixtures/${n}`, import.meta.url)));
+
+describe('converter: percussion as digidrums', () => {
+  const m = loadModule(fxb('OLGIENG.XM'));
+  const plain = convert(m);
+  const r = convert(m, { digiDrums: true, digiRate: 8000 });
+  it('produces a drum track and leaves non-drum results alone', () => {
+    expect(plain.drums).toBeUndefined();
+    expect(r.drums).toBeTruthy();
+    expect(hasDrums(r.drums)).toBe(true);
+    expect(r.drums!.drums.length).toBeGreaterThan(0);
+    expect(r.drums!.drums.length).toBeLessThanOrEqual(63);
+    expect(r.nframes).toBe(plain.nframes);
+    for (const d of r.drums!.drums) { expect(d.pcm.every((v) => v <= 15)).toBe(true); expect(d.pcm.length).toBeGreaterThan(1); }
+  });
+  it('keeps the dump consistent with the triggers (voice silent while its drum plays)', () => {
+    const tr = r.drums!.trig;
+    let live: { v: number; end: number } | null = null, checked = 0;
+    for (let f = 0; f < r.nframes; f++) {
+      if (tr[f]) { const i = trigDrum(tr[f]); if (i !== TRIG_STOP) live = { v: trigVoice(tr[f]), end: f + drumFrames(r.drums!.drums[i]) }; else live = null; }
+      if (live && f >= live.end) live = null;
+      if (live) {
+        expect(r.regs[f * 14 + 8 + live.v]).toBe(0);
+        expect(r.regs[f * 14 + 7] & (1 << live.v)).toBeTruthy();
+        expect(r.regs[f * 14 + 7] & (8 << live.v)).toBeTruthy();
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
+  });
+  it('the drum voice is not given to a tone note during a drum', () => {
+    const tr = r.drums!.trig; let busyFrames = 0;
+    for (let f = 0; f < r.nframes; f++) if (tr[f]) busyFrames++;
+    expect(busyFrames).toBeGreaterThan(5);
+    expect(r.report.some((l) => l.startsWith('digidrums:'))).toBe(true);
+  });
+});

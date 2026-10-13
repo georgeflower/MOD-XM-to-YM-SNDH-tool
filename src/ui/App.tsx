@@ -26,8 +26,8 @@ import demoUrl from '../assets/back_in_town_again.mod?inline';
 
 const DEMO = 'back_in_town_again.mod';
 
-interface Opts { gainDb: number; drumBonus: number; sticky: number; arpOrder: 'xy' | 'yx'; arpFill: number; arpMinVol: number }
-const DEFAULT_OPTS: Opts = { gainDb: 0, drumBonus: 3, sticky: 1.5, arpOrder: 'xy', arpFill: 0, arpMinVol: 3 };
+interface Opts { gainDb: number; drumBonus: number; sticky: number; arpOrder: 'xy' | 'yx'; arpFill: number; arpMinVol: number; digi: boolean; digiRate: number; digiMaxMs: number }
+const DEFAULT_OPTS: Opts = { gainDb: 0, drumBonus: 3, sticky: 1.5, arpOrder: 'xy', arpFill: 0, arpMinVol: 3, digi: false, digiRate: 8000, digiMaxMs: 500 };
 
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const slug = (s: string) => s.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'song';
@@ -144,11 +144,11 @@ export function App() {
     setBusy('Converting to YM2149 registers…');
     const h = setTimeout(() => {
       try {
-        const r = convert(mod, { gainDb: opts.gainDb, drumBonus: opts.drumBonus, sticky: opts.sticky, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, prio, inst: instMap });
+        const r = convert(mod, { gainDb: opts.gainDb, drumBonus: opts.drumBonus, sticky: opts.sticky, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, prio, inst: instMap });
         setRes(r);
         setBusy('Rendering the YM2149 preview…');
         setTimeout(() => {
-          preview().setAy(renderYm(r.regs, r.nframes, 44100, 50, 4, (r as { drums?: DrumTrack }).drums));
+          preview().setAy(renderYm(r.regs, r.nframes, 44100, 50, 4, r.drums));
           setBusy('');
         }, 20);
       } catch (e) {
@@ -212,7 +212,7 @@ export function App() {
     setBusy('Converting to AY patterns…');
     setTimeout(() => {
       try {
-        const r = moduleToSong(mod, { prio, inst: instMap, drumBonus: opts.drumBonus, sticky: opts.sticky, gainDb: opts.gainDb, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol });
+        const r = moduleToSong(mod, { prio, inst: instMap, drumBonus: opts.drumBonus, sticky: opts.sticky, gainDb: opts.gainDb, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs });
         e.loadSong(r.song, fileName);
         setSongReport([...r.report, ...r.warnings.map((w) => 'warning: ' + w)]);
         setTab('ed');
@@ -378,6 +378,19 @@ export function App() {
               </label>
               {opts.arpFill > 1 && <Slider label="Min. volume" value={opts.arpMinVol} min={1} max={12} step={1} onChange={(v) => setOpts({ ...opts, arpMinVol: v })}
                 hint="Dropped notes quieter than this AY volume are not worth an arpeggio slot" />}
+              <label className="chk" title="Percussion samples (not the tonal ones) are played as real 4-bit samples through a voice's volume register, driven by an MFP timer interrupt. They take voice C while they play.">
+                <input type="checkbox" checked={opts.digi} onChange={(e) => setOpts({ ...opts, digi: e.target.checked })} /> Percussion as digidrums
+              </label>
+              {opts.digi && <>
+                <label className="row" title="Sample rate of the digidrums; the ST can only make some rates, the nearest one is used. Higher = clearer but costs more CPU and memory.">
+                  <span className="lbl">Drum rate</span>
+                  <select value={opts.digiRate} onChange={(e) => setOpts({ ...opts, digiRate: +e.target.value })}>
+                    {[4000, 6000, 8000, 10000, 12000, 16000].map((r) => <option key={r} value={r}>{r / 1000} kHz</option>)}
+                  </select>
+                </label>
+                <Slider label="Drum length" value={opts.digiMaxMs} min={50} max={1500} step={50} unit=" ms" onChange={(v) => setOpts({ ...opts, digiMaxMs: v })}
+                  hint="Longest digidrum; longer samples are cut (with a short fade)" />
+              </>}
               <button className="btn small" onClick={() => { setOpts(DEFAULT_OPTS); setPrio({}); setInstMap({}); setMacroSel(null); }}>Reset to auto</button>
               <button className="btn small primary" disabled={!!busy} onClick={toPatterns} title="Turn the module into an editable pattern song for one YM2149 (uses the options above)">Edit as AY patterns →</button>
             </section>}
@@ -434,9 +447,10 @@ export function App() {
                         <td>{r.c4Hz ? `${r.c4Hz.toFixed(0)} Hz` : ''}</td>
                         <td>
                           <select value={mode} onChange={(e) => setMode(r.inst, e.target.value as InstMode)}>
-                            <option value="auto">{r.drum ? `auto: ${r.drum}` : 'auto: tone'}</option>
+                            <option value="auto">{r.digi ? 'auto: digidrum' : r.drum ? `auto: ${r.drum}` : 'auto: tone'}</option>
                             <option value="tone">tone (written note)</option>
                             <option value="kick">kick</option><option value="snare">snare</option><option value="hat">hat</option>
+                            <option value="digi">digidrum (sample)</option>
                             <option value="macro">custom macro…</option>
                             <option value="mute">mute</option>
                           </select>

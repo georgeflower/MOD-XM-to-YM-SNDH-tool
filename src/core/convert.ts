@@ -6,6 +6,8 @@ import type { Module, Sample } from './types';
 import { replay, FPS, type ChanState } from './replay';
 import { analyseSample, fold, ended, type SampleInfo } from './samples';
 import { powerSpectrum } from './fft';
+import { DigiExtractor } from './digi';
+import { type DrumTrack, MAX_DRUMS, drumFrames, prepareDrum, silenceDrumVoices, trigCode } from './drums';
 
 export const YM_CLOCK = 2_000_000;
 export const TONE_HZ = YM_CLOCK / 16.0; // period 1 -> 125 kHz
@@ -37,9 +39,10 @@ export interface Macro {
  *  mute   - leave the instrument out
  *  tone   - force a tone at the written note's pitch, volume follows the sample's own envelope
  *  kick/snare/hat - the built-in drum macros
+ *  digi   - play the sample itself as a 4-bit digidrum (MFP timer interrupt), see ConvertOptions.digiDrums
  *  macro  - the per-tick sequence in `macro`
  */
-export type InstMode = 'auto' | 'mute' | 'tone' | DrumKind | 'macro';
+export type InstMode = 'auto' | 'mute' | 'tone' | DrumKind | 'macro' | 'digi';
 export interface InstMap { mode: InstMode; macro?: Macro; /** semitones */ transpose?: number }
 
 export interface ConvertOptions {
@@ -55,6 +58,12 @@ export interface ConvertOptions {
   arpMinVol?: number;
   /** override the detected cycle length (samples) of an instrument's first sample */
   cycle?: Record<number, number>;
+  /** play every percussion-like instrument (not tonal, not forced to a drum macro) as a digidrum sample */
+  digiDrums?: boolean;
+  /** digidrum play rate, Hz (nearest MFP rate is used), default 8000 */
+  digiRate?: number;
+  /** longest digidrum, ms, default 500 */
+  digiMaxMs?: number;
   drumBonus?: number;
   drumGain?: number;
   gainDb?: number;
@@ -138,6 +147,8 @@ export interface InstrumentReport {
   /** pitch of C-4 (XM) / PT C-2 for this instrument in Hz, tonal only */
   c4Hz?: number;
   drum?: DrumKind;
+  /** played as a digidrum sample */
+  digi?: boolean;
   mode?: InstMode;
 }
 
@@ -157,6 +168,8 @@ export interface ConvertResult {
   dropPerFrame: Uint8Array;
   arpPerFrame: Uint8Array;
   warnings: string[];
+  /** digidrum samples + one trigger per frame (voice C), when any instrument was converted to digidrums */
+  drums?: DrumTrack;
 }
 
 export function convert(m: Module, options: ConvertOptions = {}): ConvertResult {
@@ -198,7 +211,18 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
   const dt = 1 / FPS;
   const drumCache = new Map<string, { kind: DrumKind; rms: number }>();
   const cand: Cand[][] = [];
+  // digidrums: sample table, cache by (sample, start, pitch, volume class) and the hits found
+  const digiOn = !!options.digiDrums || Object.values(options.inst ?? {}).some((x) => x.mode === 'digi');
+  const digiRate = options.digiRate ?? 8000, digiMaxMs = options.digiMaxMs ?? 500;
+  const digi = new DigiExtractor(m, { rateHz: digiRate, maxMs: digiMaxMs });
+  const digiList = digi.list;
+  const digiHits: { f: number; ch: number; idx: number; cls: number }[] = [];
+  const digiHit = (f: number, ci: number, st: ChanState) => {
+    const h = digi.hit(st);
+    if (h) digiHits.push({ f, ch: ci, ...h });
+  };
   for (const snap of rep.frames) {
+    const fIdx = cand.length;
     const lst: Cand[] = [];
     snap.forEach((st: ChanState | null, ci) => {
       if (!st || st.vol <= 0) return;
@@ -225,6 +249,12 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
         return;
       }
       const forcedDrum: DrumKind | undefined = mode === 'kick' || mode === 'snare' || mode === 'hat' ? mode : undefined;
+      if (digiOn && (mode === 'digi' || (options.digiDrums && !forcedDrum && mode !== 'tone' && inf.cls !== 'tonal'))) {
+        const ir = instReports.find((r) => r.inst === st.inst);
+        if (ir) ir.digi = true;
+        if (st.age === 0 && !(fIdx > 0 && rep.frames[fIdx - 1].includes(st))) digiHit(fIdx, ci, st);
+        return;
+      }
       if (mode === 'tone' || (inf.cls === 'tonal' && !forcedDrum)) {
         if (ended(s, st.pos)) return;
         const n = Math.max(4, Math.trunc(st.rate * dt));
@@ -250,6 +280,23 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
       }
     });
     cand.push(lst);
+  }
+
+  // ---- digidrum schedule: voice C belongs to the sample while it plays, a new drum cuts the old one
+  const trig = new Uint8Array(nf);
+  const busy = new Uint8Array(nf);
+  let digiTrack: DrumTrack | undefined;
+  if (digiHits.length) {
+    const byFrame = new Map<number, { cls: number; idx: number }>();
+    for (const h of digiHits) { const p = byFrame.get(h.f); if (!p || h.cls < p.cls) byFrame.set(h.f, { cls: h.cls, idx: h.idx }); }
+    const frames = [...byFrame.keys()].sort((a, b) => a - b);
+    frames.forEach((f, k) => {
+      const hit = byFrame.get(f)!;
+      trig[f] = trigCode(2, hit.idx);
+      const end = Math.min(nf, frames[k + 1] ?? nf, f + drumFrames(digiList[hit.idx]));
+      for (let g = f; g < end; g++) busy[g] = 1;
+    });
+    digiTrack = { drums: digiList, trig };
   }
 
   // ---- allocation
@@ -290,7 +337,7 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
     const overflow: { v: number; c: Cand }[] = [];
     let noiseTaken = false;
     for (const { v, c } of scored) {
-      if (chosen.length === NV) { overflow.push({ v, c }); continue; }
+      if (chosen.length === NV - busy[f]) { overflow.push({ v, c }); continue; }
       if (usesNoise(c)) {
         if (noiseTaken) { overflow.push({ v, c }); continue; }
         noiseTaken = true;
@@ -314,13 +361,14 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
     }
     const nw: (Item | null)[] = [null, null, null];
     const rest: Item[] = [];
+    const freeSlots = busy[f] ? [0, 1] : [0, 1, 2];
     for (const it of chosen) {
       const si = slots.indexOf(it.c.ch);
-      if (si >= 0 && nw[si] === null) nw[si] = it; else rest.push(it);
+      if (si >= 0 && freeSlots.includes(si) && nw[si] === null) nw[si] = it; else rest.push(it);
     }
     rest.sort((a, b) => (Number(!!a.c.drum) - Number(!!b.c.drum)) || ((rank.get(a.c.ch) ?? 0) - (rank.get(b.c.ch) ?? 0)));
     for (const it of rest) {
-      const order = it.c.drum ? [2, 1, 0] : [0, 1, 2];
+      const order = (it.c.drum ? [2, 1, 0] : [0, 1, 2]).filter((i) => freeSlots.includes(i));
       for (const i of order) if (nw[i] === null) { nw[i] = it; break; }
     }
     slots = nw.map((it) => (it ? it.c.ch : null));
@@ -376,6 +424,12 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
     log(`  ch${String(c + 1).padStart(2, '0')}  ${String(played[c]).padStart(10)}  ${arpMax > 1 ? String(folded[c]).padStart(11) + '  ' : ''}${String(dropped[c]).padStart(8)}  ${((100 * dropped[c]) / Math.max(1, tot)).toFixed(1)}%`);
   }
   if (octShift) log(`${octShift} events needed an octave shift (period > 4095)`);
+  if (digiTrack) {
+    silenceDrumVoices(regs, nf, digiTrack);
+    const bytes = digiList.reduce((n, d) => n + d.pcm.length, 0);
+    log(`digidrums: ${digiList.length} sample(s), ${bytes.toLocaleString()} bytes at ~${digiRate} Hz, ${digiHits.length} hit(s)${digi.skipped ? `, ${digi.skipped} hit(s) skipped (more than ${MAX_DRUMS} variants)` : ''}; voice C is busy ${busy.reduce((n, x) => n + x, 0)} of ${nf} frames`);
+    if (digi.skipped) warnings.push(`${digi.skipped} digidrum hit(s) skipped: more than ${MAX_DRUMS} sample variants`);
+  } else if (digiOn) log('digidrums: no percussion hits found');
 
-  return { regs, nframes: nf, loopFrame, report, instruments: instReports, played, dropped, folded, dropPerFrame, arpPerFrame, warnings };
+  return { regs, nframes: nf, loopFrame, report, instruments: instReports, played, dropped, folded, dropPerFrame, arpPerFrame, warnings, drums: digiTrack };
 }

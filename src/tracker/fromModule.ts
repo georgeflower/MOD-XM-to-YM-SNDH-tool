@@ -16,6 +16,8 @@
 import type { Module, Sample } from '../core/types';
 import { replay, FPS, type ChanState, type RowLog } from '../core/replay';
 import { analyseSample, fold, ended, type SampleInfo } from '../core/samples';
+import { DigiExtractor } from '../core/digi';
+import { drumFrames } from '../core/drums';
 import { classifyDrum, drumMacro, pyRound, TONE_HZ, type DrumKind, type InstMap, type MacroStep } from '../core/convert';
 import { amigaPeriodOf, PT_NOTE_BASE } from '../core/pitch';
 import {
@@ -37,6 +39,10 @@ export interface SongConvertOptions {
   arpMinVol?: number;
   /** merge identical patterns (default true) */
   dedupe?: boolean;
+  /** percussion-like instruments become digidrum samples on a fourth (drum) channel */
+  digiDrums?: boolean;
+  digiRate?: number;
+  digiMaxMs?: number;
 }
 
 export interface SongConvertResult {
@@ -129,6 +135,44 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
 
   const modeOf = (inst: number): InstMap | undefined => options.inst?.[inst];
   const isMuted = (inst: number) => modeOf(inst)?.mode === 'mute';
+  /** this source sample is played as a digidrum (not as tone / drum macro) */
+  const isDigi = (st: ChanState): boolean => {
+    const mp = modeOf(st.inst);
+    const mode = mp?.mode ?? 'auto';
+    if (mode === 'digi') return true;
+    if (!options.digiDrums) return false;
+    const inf = info.get(`${st.inst}:${st.ksmp}`);
+    if (!inf || inf.cls === 'empty') return false;
+    return !(mode === 'mute' || mode === 'macro' || mode === 'tone' || mode === 'kick' || mode === 'snare' || mode === 'hat') && inf.cls !== 'tonal';
+  };
+
+  // ---------- digidrum hits: which frame starts which sample, and how long voice C belongs to it
+  const digi = new DigiExtractor(m, { rateHz: options.digiRate, maxMs: options.digiMaxMs });
+  const rowOfFrame = new Int32Array(frames.length).fill(-1);
+  rows.forEach((r, ri) => { for (let k = 0; k < r.len; k++) if (r.frame + k < frames.length) rowOfFrame[r.frame + k] = ri; });
+  const hitAt = new Map<number, { idx: number; cls: number; ch: number }>();
+  if (options.digiDrums || Object.values(options.inst ?? {}).some((x) => x.mode === 'digi')) {
+    for (let f = 0; f < frames.length; f++) {
+      frames[f].forEach((st, c) => {
+        if (!st || st.age !== 0 || (f > 0 && frames[f - 1].includes(st)) || st.vol <= 0 || isMuted(st.inst) || !isDigi(st)) return;
+        const h = digi.hit(st);
+        if (!h) return;
+        const p = hitAt.get(f);
+        if (!p || h.cls < p.cls) hitAt.set(f, { ...h, ch: c });
+      });
+    }
+  }
+  const hitFrames = [...hitAt.keys()].sort((a, b) => a - b);
+  const busyFrame = new Uint8Array(frames.length);
+  hitFrames.forEach((f, k) => {
+    const end = Math.min(frames.length, hitFrames[k + 1] ?? frames.length, f + drumFrames(digi.list[hitAt.get(f)!.idx]));
+    for (let g = f; g < end; g++) busyFrame[g] = 1;
+  });
+  // a row gives up voice C when the drum covers at least half of it
+  const busyRow = new Uint8Array(rows.length);
+  rows.forEach((r, ri) => { let n = 0; for (let k = 0; k < r.len; k++) n += busyFrame[r.frame + k] ?? 0; busyRow[ri] = n * 2 >= r.len && n > 0 ? 1 : 0; });
+  const drumCells: Cell[] = rows.map(() => emptyCell());
+  let drumHitsWritten = 0, drumHitsLost = 0;
 
   // ---------- loudness reference (97th percentile of tonal playback levels, like the frame converter)
   const rmsOf = (st: ChanState): number | null => {
@@ -145,8 +189,8 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
     if (!inf || inf.cls === 'empty') return false;
     const mp = modeOf(st.inst);
     if (mp?.mode === 'mute' || mp?.mode === 'macro') return false;
-    if (mp?.mode === 'kick' || mp?.mode === 'snare' || mp?.mode === 'hat') return false;
-    return mp?.mode === 'tone' || inf.cls === 'tonal';
+    if (mp?.mode === 'kick' || mp?.mode === 'snare' || mp?.mode === 'hat' || mp?.mode === 'digi') return false;
+    return mp?.mode === 'tone' || (inf.cls === 'tonal' && !isDigi(st));
   };
   const tl: number[] = [];
   for (const fr of frames) for (const st of fr) {
@@ -201,6 +245,7 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
     if (cached) return cached;
     const inf = info.get(key);
     if (!inf || inf.cls === 'empty') return null;
+    if (isDigi(st)) return null;
     const mp = modeOf(st.inst);
     const mode = mp?.mode ?? 'auto';
     const trans = Math.round(mp?.transpose ?? 0);
@@ -284,7 +329,7 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
       const st = frames[f][c];
       if (!st) continue;
       if (st.age === 0 && !(f > 0 && frames[f - 1].includes(st)) && !out.trig) out.trig = { off: k, st };
-      if (st.vol <= 0 || isMuted(st.inst)) continue;
+      if (st.vol <= 0 || isMuted(st.inst) || isDigi(st)) continue;
       const inf = info.get(`${st.inst}:${st.ksmp}`);
       if (!inf || inf.cls === 'empty') continue;
       const mp = modeOf(st.inst);
@@ -437,20 +482,21 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
     const chosen: number[] = [];
     let noiseTaken = false;
     const overflow: number[] = [];
+    const allowed = busyRow[ri] ? [0, 1] : [0, 1, 2];          // voice C is the digidrum's while it plays
     for (const { c } of cand) {
-      if (chosen.length === 3) { overflow.push(c); continue; }
+      if (chosen.length === allowed.length) { overflow.push(c); continue; }
       if (infos[c].noise) { if (noiseTaken) { overflow.push(c); continue; } noiseTaken = true; }
       chosen.push(c);
     }
 
     // ----- voices: keep owners, hand out free ones
     const ownerVoice = new Map<number, number>();
-    voices.forEach((v, i) => { if (v.owner !== null && chosen.includes(v.owner)) ownerVoice.set(v.owner, i); });
+    voices.forEach((v, i) => { if (v.owner !== null && chosen.includes(v.owner) && allowed.includes(i)) ownerVoice.set(v.owner, i); });
     const used = new Set<number>(ownerVoice.values());
     const needVoice = chosen.filter((c) => !ownerVoice.has(c));
     needVoice.sort((a, b) => Number(!!infos[a].drum) - Number(!!infos[b].drum) || (prio[b] ?? 0) - (prio[a] ?? 0));
     for (const c of needVoice) {
-      const order = infos[c].drum || infos[c].noise ? [2, 1, 0] : [0, 1, 2];
+      const order = (infos[c].drum || infos[c].noise ? [2, 1, 0] : [0, 1, 2]).filter((i) => allowed.includes(i));
       const pick = order.find((i) => !used.has(i) && voices[i].owner === null) ?? order.find((i) => !used.has(i));
       if (pick === undefined) continue;                      // cannot happen (<= 3 chosen)
       if (voices[pick].owner !== null && prevActive[voices[pick].owner!]) steals++;
@@ -558,6 +604,18 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
       }
     }
 
+    // ----- digidrum hits of this row go to the drum column (first one wins, the others cannot share the cell)
+    let wrote = false;
+    for (let k = 0; k < rl.len; k++) {
+      const h = hitAt.get(rl.frame + k);
+      if (!h) continue;
+      if (wrote) { drumHitsLost++; continue; }
+      const dc = drumCells[ri];
+      dc.note = h.idx + 1;
+      if (k > 0 && k < 16) { dc.effect = parseEffectChar('E'); dc.param = 0xd0 | k; }
+      wrote = true; drumHitsWritten++;
+    }
+
     prevActive = infos.map((x) => x.active);
   }
 
@@ -579,6 +637,20 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
     flat[ri][slot].effect = parseEffectChar('F');
     flat[ri][slot].param = pendingSpeed;
     curSpeed = pendingSpeed; pendingSpeed = null;
+  }
+
+  // ---------- digidrum column + the instrument that holds the sample bank
+  const hasDigi = drumHitsWritten > 0;
+  let bankInst = 0;
+  if (hasDigi) {
+    if (instruments.length > 255) { warnings.push('no free instrument slot for the digidrum bank'); }
+    else {
+      const bank = defaultInstrument('Digidrums');
+      bank.digiDrums = digi.list;
+      bankInst = instruments.length;
+      instruments.push(bank);
+      for (let ri = 0; ri < nRows; ri++) { if (drumCells[ri].note) drumCells[ri].instrument = bankInst; flat[ri] = [...flat[ri], drumCells[ri]]; }
+    }
   }
 
   // ---------- chunk into patterns along the played flow, loop target gets its own pattern start
@@ -607,19 +679,25 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
   if (pats.length > 255) warnings.push(`${pats.length} patterns: more than the 255 a .ymt file can order`);
   if (instruments.length > 256) warnings.push(`${instruments.length - 1} instruments: only the first 255 fit a pattern cell`);
 
-  const song = newSong(3);
+  const song = newSong(hasDigi && bankInst ? 4 : 3);
   song.name = (m.title || 'Converted module').slice(0, 32);
-  song.patterns = pats.length ? pats : [emptyPattern(16, 3)];
+  song.patterns = pats.length ? pats : [emptyPattern(16, song.channelCount ?? 3)];
   song.order = order.length ? order : [0];
   song.restartPos = restartPos;
   song.speed = first;
   song.bpm = 125;
   song.instruments = instruments;
   song.channelNames = ['A', 'B', 'C'];
+  if (hasDigi && bankInst) { song.channelNames.push('Drum'); song.drumChannel = 3; }
 
   report.push(`${chunks.length} pattern visits -> ${pats.length} patterns after merging, ${order.length} order entries, ${instruments.length - 1} instruments`);
   const sum = (a: number[]) => a.reduce((p, c) => p + c, 0);
   report.push(`voice rows: ${sum(played)} played, ${sum(foldedRows)} in arpeggios, ${sum(droppedRows)} dropped, ${steals} voice steals, ${noteOffs} key-offs`);
+  if (hasDigi) {
+    const bytes = digi.list.reduce((n, d) => n + d.pcm.length, 0);
+    report.push(`digidrums: ${digi.list.length} sample(s), ${bytes.toLocaleString()} bytes at ~${digi.rateHz} Hz, ${drumHitsWritten} hit(s) on the drum channel${drumHitsLost ? `, ${drumHitsLost} lost (two hits in one row)` : ''}${digi.skipped ? `, ${digi.skipped} skipped (more than 63 variants)` : ''}`);
+    if (digi.skipped) warnings.push(`${digi.skipped} digidrum hit(s) skipped: more than 63 sample variants`);
+  } else if (options.digiDrums) report.push('digidrums: no percussion hits found');
   if (timingSlips) report.push(`${timingSlips} tempo changes had to replace an effect`);
   for (const [k, n] of warnCount) warnings.push(`${k} x${n} not translated`);
   void FX;
