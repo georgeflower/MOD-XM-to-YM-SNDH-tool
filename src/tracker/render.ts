@@ -29,7 +29,7 @@ const MAX_FRAMES = FPS * 60 * 20;
 // YM2149 amplitude table (relative); the tracker's volume column is *linear*, so map back to the nearest step.
 const YM_AMP = [0.0, 0.00465, 0.00686, 0.01007, 0.01471, 0.02153, 0.03154, 0.04616,
   0.06754, 0.09891, 0.14475, 0.21184, 0.31, 0.4536, 0.66355, 0.97087];
-const LINEAR_TO_YM_VOL: Uint8Array = (() => {
+export const LINEAR_TO_YM_VOL: Uint8Array = (() => {
   const t = new Uint8Array(65);
   for (let k = 1; k <= 64; k++) {
     const target = (k / 64) * YM_AMP[15];
@@ -45,7 +45,7 @@ export function freqToYmPeriod(freq: number, clock = 2_000_000): number {
   if (freq <= 0) return 0;
   return Math.max(1, Math.min(4095, Math.round(clock / (16 * freq))));
 }
-const VIB_TABLE = new Int8Array(64);
+export const VIB_TABLE = new Int8Array(64);
 for (let i = 0; i < 64; i++) VIB_TABLE[i] = Math.round(Math.sin((i / 64) * Math.PI * 2) * 64);
 
 const FXN = (l: string) => EFFECT_LETTERS.indexOf(l) + 1;

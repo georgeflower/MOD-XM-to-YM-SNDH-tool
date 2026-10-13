@@ -12,6 +12,7 @@ import { hasFx } from '../core/fx';
 import { renderYm } from '../export/ymemu';
 import { encodeWav } from '../export/wav';
 import { zip } from '../export/zip';
+import { songToMaxymiser, instrumentToMyi } from '../maxymiser/convert';
 import { download } from './download';
 import { NumField, TextField } from './fields';
 import { InstrumentEditor } from './InstrumentEditor';
@@ -268,6 +269,34 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
     game: withRender((r) => download(`${base}_gamekit.zip`, zip(gameKitFiles(base, r.regs, r.nframes, r.loopFrame, r.drums, r.fx)), 'application/zip')),
     wav: withRender((r) => download(`${base}_ym.wav`, encodeWav(renderYm(r.regs, r.nframes, 44100, 50, 4, r.drums, r.fx), 44100), 'audio/wav')),
     regs: withRender((r) => download(`${base}.regs`, r.regs.subarray(0, r.nframes * 14))),
+    mym: () => {
+      try {
+        const m = songToMaxymiser(song);
+        const short = (base.replace(/_/g, '').slice(0, 8) || 'SONG').toUpperCase();
+        const readme = [
+          `${song.name} - exported from the AY pattern editor for maxYMiser (by gwEm).`,
+          '',
+          `${short}.MYS is the song, ${short}.MYV the voice bank with its instruments and sequences.`,
+          'Load both in maxYMiser (voice set and song), or name them DEFAULT.MYS / DEFAULT.MYV to have it load them at start-up.',
+          `${m.stats.orders} song positions, ${m.stats.patterns} patterns, ${m.stats.instruments} instruments, ${m.stats.sequences} sequences.`,
+          '',
+          m.warnings.length ? 'Not carried over exactly:\n' + m.warnings.map((w) => `- ${w}`).join('\n') : 'Everything was carried over.',
+          '',
+          'maxYMiser is (c) Gareth Morris "gwEm"; its licence asks that anything released that was made with it says so.',
+        ].join('\n');
+        download(`${base}_maxymiser.zip`, zip([{ name: `${short}.MYS`, data: m.mys }, { name: `${short}.MYV`, data: m.myv }, { name: 'README.txt', data: readme }]), 'application/zip');
+        if (m.warnings.length) onError(m.warnings.join('; '));
+      } catch (e) { onError(String((e as Error).message ?? e)); }
+    },
+    myi: () => {
+      try {
+        const inst = song.instruments[ed.instrument];
+        if (!inst) throw new Error('no instrument selected');
+        const r = instrumentToMyi(inst, song.speed);
+        download(`${slug(inst.name || `instrument_${toHex2(ed.instrument)}`)}.myi`, r.data);
+        if (r.warnings.length) onError(r.warnings.join('; '));
+      } catch (e) { onError(String((e as Error).message ?? e)); }
+    },
   };
 
   const hintPat = hintAt && song.patterns[hintAt.p];
@@ -398,6 +427,8 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
           <button className="btn primary" onClick={exp.sndh}>SNDH (.sndh)</button>
           <button className="btn" onClick={exp.ym}>YM (.ym)</button>
           <button className="btn" onClick={exp.game}>Game kit (.zip)</button>
+          <button className="btn" onClick={exp.mym} title="song + voice bank for gwEm's maxYMiser tracker">maxYMiser (.mys + .myv)</button>
+          <button className="btn" onClick={exp.myi} title="the selected instrument as a maxYMiser .myi">Instrument (.myi)</button>
           <button className="btn" onClick={exp.wav}>Preview (.wav)</button>
           <button className="btn" onClick={exp.regs}>Registers (.regs)</button>
         </div>

@@ -12,6 +12,7 @@ A browser tool that turns **ProTracker `.MOD`** and **FastTracker II `.XM`** mod
 | **SNDH** (`.sndh`) | Header + a position-independent 68000 player (≈0.8 KB, includes the digidrum and timer-effect engines) + packed register stream (+ digidrum table). Timer C 50 Hz (`TC50`). Verified bit-exact in an emulated 68000 (psgplay) incl. loop wrap-around and digidrum sample values. |
 | **YM** (`.ym`) | `YM5!` uncompressed register dump; `YM6!` with digidrums / timer effects when the song has any (loads in ST-Sound and friends). |
 | **Game kit** (`.zip`) | `<name>.h` (packed stream as a C array, + digidrum table) + `ymplay.h` (small replayer; with digidrums / timer effects also the 68000 engine). The game owns the PSG, so sound effects can steal a voice. |
+| **maxYMiser** (`.mys` + `.myv`, `.myi`) | The song as native files for gwEm's [maxYMiser](https://preromanbritain.com/maxymiser/) tracker (song + voice bank, or one instrument), so a tune can be continued there. See below. |
 | Raw regs / WAV / report | 14 bytes per frame; YM emulator preview; conversion log. |
 
 How the conversion works: the module is replayed tick-accurately (all XM/MOD effects, envelopes, auto-vibrato,
@@ -121,6 +122,27 @@ The YM Tracker's three MFP-timer effects, with its parameter: `xx` = pitch (high
   generated game-kit C code does the same (`tools/verify/gamekit_check.sh`, which includes an effect that starts in the frame of a drum trigger).
   YM6 effect rendering in ST-Sound itself could not be checked here.
 
+## maxYMiser export
+
+*Export → maxYMiser* writes a `.MYS` song and a `.MYV` voice bank (zipped with a short note); *Instrument (.myi)* writes the selected instrument. Both
+use the editor's own file formats (song `MYM0`, voice bank version 0), so maxYMiser 1.29 and later load them, and gwEm's replayer plays them.
+
+* **Timing is 1 : 1.** maxYMiser calls its replayer at 50–200 Hz and one row is `speed` calls: that is this editor's tick, so BPM × 0.4 becomes the
+  replay rate (125 BPM = 50 Hz) and the speed carries over. Below 125 BPM is clamped to 50 Hz (warned). `Fxx` speed changes become `Sxx`.
+* **Instruments become sequences.** ADSR / volume envelope → volume sequence, arpeggio and pitch macros → arpeggio / vibrato sequences, built-in vibrato → vibrato
+  sequence, tone / noise / hardware envelope (buzzer, incl. fixed envelope period) → mixer / noise / fixed-pitch sequences, step-table instruments (the ones made by the module
+  converter) → all of them step by step, a fractional-semitone tuning as a fine detune per note. Sequences hold 31 steps, so longer envelopes run at a slower sequence speed.
+  ADSR / step-table **release** is played as a note re-trigger with a fade instrument (maxYMiser itself cuts on note-off).
+* **Effects that carry over:** `0xy` arpeggio, `1xx` `2xx` slides, `3xx` tone portamento, `4xy` vibrato, `Cxx` / volume column (as attenuation), `Fxx` speed, `Dxx`/`Bxx`/`E6x`
+  (the player's real walk through the song is unrolled into positions, the loop point becomes the repeat position), `Xxx` forced buzzer, `Kxx` key off.
+* **Not exported** (listed as warnings): volume slides, tremolo, global volume, retrigger / note cut / delay, `L M P Y` envelope effects, tempo changes, the digidrum channel
+  and `Z` (use the SNDH / YM export for digidrums), timer effects `Q S U`, instruments beyond 32, second-chip channels.
+* **Verified against the real replayer.** `scripts/maxymiser-check.ts <MYM_REPL.BIN> <song>` wraps the export in an SNDH with gwEm's own replayer
+  (`tools/verify/maxymiser/`) and compares every frame with the editor's render: simple songs are identical, converted modules match except where noted (fractional
+  tuning that varies per step, vibrato phase). The format code also round-trips gwEm's example songs, banks and instruments byte for byte, and the files decode in
+  [go-MaxYMiser](https://github.com/olivierh59500/go-MaxYMiser). The replayer binary and gwEm's files are not part of this repository.
+* maxYMiser is © Gareth Morris "gwEm"; its licence asks that anything released that was made with it says so.
+
 ## Using it
 
 1. Open the page, **Load MOD / XM / SNDH / YM…** (or drop a file anywhere) — or press **Demo**.
@@ -146,6 +168,7 @@ npx tsx scripts/export-cli.ts song.mod out/   # same exporters from the command 
   **frame for frame** (`tools/reference/` holds the Python oracle).
 * `tools/verify/sndh_check.py` — runs an `.sndh` in [psgplay](https://github.com/frno7/psgplay)'s 68000 core and compares
   every YM register write against the `.regs` dump (`scripts/synth-loop.ts` builds a looping test song).
+* `scripts/maxymiser-check.ts` + `tools/verify/maxymiser/` — plays the maxYMiser export through gwEm's real replayer (supply `MYM_REPL.BIN` yourself) and diffs the registers with the editor's render.
 * `tools/verify/gamekit_check.sh` — generates a game kit for a drum test song, compiles `ymplay.h` for the 68000, wraps it in an SNDH and runs it in psgplay.
 * Perceptual check: chroma similarity against libopenmpt renders ≈ 0.95 (XM) / 0.95 (MOD).
 
@@ -155,6 +178,7 @@ npx tsx scripts/export-cli.ts song.mod out/   # same exporters from the command 
 src/core        module loaders, tracker replayer, AY converter, digidrum samples (drums.ts, digi.ts)
 src/export      stream packer, YM5/YM6, SNDH, game kit, C header + replayer, YM emulator (preview), WAV, ZIP
 src/player68k   68000 SNDH player + digidrum / timer-effect engine (player.s, drumeng.s, gamedrum.s → blob.ts)
+src/maxymiser   maxYMiser .MYS/.MYV/.MYI codec and the song -> maxYMiser converter
 src/tracker     pattern song model, renderer (tick player), module -> patterns, editor store, .ymt IO
 src/ui          React UI (FT2-flavoured skin), converter tab, pattern editor tab, A/B audio
 public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of the A/B switch
@@ -164,7 +188,7 @@ public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of th
 
 * Mapper follow-ups: sample → waveform (square duty/buzzer envelope), saving a mapping with the project
 * More than one timer effect or drum at a time (needs a second timer / mixing engine); timer-driven arpeggio and other handler effects that are not drums or Q/S/U
-* Furnace `.fur`, Arkos Tracker `.aks`, Maxymiser `.MYS/.MYV/.MYI` export
+* Furnace `.fur`, Arkos Tracker `.aks` export
+* maxYMiser: digidrums as DMA/Timer-D samples, timer effects as mixer-sequence timers, `.MYS` / `.MYV` import
 
-Note: SNDH files made here play in any SNDH player but cannot be opened *in* Maxymiser (it only loads its own songs) —
-that needs the native Maxymiser export on the roadmap.
+Note: SNDH files made here play in any SNDH player but cannot be opened *in* maxYMiser (it only loads its own songs) — use the maxYMiser export for that.
