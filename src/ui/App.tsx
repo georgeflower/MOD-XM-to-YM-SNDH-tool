@@ -27,8 +27,10 @@ import demoUrl from '../assets/back_in_town_again.mod?inline';
 
 const DEMO = 'back_in_town_again.mod';
 
-interface Opts { gainDb: number; drumBonus: number; sticky: number; arpOrder: 'xy' | 'yx'; arpFill: number; arpMinVol: number; digi: boolean; digiRate: number; digiMaxMs: number; middle: boolean }
-const DEFAULT_OPTS: Opts = { gainDb: 0, drumBonus: 3, sticky: 1.5, arpOrder: 'xy', arpFill: 0, arpMinVol: 3, digi: false, digiRate: 8000, digiMaxMs: 500, middle: false };
+interface Opts { gainDb: number; drumBonus: number; sticky: number; arpOrder: 'xy' | 'yx'; arpFill: number; arpMinVol: number; digi: boolean; digiRate: number; digiMaxMs: number; middle: boolean; waveform: boolean }
+const waveName = (w: string | undefined, on: boolean) =>
+  !on ? 'square' : w === 'saw' || w === 'pulse' ? 'saw buzzer' : w === 'sawup' ? 'saw buzzer ↗' : w === 'smooth' ? 'triangle buzzer' : 'square';
+const DEFAULT_OPTS: Opts = { gainDb: 0, drumBonus: 3, sticky: 1.5, arpOrder: 'xy', arpFill: 0, arpMinVol: 3, digi: false, digiRate: 8000, digiMaxMs: 500, middle: false, waveform: false };
 
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const slug = (s: string) => s.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'song';
@@ -145,7 +147,7 @@ export function App() {
     setBusy('Converting to YM2149 registers…');
     const h = setTimeout(() => {
       try {
-        const r = convert(mod, { gainDb: opts.gainDb, drumBonus: opts.drumBonus, sticky: opts.sticky, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, prio, inst: instMap });
+        const r = convert(mod, { gainDb: opts.gainDb, drumBonus: opts.drumBonus, sticky: opts.sticky, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, waveform: opts.waveform, prio, inst: instMap });
         setRes(r);
         setBusy('Rendering the YM2149 preview…');
         setTimeout(() => {
@@ -192,7 +194,7 @@ export function App() {
   const patchInst = (i: number, patch: Partial<InstMap>) =>
     setInstMap((m) => {
       const next: Record<number, InstMap> = { ...m, [i]: { ...(m[i] ?? { mode: 'auto' }), ...patch } };
-      if (next[i].mode === 'auto' && !next[i].transpose) delete next[i];
+      if (next[i].mode === 'auto' && !next[i].transpose && !next[i].wave) delete next[i];
       return next;
     });
   const setMode = (i: number, mode: InstMode) => {
@@ -213,7 +215,7 @@ export function App() {
     setBusy('Converting to AY patterns…');
     setTimeout(() => {
       try {
-        const r = moduleToSong(mod, { prio, inst: instMap, drumBonus: opts.drumBonus, sticky: opts.sticky, gainDb: opts.gainDb, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle });
+        const r = moduleToSong(mod, { prio, inst: instMap, drumBonus: opts.drumBonus, sticky: opts.sticky, gainDb: opts.gainDb, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, waveform: opts.waveform });
         e.loadSong(r.song, fileName);
         setSongReport([...r.report, ...r.warnings.map((w) => 'warning: ' + w)]);
         setTab('ed');
@@ -362,6 +364,9 @@ export function App() {
                 hint="How strongly kicks/snares/hats win a voice against melody notes" />
               <Slider label="Voice stickiness" value={opts.sticky} min={0} max={4} step={0.25} onChange={(v) => setOpts({ ...opts, sticky: v })}
                 hint="Higher = a note stays on the same YM voice (less jumping, fewer clicks)" />
+              <label className="chk" title="Match the sample's waveform: sawtooth, triangle and sine-like tones become the YM's hardware-envelope buzzer (one voice at a time, bass range, loud notes) instead of a square wave. Square and complex samples stay square tones. Each instrument can be set by hand in the table.">
+                <input type="checkbox" checked={opts.waveform} onChange={(e) => setOpts({ ...opts, waveform: e.target.checked })} /> Sample waveform → buzzer (saw / triangle)
+              </label>
               <label className="chk" title="How AY composers lay out the three voices: bass and the synthetic drums on the middle voice (B), melody and arpeggios on A and C, so the voices sit in different frequency ranges. Digidrums stay on voice C.">
                 <input type="checkbox" checked={opts.middle} onChange={(e) => setOpts({ ...opts, middle: e.target.checked })} /> Bass + drums on the middle voice
               </label>
@@ -438,7 +443,7 @@ export function App() {
             <section className="panel">
               <h2>Instruments → AY role</h2>
               <table>
-                <thead><tr><th>#</th><th>Name</th><th>Detected</th><th>C-4</th><th>AY role</th><th title="semitones">Tr.</th></tr></thead>
+                <thead><tr><th>#</th><th>Name</th><th>Detected</th><th>C-4</th><th>Wave</th><th>AY role</th><th title="semitones">Tr.</th></tr></thead>
                 <tbody>
                   {instRows.map((r) => {
                     const cur = instMap[r.inst];
@@ -449,6 +454,18 @@ export function App() {
                         <td className="name">{r.name || '—'}</td>
                         <td>{r.cls}</td>
                         <td>{r.c4Hz ? `${r.c4Hz.toFixed(0)} Hz` : ''}</td>
+                        <td>
+                          {r.cls === 'tonal' && mode !== 'macro' && mode !== 'mute' && mode !== 'digi' && mode !== 'kick' && mode !== 'snare' && mode !== 'hat' ? (
+                            <select value={cur?.wave ?? ''} title="Waveform of the sample's cycle. A sawtooth / triangle / sine-like tone can be played as the YM's hardware-envelope buzzer (one voice at a time, loud notes in the bass/low range only)."
+                              onChange={(e) => patchInst(r.inst, { wave: (e.target.value || undefined) as InstMap['wave'] })}>
+                              <option value="">{`auto: ${opts.waveform ? waveName(r.wave, true) : 'square'} (${r.wave ?? '?'})`}</option>
+                              <option value="tone">square tone</option>
+                              <option value="saw">saw buzzer ↘</option>
+                              <option value="sawup">saw buzzer ↗</option>
+                              <option value="smooth">triangle buzzer</option>
+                            </select>
+                          ) : ''}
+                        </td>
                         <td>
                           <select value={mode} onChange={(e) => setMode(r.inst, e.target.value as InstMode)}>
                             <option value="auto">{r.digi ? 'auto: digidrum' : r.drum ? `auto: ${r.drum}` : 'auto: tone'}</option>

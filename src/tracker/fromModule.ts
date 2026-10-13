@@ -18,6 +18,7 @@ import { replay, FPS, type ChanState, type RowLog } from '../core/replay';
 import { analyseSample, fold, ended, type SampleInfo } from '../core/samples';
 import { DigiExtractor } from '../core/digi';
 import { drumFrames } from '../core/drums';
+import { analyseWave, waveOfClass, BUZZ_SHAPE, buzzable, type WaveChoice } from '../core/waveform';
 import { classifyDrum, drumMacro, pyRound, TONE_HZ, type DrumKind, type InstMap, type MacroStep } from '../core/convert';
 import { amigaPeriodOf, PT_NOTE_BASE } from '../core/pitch';
 import {
@@ -47,6 +48,8 @@ export interface SongConvertOptions {
   middleLayout?: boolean;
   /** notes below this frequency count as bass for the middle layout, Hz (default 200) */
   bassHz?: number;
+  /** sawtooth / triangle / sine-like sustained samples become hardware-envelope buzzer instruments where the pitch allows (see core/waveform) */
+  waveform?: boolean;
 }
 
 export interface SongConvertResult {
@@ -75,6 +78,7 @@ interface Plan {
   kOct: number;                  // semitones added to the written note (whole octaves for tonal samples)
   fixedNote?: number;            // drums: the note that selects the pitch / is irrelevant for noise
   sustained: boolean;            // loops until key-off
+  buzz?: boolean;                // hardware-envelope instrument: the note keeps its low octave
 }
 
 interface Voice {
@@ -292,6 +296,21 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
       while (steps.length > 1 && steps[steps.length - 1].vol === 0 && looped) steps.pop();
       ins = mkSeq(steps, looped ? steps.length - 1 : -1, 3);
       plan = { ay: instruments.length, kind: 'tone', kOct, sustained: looped };
+      // waveform -> buzzer: a saw / triangle / sine-like sample becomes the hardware envelope at the note's pitch.
+      // The buzzer has no volume, so it is used for sustained samples (or when asked for) whose typical note is in range.
+      const choice: WaveChoice | undefined = mp?.wave ?? (options.waveform && looped ? waveOfClass(analyseWave(s, inf.cycle).cls) : undefined);
+      if (choice && choice !== 'tone') {
+        const shape = BUZZ_SHAPE[choice];
+        const nTyp = clamp(nref + kOct, 1, 96);
+        if (buzzable(noteToFreq(nTyp), shape)) {
+          ins.seq!.steps.forEach((x) => { x.tone = false; });
+          ins.seq!.release = 0;
+          ins.toneEnabled = false;
+          ins.useHardEnv = true; ins.hardEnvShape = shape; ins.hardEnvAutoPeriod = true; ins.hardEnvDivisor = 1; ins.syncBuzz = false;
+          if (shape === 10) plan.kOct += 12;                         // a triangle envelope cycle is two ramps: the written note is an octave up
+          plan.buzz = true;
+        } else report.push(`  ${nameOf(st.inst, st.ksmp)}: ${choice} waveform is out of the buzzer's range (typical note too high), played as a square wave`);
+      }
     } else {
       const d = drumOf(st, forcedDrum);
       const lv = d.kind === 'kick' ? [1.0, 0.8, 0.55, 0.3] : d.kind === 'hat' ? [0.9, 0.5] : [1.0, 0.85, 0.6, 0.3];
@@ -379,7 +398,7 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
     let n = plan.fixedNote ?? srcNote + plan.kOct;
     n = clamp(n, 1, 96);
     // keep the YM period in range (30 Hz .. ) by moving whole octaves
-    while (n < 85 && 2_000_000 / (16 * noteToFreq(n)) > 4095) n += 12;
+    while (!plan.buzz && n < 85 && 2_000_000 / (16 * noteToFreq(n)) > 4095) n += 12;
     return clamp(n, 1, 96);
   };
 

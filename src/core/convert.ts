@@ -7,6 +7,7 @@ import { replay, FPS, type ChanState } from './replay';
 import { analyseSample, fold, ended, type SampleInfo } from './samples';
 import { powerSpectrum } from './fft';
 import { DigiExtractor } from './digi';
+import { analyseWave, waveOfClass, BUZZ_SHAPE, BUZZ_MIN_LEVEL, buzzPeriod, buzzable, type WaveChoice, type WaveClass, type WaveInfo } from './waveform';
 import { type DrumTrack, MAX_DRUMS, drumFrames, prepareDrum, silenceDrumVoices, trigCode } from './drums';
 
 export const YM_CLOCK = 2_000_000;
@@ -43,7 +44,11 @@ export interface Macro {
  *  macro  - the per-tick sequence in `macro`
  */
 export type InstMode = 'auto' | 'mute' | 'tone' | DrumKind | 'macro' | 'digi';
-export interface InstMap { mode: InstMode; macro?: Macro; /** semitones */ transpose?: number }
+export interface InstMap {
+  mode: InstMode; macro?: Macro; /** semitones */ transpose?: number;
+  /** waveform of a tonal instrument: 'tone' = square wave, saw / sawup / smooth = hardware-envelope buzzer; unset = detect (when ConvertOptions.waveform is on) */
+  wave?: WaveChoice;
+}
 
 export interface ConvertOptions {
   /** extra allocation priority per 0-based source channel */
@@ -78,6 +83,14 @@ export interface ConvertOptions {
   middleLayout?: boolean;
   /** notes below this frequency count as bass for the middle layout, Hz (default 200) */
   bassHz?: number;
+  /**
+   * map the sample's waveform to the closest AY sound: sawtooth / triangle / sine-like tonal instruments become the
+   * hardware-envelope buzzer where it can hit the pitch (see core/waveform). Off: every tonal sample is a square wave.
+   * An instrument's own `wave` setting always applies.
+   */
+  waveform?: boolean;
+  /** AY level a note needs to be played as a buzzer instead of a square wave (the buzzer has no volume), default 12 */
+  buzzMinLevel?: number;
 }
 
 const DEFAULTS = { drumBonus: 3.0, drumGain: 1.0, gainDb: 0.0, sticky: 1.5, refPercentile: 97.0 };
@@ -108,6 +121,10 @@ interface Cand {
   drum?: DrumKind;
   /** macro notes: AY volume decided already (before gain) */
   fixedVol?: number;
+  /** hardware-envelope shape this tonal note would like to be played with (buzzer), 0 = square tone */
+  buzz?: number;
+  /** frames since the note started */
+  age?: number;
 }
 const A4_TO_C4 = 261.6255653;
 const noteHz = (note: number) => A4_TO_C4 * Math.pow(2, (note - 49) / 12);
@@ -157,6 +174,10 @@ export interface InstrumentReport {
   /** played as a digidrum sample */
   digi?: boolean;
   mode?: InstMode;
+  /** detected waveform of a tonal sample */
+  wave?: WaveClass;
+  /** played (at least partly) as a hardware-envelope buzzer */
+  buzz?: boolean;
 }
 
 export interface ConvertResult {
@@ -189,13 +210,20 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
 
   // ---- instrument analysis
   const info = new Map<string, SampleInfo>();
+  const waves = new Map<string, WaveInfo>();
   const instReports: InstrumentReport[] = [];
   m.instruments.forEach((ins, i) => {
     if (!ins) return;
-    ins.samples.forEach((s, k) => info.set(`${i}:${k}`, analyseSample(s, k === 0 ? options.cycle?.[i] : undefined)));
+    ins.samples.forEach((s, k) => {
+      const a = analyseSample(s, k === 0 ? options.cycle?.[i] : undefined);
+      info.set(`${i}:${k}`, a);
+      if (a.cls === 'tonal') waves.set(`${i}:${k}`, analyseWave(s, a.cycle));
+    });
     const a = info.get(`${i}:0`);
     if (a && a.cls !== 'empty') {
       const r: InstrumentReport = { inst: i, name: ins.name, cls: a.cls };
+      const wv = waves.get(`${i}:0`);
+      if (wv) r.wave = wv.cls;
       if (a.cls === 'tonal' && a.cycle) {
         const s = ins.samples[0];
         const rate = m.amiga ? 3546894.6 / (428 * Math.pow(2, -(s.modFine ?? 0) / 96)) : 8363 * Math.pow(2, (s.rel * 128 + s.fine) / (12 * 128));
@@ -271,7 +299,8 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
         for (let i = 0; i < w.length; i++) sum += w[i] * w[i];
         const rms = Math.sqrt(sum / w.length);
         const hz = mode === 'tone' ? noteHz(st.note) * bend * trans : (st.rate / inf.cycle!) * trans;
-        lst.push({ ch: ci, kind: 'tone', per: TONE_HZ / hz, np: null, lvl: rms * st.vol, inst: st.inst });
+        const choice: WaveChoice | undefined = mp?.wave ?? (options.waveform ? waveOfClass(waves.get(`${st.inst}:${st.ksmp}`)?.cls ?? 'complex') : undefined);
+        lst.push({ ch: ci, kind: 'tone', per: TONE_HZ / hz, np: null, lvl: rms * st.vol, inst: st.inst, buzz: choice ? BUZZ_SHAPE[choice] : 0, age: st.age });
       } else {
         const key = `${st.inst}:${st.ksmp}`;
         let bc = drumCache.get(key);
@@ -402,8 +431,35 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
   let prevNp = 8;
   let prevMix = [0, 0, 0];
   let octShift = 0;
+  // buzzer (hardware envelope as a sawtooth / triangle voice): one voice at a time, loud notes in range only
+  const buzzMin = options.buzzMinLevel ?? BUZZ_MIN_LEVEL;
+  let prevBuzz: { voice: number; ch: number; shape: number } | null = null;
+  let buzzFrames = 0;
+  const buzzInst = new Set<number>();
   for (let f = 0; f < nf; f++) {
     const vols = [0, 0, 0];
+    // pick the buzzer voice of this frame
+    let bz: { voice: number; shape: number; period: number; retrig: boolean } | null = null;
+    {
+      let best = -1, bestV = -1;
+      alloc[f].forEach((it0, i) => {
+        if (!it0 || it0.arp) return;
+        const { v, c } = it0;
+        if (!c.buzz || c.kind !== 'tone' || c.np != null || v < buzzMin || !buzzable(TONE_HZ / c.per!, c.buzz)) return;
+        const own = prevBuzz && prevBuzz.voice === i && prevBuzz.ch === c.ch ? 100 : 0;
+        if (v + own > bestV) { bestV = v + own; best = i; }
+      });
+      if (best >= 0) {
+        const c = alloc[f][best]!.c;
+        const period = Math.max(1, Math.min(65535, pyRound(buzzPeriod(TONE_HZ / c.per!, c.buzz!))));
+        const pb = prevBuzz as { voice: number; ch: number; shape: number } | null;
+        const same: boolean = !!pb && pb.voice === best && pb.ch === c.ch && pb.shape === c.buzz;
+        bz = { voice: best, shape: c.buzz!, period, retrig: !same || c.age === 0 || f === 0 || f === loopFrame };
+        buzzInst.add(c.inst);
+        buzzFrames++;
+      }
+      prevBuzz = bz ? { voice: bz.voice, ch: alloc[f][bz.voice]!.c.ch, shape: bz.shape } : null;
+    }
     const mixbits = [...prevMix];
     let npv = prevNp;
     alloc[f].forEach((it0, i) => {
@@ -411,6 +467,7 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
       const it = it0.arp ? [it0, ...it0.arp][f % (1 + it0.arp.length)] : it0;
       const { v, c } = it;
       vols[i] = v;
+      if (bz && bz.voice === i) { vols[i] = 0x10; mixbits[i] = 0; return; }
       if (c.kind === 'tone') {
         let per = c.per!;
         while (per > 4095) { per /= 2.0; octShift++; }
@@ -435,8 +492,16 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
     for (let i = 0; i < 3; i++) { regs[b + 2 * i] = prevPer[i] & 0xff; regs[b + 2 * i + 1] = prevPer[i] >> 8; }
     regs[b + 6] = prevNp; regs[b + 7] = mix;
     regs[b + 8] = vols[0]; regs[b + 9] = vols[1]; regs[b + 10] = vols[2];
+    if (bz) { regs[b + 11] = bz.period & 255; regs[b + 12] = bz.period >> 8; }
+    else if (f > 0) { regs[b + 11] = regs[b - NREGS + 11]; regs[b + 12] = regs[b - NREGS + 12]; }
+    regs[b + 13] = bz && bz.retrig ? bz.shape : 0xff;       // 0xff = envelope shape not written (a write restarts the envelope)
   }
+  if (!buzzFrames) for (let f = 0; f < nf; f++) regs[f * NREGS + 13] = 0;
 
+  if (buzzFrames) {
+    log(`buzzer: ${buzzFrames} frame(s) played as a hardware-envelope sawtooth / triangle voice`);
+    for (const r of instReports) if (buzzInst.has(r.inst)) r.buzz = true;
+  }
   log(`loudness reference (tonal p${o.refPercentile}) = ${ref.toFixed(3)} -> AY volume 15`);
   log(arpMax > 1 ? 'channel   voice-frames   in-arpeggio   dropped' : 'channel   voice-frames   dropped');
   for (let c = 0; c < m.nch; c++) {

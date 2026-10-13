@@ -31,6 +31,13 @@ voice (stickiness avoids voice jumping, one noise generator is shared, volumes m
 * **Arp fill**: a module has more channels than the YM has voices. With fill on, notes that would be dropped are folded
   into a 2- or 3-note arpeggio on the voice with the closest pitch (alternating every frame). The strip under the roll
   shows dropped notes (red) and arpeggio notes (cyan); the channel table lists the shares.
+* **Sample waveform → buzzer** (option, off by default; per-instrument override in the table): the cycle of each tonal sample is analysed (spectrum
+  against square, pulse, sawtooth and triangle/sine templates) and, when it is a sawtooth, a thin pulse or a triangle/sine, played as the YM's *buzzer* — the hardware envelope run
+  at the note's pitch, shape 8 / 12 (saw, falling / rising) or 10 (triangle) with the tone generator off — instead of a square wave. The YM has no pulse-width control, so a thin pulse
+  becomes the saw (the closest bright wave); squares and anything the templates don't fit stay square tones. The envelope generator is shared and can't be scaled in level, so the
+  buzzer is used for one voice at a time, for notes loud enough (AY level ≥ 12, else a square at the right level) and only where the envelope period hits the pitch (envelope period
+  ≥ 32: up to about 240 Hz for a saw, 120 Hz for a triangle — i.e. bass). In the pattern editor it makes buzzer step-table instruments (hardware envelope, tone off) for sustained samples
+  whose typical note is in range; a triangle is written an octave up there because its envelope cycle is two ramps. Works in every export (the envelope registers are in the stream).
 * **Bass + drums on the middle voice** (option, off by default): the layout AY composers use. A source channel whose notes sit
   below 200 Hz (median) is the bass; it and the synthetic drums prefer voice B, melody and arpeggios voices A and C, so the three
   voices live in different frequency ranges. A melody note on B makes room when a bass or drum needs it and an outer voice is
@@ -248,7 +255,7 @@ public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of th
 
 ## Roadmap
 
-* Mapper follow-ups: sample → waveform (square duty/buzzer envelope), saving a mapping with the project
+* Mapper follow-ups: saving a mapping with the project
 * More than one timer effect or drum at a time (needs a second timer / mixing engine); timer-driven arpeggio and other handler effects that are not drums or Q/S/U
 * Furnace `.fur` export
 * maxYMiser: the STe DMA track (sampled sound), sequence-switching effects, more than one timer effect on the voices at once
