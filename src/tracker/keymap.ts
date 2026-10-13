@@ -24,3 +24,9 @@ export function keyToHex(code: string): number | null {
   if (/^Key[A-F]$/.test(code)) return code.charCodeAt(3) - 55;
   return null;
 }
+
+/** drum channel: the same keys pick digidrum 1..27 of the instrument's bank (the octave does not matter) */
+export function keyToDrum(code: string): number | null {
+  const semi = code in LOW ? LOW[code] : code in HIGH ? HIGH[code] + 12 : -1;
+  return semi < 0 ? null : semi + 1;
+}

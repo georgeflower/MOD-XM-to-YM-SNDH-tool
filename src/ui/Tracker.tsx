@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { Editor, Scope } from '../tracker/editor';
-import { type Cell, VOICES, NOTE_OFF, noteName, effectChar, toHex2, parseEffectChar } from '../tracker/types';
-import { keyToNote, keyToHex } from '../tracker/keymap';
+import { type Cell, NOTE_OFF, noteName, effectChar, toHex2, parseEffectChar } from '../tracker/types';
+import { keyToNote, keyToHex, keyToDrum } from '../tracker/keymap';
 import { cellHint } from '../tracker/hints';
 import { encodeYmt, decodeYmt, isYmt } from '../tracker/ymt';
 import { writeSndh } from '../export/sndh';
@@ -14,6 +14,7 @@ import { zip } from '../export/zip';
 import { download } from './download';
 import { NumField, TextField } from './fields';
 import { InstrumentEditor } from './InstrumentEditor';
+import { DrumEditor } from './DrumEditor';
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'song';
 
@@ -68,6 +69,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
   const [hintAt, setHintAt] = useState<{ p: number; r: number; c: number } | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [instOpen, setInstOpen] = useState(false);
+  const [drumOpen, setDrumOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ row: number; channel: number } | null>(null);
@@ -174,7 +176,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
       // note keys always audition; they are written when editing on the note column
       if (!(ed.editing && ed.column !== 0)) {
         if (e.code === 'Digit1' && ed.editing && ed.column === 0) { e.preventDefault(); ed.insertNote(NOTE_OFF); return; }   // FT2: 1 = key off
-        const n = keyToNote(e.code, ed.octave);
+        const n = ed.isDrumColumn(ed.channel) ? keyToDrum(e.code) : keyToNote(e.code, ed.octave);
         if (n !== null) {
           e.preventDefault();
           if (e.repeat) return;
@@ -269,6 +271,13 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
 
   const hintPat = hintAt && song.patterns[hintAt.p];
   const hint = hintPat && hintAt ? cellHint(hintPat, hintAt.r, hintAt.c, song.speed) : cellHint(pat, ed.row, ed.channel, song.speed);
+  let drumHint = '';
+  if (ed.isDrumColumn(ed.channel)) {
+    const cell = pat.cells[ed.row]?.[ed.channel];
+    const bank = song.instruments[(cell?.instrument || ed.instrument)]?.digiDrums ?? [];
+    if (cell && cell.note > 0 && cell.note < NOTE_OFF) drumHint = bank.length ? `Drum ${(cell.note - 1) % bank.length + 1} of ${bank.length}: ${bank[(cell.note - 1) % bank.length].name}` : 'This instrument has no digidrums – open "Drums…" in the instrument panel.';
+    else drumHint = 'Drum channel: keys Z S X D C V … pick drum 1, 2, 3 … of the instrument; the instrument column switches the drum bank; === stops the drum.';
+  }
   const sel = ed.sel;
   const usage = ed.usage();
   const anySolo = ed.soloed.some(Boolean);
@@ -300,6 +309,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
           <label title="F1-F8">Octave <button className="btn tiny" onClick={() => ed.setOctave(ed.octave - 1)}>−</button><span className="val">{ed.octave}</span><button className="btn tiny" onClick={() => ed.setOctave(ed.octave + 1)}>+</button></label>
           <label title="Rows the cursor moves after a note is entered (` or § key)">Add <button className="btn tiny" onClick={() => ed.cycleStep(-1)}>−</button><span className="val">{ed.step}</span><button className="btn tiny" onClick={() => ed.cycleStep(1)}>+</button></label>
           <label title="Instrument used for the notes you type">Instrument <button className="btn tiny" onClick={() => ed.selectInstrument(ed.instrument - 1)}>−</button><span className="val">{toHex2(ed.instrument)}</span><button className="btn tiny" onClick={() => ed.selectInstrument(ed.instrument + 1)}>+</button></label>
+          <label className="chk" title="Adds a fourth column for digidrums: a note there plays that drum of the instrument on voice C"><input type="checkbox" checked={ed.hasDrumChannel} onChange={(e) => ed.setDrumChannel(e.target.checked)} /> Drum channel</label>
           <button className="btn" onClick={() => setDialog({ kind: 'transpose' })}>Transpose…</button>
           <button className="btn" onClick={() => setDialog({ kind: 'scale', scope: sel ? 'block' : 'pattern' })} title="Ctrl/Alt/Shift+V">Scale volume…</button>
           <span className="time">{ed.playing ? `${toHex2(ed.playOrder)}:${toHex2(ed.playRow)}` : `${secs ? Math.floor(secs / 60) + ':' + String(Math.floor(secs % 60)).padStart(2, '0') : '—'}`}</span>
@@ -333,13 +343,13 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
 
         <section className="panel tk-pat">
           <h2>Pattern {toHex2(ed.patIdx)} <small>position {toHex2(ed.orderPos)} · row {toHex2(ed.row)}/{toHex2(pat.rows - 1)}</small>{ed.editing && <span className="recdot">EDIT</span>}</h2>
-          <div className="phead">
+          <div className="phead" style={{ ["--nch" as string]: ed.nch }}>
             <div className="rn">Row</div>
-            {Array.from({ length: VOICES }, (_, c) => {
+            {Array.from({ length: ed.nch }, (_, c) => {
               const silenced = anySolo ? !ed.soloed[c] : ed.muted[c];
               return (
                 <div key={c} className={`ph${silenced ? ' dim' : ''}`}>
-                  <span>{CH_NAME[c]}</span>
+                  <span>{ed.isDrumColumn(c) ? 'Drum' : CH_NAME[c]}</span>
                   <button className={`ms${ed.muted[c] ? ' on' : ''}`} title="Mute" onClick={(e) => { ed.toggleMute(c); e.currentTarget.blur(); }}>M</button>
                   <button className={`ms${ed.soloed[c] ? ' on solo' : ''}`} title="Solo" onClick={(e) => { ed.toggleSolo(c); e.currentTarget.blur(); }}>S</button>
                 </div>
@@ -347,7 +357,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
             })}
           </div>
           <div className="pscroll" ref={scrollRef} onWheel={onWheel}>
-            <div className="pgrid" ref={gridRef} onMouseDown={onDown} onMouseMove={onMove}>
+            <div className="pgrid" style={{ ["--nch" as string]: ed.nch }} ref={gridRef} onMouseDown={onDown} onMouseMove={onMove}>
               {pat.cells.map((cells, r) => (
                 <Row key={r} r={r} cells={cells} cur={r === ed.row ? ed.channel : -1} col={ed.column} editing={ed.editing}
                   s1={sel && r >= sel.r1 && r <= sel.r2 ? sel.c1 : -1} s2={sel && r >= sel.r1 && r <= sel.r2 ? sel.c2 : -2}
@@ -355,7 +365,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
               ))}
             </div>
           </div>
-          <div className="statusline" aria-live="polite">{msg || hint || (ed.editing ? 'Editing: type notes with the keyboard (Z S X D C V … lower row, Q 2 W 3 E … upper row).' : 'Not editing – keys only audition. Press Space or "Edit" to record notes into the pattern.')}</div>
+          <div className="statusline" aria-live="polite">{msg || drumHint || hint || (ed.editing ? 'Editing: type notes with the keyboard (Z S X D C V … lower row, Q 2 W 3 E … upper row).' : 'Not editing – keys only audition. Press Space or "Edit" to record notes into the pattern.')}</div>
         </section>
 
         <section className="panel tk-inst">
@@ -371,6 +381,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
           </div>
           <div className="btns">
             <button className="btn small" onClick={() => setInstOpen((v) => !v)}>{instOpen ? 'Hide editor' : 'Edit…'}</button>
+            <button className="btn small" onClick={() => setDrumOpen((v) => !v)} title="Digidrum samples of this instrument">{drumOpen ? 'Hide drums' : 'Drums…'}</button>
             <button className="btn small" onClick={() => ed.addInstrument(song.instruments[ed.instrument])} title="Copy the selected instrument">Duplicate</button>
             <button className="btn small" onClick={() => ed.addInstrument()}>New</button>
           </div>
@@ -378,6 +389,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
       </div>
 
       {instOpen && <InstrumentEditor ed={ed} idx={ed.instrument} onClose={() => setInstOpen(false)} />}
+      {drumOpen && <DrumEditor ed={ed} idx={ed.instrument} onClose={() => setDrumOpen(false)} />}
 
       <section className="panel">
         <h2>Export <small>{secs ? `${secs.toFixed(1)} s · ${Math.round(secs * 50)} frames` : ''}</small></h2>

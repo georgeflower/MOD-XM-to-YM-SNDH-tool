@@ -125,7 +125,7 @@ tr.loopmark td { background: #14203a; }
 .btns + .plen { margin-top: 8px; }
 
 .tk-pat { width: max-content; max-width: 100%; }
-.phead, .pr { display: grid; grid-template-columns: 4ch repeat(3, 15ch); white-space: pre; }
+.phead, .pr { display: grid; grid-template-columns: 4ch repeat(var(--nch, 3), 15ch); white-space: pre; }
 .phead { background: #14183a; color: var(--ink-dim); }
 .phead .rn { text-align: right; padding-right: 1ch; }
 .ph { display: flex; justify-content: center; gap: 6px; align-items: center; border-left: 1px solid #2b3150; }
@@ -168,3 +168,18 @@ tr.loopmark td { background: #14203a; }
 .stepbars i { flex: 1; min-width: 2px; background: var(--accent); min-height: 1px; }
 .stepbars i.loop { outline: 1px solid var(--good); }
 .panel h2 .right { margin-left: 8px; }
+
+/* digidrum editor */
+.drumed .close { float: right; }
+.dcols { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(300px, 1.4fr); gap: 12px; }
+@media (max-width: 760px) { .dcols { grid-template-columns: 1fr; } }
+.dlist { max-height: 260px; overflow: auto; border: 1px solid #2b3150; border-radius: 6px; background: #0d1030; }
+.dempty { padding: 10px; color: var(--ink-dim); }
+.drow { color: #dfe4ff; display: flex; gap: 8px; align-items: center; padding: 3px 8px; cursor: pointer; font-family: var(--mono, monospace); }
+.drow.on { background: rgba(120, 150, 255, .25); }
+.drow .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drow .us { color: #9aa4d6; font-size: 12px; }
+.drow .oi { color: #ffe08a; }
+.dset { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 8px 0; }
+.dset small { color: var(--ink-dim); margin-left: 4px; }
+.dwave { width: 100%; max-width: 520px; height: 90px; border-radius: 4px; display: block; }

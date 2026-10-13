@@ -7,11 +7,11 @@
  */
 import {
   type Song, type Cell, type Instrument, type Pattern,
-  emptyCell, emptyPattern, defaultInstrument, newSong, NOTE_OFF, VOICES, noteToFreq,
+  emptyCell, emptyPattern, defaultInstrument, newSong, NOTE_OFF, noteToFreq, channelsOf, drumChannelOf, defaultChannelNames,
 } from './types';
 import { renderSong, type RenderResult, type RowMark } from './render';
 import { renderYm } from '../export/ymemu';
-import type { DrumTrack } from '../core/drums';
+import { type DrumTrack, type DrumSample, drumToAudio } from '../core/drums';
 
 export type Column = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;      // note, inst hi/lo, vol hi/lo, fx letter, param hi/lo
 export interface Sel { r1: number; c1: number; r2: number; c2: number }
@@ -47,8 +47,8 @@ export class Editor {
   step = 1;
   anchor: { row: number; channel: number } | null = null;
   sel: Sel | null = null;
-  muted = [false, false, false];
-  soloed = [false, false, false];
+  muted: boolean[] = Array(16).fill(false);
+  soloed: boolean[] = Array(16).fill(false);
   playing = false;
   playMode: 'song' | 'pattern' = 'song';
   playOrder = 0;
@@ -82,6 +82,25 @@ export class Editor {
   get canUndo() { return this.undoStack.length > 0; }
   get canRedo() { return this.redoStack.length > 0; }
   get lastRegs() { return this.lastRender; }
+  /** number of pattern columns (3 voices, +1 when the song has a digidrum channel) */
+  get nch(): number { return channelsOf(this.song); }
+  get hasDrumChannel(): boolean { return drumChannelOf(this.song) >= 0; }
+  /** add / remove the digidrum column (always the last one) */
+  setDrumChannel(on: boolean) {
+    const s = this.song, n = channelsOf(s);
+    if (on === this.hasDrumChannel) return;
+    if (on) {
+      const patterns = s.patterns.map((p) => ({ ...p, cells: p.cells.map((r) => [...r, emptyCell()]) }));
+      this.commit({ ...s, patterns, channelCount: n + 1, drumChannel: n, channelNames: [...(s.channelNames ?? defaultChannelNames(n)).slice(0, n), 'Drum'] });
+    } else {
+      const d = drumChannelOf(s);
+      const patterns = s.patterns.map((p) => ({ ...p, cells: p.cells.map((r) => r.filter((_, i) => i !== d)) }));
+      this.commit({ ...s, patterns, channelCount: n - 1, drumChannel: -1, channelNames: (s.channelNames ?? defaultChannelNames(n)).filter((_, i) => i !== d) });
+    }
+    if (this.channel >= this.nch) this.channel = this.nch - 1;
+    this.sel = null; this.anchor = null;
+    this.emit();
+  }
 
   // ---------- song replacement / history
   private commit(next: Song, opts: { audio?: boolean } = {}) {
@@ -144,7 +163,7 @@ export class Editor {
   // ---------- cursor
   setCursor(row: number, channel?: number, column?: Column) {
     this.row = Math.max(0, Math.min(this.rows - 1, row));
-    if (channel !== undefined) this.channel = Math.max(0, Math.min(VOICES - 1, channel));
+    if (channel !== undefined) this.channel = Math.max(0, Math.min(this.nch - 1, channel));
     if (column !== undefined) this.column = column;
     this.emit();
   }
@@ -153,8 +172,8 @@ export class Editor {
     if (r < 0) r = this.rows - 1;
     if (r >= this.rows) r = 0;
     let c = this.channel + dc;
-    if (c < 0) c = VOICES - 1;
-    if (c >= VOICES) c = 0;
+    if (c < 0) c = this.nch - 1;
+    if (c >= this.nch) c = 0;
     this.row = r; this.channel = c;
     this.emit();
   }
@@ -162,12 +181,12 @@ export class Editor {
     let col = this.column + d, ch = this.channel;
     while (col < 0) { col += 8; ch--; }
     while (col > 7) { col -= 8; ch++; }
-    if (ch < 0) ch = VOICES - 1;
-    if (ch >= VOICES) ch = 0;
+    if (ch < 0) ch = this.nch - 1;
+    if (ch >= this.nch) ch = 0;
     this.column = col as Column; this.channel = ch;
     this.emit();
   }
-  nextChannel(d: number) { this.channel = (this.channel + d + VOICES) % VOICES; this.column = 0; this.emit(); }
+  nextChannel(d: number) { this.channel = (this.channel + d + this.nch) % this.nch; this.column = 0; this.emit(); }
   setOrderPos(n: number) {
     this.orderPos = Math.max(0, Math.min(this.song.order.length - 1, n));
     this.row = 0; this.sel = null; this.anchor = null;
@@ -184,7 +203,7 @@ export class Editor {
   extendSelection(dr: number, dc: number) {
     const a = this.anchor ?? { row: this.row, channel: this.channel };
     const row = Math.max(0, Math.min(this.rows - 1, this.row + dr));
-    const ch = Math.max(0, Math.min(VOICES - 1, this.channel + dc));
+    const ch = Math.max(0, Math.min(this.nch - 1, this.channel + dc));
     this.anchor = a;
     this.sel = { r1: Math.min(a.row, row), r2: Math.max(a.row, row), c1: Math.min(a.channel, ch), c2: Math.max(a.channel, ch) };
     this.row = row; this.channel = ch;
@@ -316,7 +335,7 @@ export class Editor {
     this.mutate(this.patIdx, (w) => {
       for (let r = 0; r < clip.cells.length; r++) {
         if (r0 + r >= this.rows) break;
-        for (let c = 0; c < clip.cells[r].length; c++) { if (c0 + c >= VOICES) break; w(r0 + r)[c0 + c] = cloneCell(clip.cells[r][c]); }
+        for (let c = 0; c < clip.cells[r].length; c++) { if (c0 + c >= this.nch) break; w(r0 + r)[c0 + c] = cloneCell(clip.cells[r][c]); }
       }
     });
   }
@@ -338,7 +357,7 @@ export class Editor {
       this.commit({ ...s, patterns });
       return;
     }
-    let r1 = 0, r2 = this.rows - 1, c1 = 0, c2 = VOICES - 1;
+    let r1 = 0, r2 = this.rows - 1, c1 = 0, c2 = this.nch - 1;
     if (scope === 'track') { c1 = c2 = this.channel; }
     else if (scope === 'block') { if (this.sel) ({ r1, r2, c1, c2 } = this.sel); else c1 = c2 = this.channel; }
     this.mutate(this.patIdx, (w) => {
@@ -372,7 +391,7 @@ export class Editor {
     const s = this.song;
     pat = Math.max(0, Math.min(255, pat));
     let patterns = s.patterns;
-    while (pat >= patterns.length) patterns = [...patterns, emptyPattern(patterns[0]?.rows ?? 64, VOICES)];
+    while (pat >= patterns.length) patterns = [...patterns, emptyPattern(patterns[0]?.rows ?? 64, this.nch)];
     const order = s.order.slice(); order[idx] = pat;
     this.commit({ ...s, order, patterns });
   }
@@ -386,7 +405,7 @@ export class Editor {
   /** insert a new empty pattern after the current order position */
   addPattern() {
     const s = this.song;
-    const patterns = [...s.patterns, emptyPattern(this.rows, VOICES)];
+    const patterns = [...s.patterns, emptyPattern(this.rows, this.nch)];
     const order = s.order.slice(); order.splice(this.orderPos + 1, 0, patterns.length - 1);
     this.commit({ ...s, order, patterns });
     this.orderPos++; this.row = 0; this.emit();
@@ -419,7 +438,7 @@ export class Editor {
     const p = this.pattern;
     if (n === p.rows) return;
     const cells = p.cells.slice(0, n);
-    while (cells.length < n) cells.push(Array.from({ length: VOICES }, emptyCell));
+    while (cells.length < n) cells.push(Array.from({ length: this.nch }, emptyCell));
     const patterns = this.song.patterns.slice(); patterns[this.patIdx] = { rows: n, cells };
     this.commit({ ...this.song, patterns });
   }
@@ -456,7 +475,7 @@ export class Editor {
   toggleSolo(c: number) { this.soloed = this.soloed.map((v, i) => (i === c ? !v : v)); this.scheduleRefresh(); this.emit(); }
   private muteMask(): boolean[] {
     const anySolo = this.soloed.some(Boolean);
-    return [0, 1, 2].map((c) => (anySolo ? !this.soloed[c] : this.muted[c]));
+    return Array.from({ length: this.nch }, (_, c) => (anySolo ? !this.soloed[c] : this.muted[c]));
   }
 
   // ---------- rendering & playback
@@ -552,8 +571,16 @@ export class Editor {
 
   // ---------- audition (jam)
   private audNote = 0;
+  isDrumColumn(c: number) { return drumChannelOf(this.song) === c; }
+  /** play a digidrum sample on its own (sample-and-hold DAC, like the hardware) */
+  auditionDrum(d: DrumSample) { this.audio?.audition?.(drumToAudio(d)); }
   jam(note: number) {
     if (!this.audio?.audition || this.playing) return;
+    if (this.isDrumColumn(this.channel)) {
+      const bank = this.song.instruments[this.instrument]?.digiDrums ?? [];
+      if (bank.length) { this.audNote = note; this.auditionDrum(bank[(note - 1) % bank.length]); }
+      return;
+    }
     const song = this.auditionSong(note);
     const res = renderSong(song, { maxFrames: 150, noLoopStop: true });
     const pcm = renderYm(res.regs, res.nframes, 44100, 50, 4, res.drums);
