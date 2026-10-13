@@ -22,7 +22,8 @@ import { moduleToSong } from '../tracker/fromModule';
 import { decodeYmt, isYmt } from '../tracker/ymt';
 import { Tracker } from './Tracker';
 import { download } from './download';
-import { DEFAULT_OPTS, mappingToJson, parseMapping, type Opts } from '../core/mapping';
+import { DEFAULT_OPTS, mappingToJson, parseMapping, cleanName, type Opts } from '../core/mapping';
+import { TextField } from './fields';
 import { AyRoll } from './AyRoll';
 import { ImportDialog } from './ImportDialog';
 import demoUrl from '../assets/OMARSBAZAAR.xm?inline';
@@ -58,6 +59,9 @@ export function App() {
   const [opts, setOpts] = useState<Opts>(DEFAULT_OPTS);
   const [prio, setPrio] = useState<Record<number, number>>({});
   const [instMap, setInstMap] = useState<Record<number, InstMap>>({});
+  /** custom instrument names (instrument number -> name); empty = the module's own */
+  const [names, setNames] = useState<Record<number, string>>({});
+  const rename = (i: number, v: string) => setNames((n) => { const c = cleanName(v); const next = { ...n }; if (c) next[i] = c; else delete next[i]; return next; });
   const [macroSel, setMacroSel] = useState<number | null>(null);
   const [res, setRes] = useState<ConvertResult | null>(null);
   const [busy, setBusy] = useState('');
@@ -204,12 +208,12 @@ export function App() {
   const modInfo = () => (mod ? { title: mod.title, kind: mod.kind, channels: mod.nch, instruments: mod.instruments.filter(Boolean).length } : undefined);
   const saveMapping = () => {
     const info = modInfo();
-    if (info) download(`${slug(mod!.title || fileName)}_mapping.json`, mappingToJson({ opts, prio, inst: instMap }, info), 'application/json');
+    if (info) download(`${slug(mod!.title || fileName)}_mapping.json`, mappingToJson({ opts, prio, inst: instMap, names }, info), 'application/json');
   };
   const loadMapping = async (f: File) => {
     try {
       const r = parseMapping(await f.text(), modInfo());
-      setOpts(r.opts); setPrio(r.prio); setInstMap(r.inst); setMacroSel(null);
+      setOpts(r.opts); setPrio(r.prio); setInstMap(r.inst); setNames(r.names ?? {}); setMacroSel(null);
       setError(r.warnings.length ? 'Mapping loaded; ' + r.warnings.join('; ') : '');
     } catch (e) { setError(String((e as Error).message ?? e)); }
   };
@@ -231,7 +235,7 @@ export function App() {
     setBusy('Converting to AY patterns…');
     setTimeout(() => {
       try {
-        const r = moduleToSong(mod, { prio, inst: instMap, drumBonus: opts.drumBonus, sticky: opts.sticky, gainDb: opts.gainDb, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: true, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, waveform: opts.waveform });
+        const r = moduleToSong(mod, { prio, inst: instMap, drumBonus: opts.drumBonus, sticky: opts.sticky, gainDb: opts.gainDb, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: true, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, waveform: opts.waveform, names });
         e.loadSong(r.song, fileName);
         setSongReport([...r.report, ...r.warnings.map((w) => 'warning: ' + w)]);
         setTab('ed');
@@ -277,24 +281,25 @@ export function App() {
   return (
     <div className="app" ref={dropRef}>
       <header className="titlebar">
-        <h1>MOD/XM <span>→</span> YM2149 <small>Atari ST · SNDH · game stream</small></h1>
+        <h1>MOD/XM <span>→</span> YM2149 <small>Atari ST · SNDH · game stream · v{__APP_VERSION__.replace(/\.0$/, '')}</small></h1>
         <div className="actions">
-          <label className="btn">Load MOD / XM / SNDH / YM / YMT…
+          <label title="Open a MOD, XM, SNDH, YM or YMT file (you can also drop a file anywhere on the page)" className="btn">Load MOD / XM / SNDH / YM / YMT…
             <input type="file" accept=".mod,.xm,.sndh,.snd,.ym,.ymt,.MOD,.XM,.SNDH,.SND,.YM,.YMT" hidden onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
           </label>
-          <button className="btn" onClick={loadDemo}>Demo: Omar's Bazaar</button>
+          <a className="btn" href="./docs/index.html" target="_blank" rel="noopener" title="Manual, how-to guide, effects reference and technical specifications (opens in a new tab)">Help</a>
+          <button title="Load the bundled demo song, Omar's Bazaar by Qumran" className="btn" onClick={loadDemo}>Demo: Omar's Bazaar</button>
         </div>
       </header>
 
       <nav className="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === 'conv'} className={tab === 'conv' ? 'on' : ''} onClick={() => switchTab('conv')}>Converter</button>
-        <button role="tab" aria-selected={tab === 'ed'} className={tab === 'ed' ? 'on' : ''} onClick={() => switchTab('ed')}>AY pattern editor</button>
+        <button title="Load, convert, listen and export a module" role="tab" aria-selected={tab === 'conv'} className={tab === 'conv' ? 'on' : ''} onClick={() => switchTab('conv')}>Converter</button>
+        <button title="Edit a song as patterns for one YM2149 (FastTracker 2 style)" role="tab" aria-selected={tab === 'ed'} className={tab === 'ed' ? 'on' : ''} onClick={() => switchTab('ed')}>AY pattern editor</button>
       </nav>
 
       {error && <div className="panel err">{error}</div>}
 
       {importOpen && mod && (
-        <ImportDialog mod={mod} convOpts={convOpts} prio={prio} setPrio={setPrio} mainPlaying={playing} mainSource={source} hasOrig={origOk}
+        <ImportDialog mod={mod} names={names} rename={rename} mainPos={pos} mainDur={seconds} seekMain={(sec) => { const pv = preview(); void pv.play(sec); setPos(sec); setPlaying(true); }} convOpts={convOpts} prio={prio} setPrio={setPrio} mainPlaying={playing} mainSource={source} hasOrig={origOk}
           playMain={playMain} stopMain={stopMain} busy={busy} onClose={() => setImportOpen(false)}
           onEdit={() => { setImportOpen(false); toPatterns(); }} />
       )}
@@ -341,7 +346,7 @@ export function App() {
                 </dl>
                 {tune.info && tune.info.subtunes > 1 && (
                   <label className="row"><span className="lbl">Subtune</span>
-                    <select value={subtune} onChange={(e) => { const v = +e.target.value; setSubtune(v); rerunSndh(v, secOverride); }}>
+                    <select title="Which subtune of the SNDH file to run" value={subtune} onChange={(e) => { const v = +e.target.value; setSubtune(v); rerunSndh(v, secOverride); }}>
                       {Array.from({ length: tune.info.subtunes }, (_, i) => (
                         <option key={i} value={i + 1}>{i + 1}{tune.info!.subtuneNames[i] ? ' — ' + tune.info!.subtuneNames[i] : ''}</option>
                       ))}
@@ -422,10 +427,10 @@ export function App() {
                 <Slider label="Drum length" value={opts.digiMaxMs} min={50} max={1500} step={50} unit=" ms" onChange={(v) => setOpts({ ...opts, digiMaxMs: v })}
                   hint="Longest digidrum; longer samples are cut (with a short fade)" />
               </>}
-              <button className="btn small" onClick={() => { setOpts(DEFAULT_OPTS); setPrio({}); setInstMap({}); setMacroSel(null); }}>Reset to auto</button>
+              <button title="Back to the automatic settings: options, priorities, instrument roles and names" className="btn small" onClick={() => { setOpts(DEFAULT_OPTS); setPrio({}); setInstMap({}); setNames({}); setMacroSel(null); }}>Reset to auto</button>
               <button className="btn small" onClick={saveMapping} title="Save the instrument mapping, channel priorities and these options as a .json file">Save mapping</button>
               <label className="btn small" title="Load a mapping saved earlier (for this module or a similar one)">Load mapping…<input type="file" accept=".json,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadMapping(f); e.target.value = ''; }} /></label>
-              <button className="btn small primary" onClick={() => setImportOpen(true)} title="Choose which channels matter most, listen to each channel alone and to the full import">Manual import…</button>
+              <button className="btn small primary" onClick={() => setImportOpen(true)} title="Choose which channels matter most, listen to each channel alone and to the full preview">Manual import…</button>
               <button className="btn small primary" disabled={!!busy} onClick={toPatterns} title="Turn the module into an editable pattern song for one YM2149 (uses the options above)">Edit as AY patterns →</button>
             </section>}
 
@@ -435,9 +440,9 @@ export function App() {
                 <button className="btn primary" disabled={!out} onClick={exp.sndh} title="Playable in any SNDH player (68000 player included, 50 Hz)">SNDH (.sndh)</button>
                 <button className="btn" disabled={!out} onClick={exp.ym} title="YM5! register dump — ST-Sound, Atari players">YM (.ym)</button>
                 <button className="btn" disabled={!out} onClick={exp.game} title="C header with the packed stream + ymplay.h replayer">Game kit (.zip)</button>
-                <button className="btn" disabled={!out} onClick={exp.wav}>Preview (.wav)</button>
-                <button className="btn" disabled={!out} onClick={exp.regs}>Raw regs (.regs)</button>
-                <button className="btn" disabled={!out} onClick={exp.log}>Report (.txt)</button>
+                <button title="44.1 kHz audio of the YM2149 emulation" className="btn" disabled={!out} onClick={exp.wav}>Preview (.wav)</button>
+                <button title="The 14 YM registers of every 50 Hz frame as raw bytes" className="btn" disabled={!out} onClick={exp.regs}>Raw regs (.regs)</button>
+                <button title="The conversion report as a text file" className="btn" disabled={!out} onClick={exp.log}>Report (.txt)</button>
               </div>
               {packed && out && (
                 <p className="note">Packed stream: <b>{packed.data.length.toLocaleString()}</b> bytes ({(packed.data.length / (out.nframes / 50)).toFixed(0)} B/s). SNDH adds a {PLAYER_BLOB.length}-byte player{hasDrums(out.drums) || hasFx(out.fx) ? ' (with the digidrum / timer-effect engine)' : ''}.</p>
@@ -449,12 +454,12 @@ export function App() {
           <section className="panel">
             <h2>Preview <small>space = play/stop · tab = original ⇄ YM</small></h2>
             <div className="transport">
-              <button className="btn" onClick={rewind} disabled={!out}>⏮</button>
-              <button className="btn primary" onClick={togglePlay} disabled={!out || !!busy}>{playing ? '■ Stop' : '▶ Play'}</button>
+              <button title="Back to the start" className="btn" onClick={rewind} disabled={!out}>⏮</button>
+              <button title="Play or stop the preview (Space)" className="btn primary" onClick={togglePlay} disabled={!out || !!busy}>{playing ? '■ Stop' : '▶ Play'}</button>
               <div className="ab" role="group" aria-label="Source">
                 <button className={source === 'orig' ? 'on' : ''} disabled={!origOk || !mod} onClick={() => pickSource('orig')}
                   title={!mod ? 'Only for loaded modules' : origOk ? '' : 'Needs the page to be served over http(s) — not available when index.html is opened from disk'}>A · Original</button>
-                <button className={source === 'ay' ? 'on' : ''} onClick={() => pickSource('ay')}>B · YM2149</button>
+                <button title="The YM2149 version (Tab switches between A and B)" className={source === 'ay' ? 'on' : ''} onClick={() => pickSource('ay')}>B · YM2149</button>
               </div>
               <span className="time">{fmtTime(pos)} / {fmtTime(seconds)}</span>
               {busy && <span className="busy">{busy}</span>}
@@ -468,7 +473,7 @@ export function App() {
             <section className="panel">
               <h2>Instruments → AY role</h2>
               <table>
-                <thead><tr><th>#</th><th>Name</th><th>Detected</th><th>C-4</th><th>Wave</th><th>AY role</th><th title="semitones">Tr.</th></tr></thead>
+                <thead><tr><th>#</th><th>Name</th><th>Detected</th><th>C-4</th><th>Wave</th><th>AY role</th><th title="Transpose in semitones">Tr.</th></tr></thead>
                 <tbody>
                   {instRows.map((r) => {
                     const cur = instMap[r.inst];
@@ -476,7 +481,7 @@ export function App() {
                     return (
                       <tr key={r.inst} className={macroSel === r.inst ? 'sel' : ''}>
                         <td>{r.inst.toString(16).toUpperCase().padStart(2, '0')}</td>
-                        <td className="name">{r.name || '—'}</td>
+                        <td className="name"><TextField className="txt rn" value={names[r.inst] ?? r.name ?? ''} maxLength={24} placeholder={r.name || '—'} title={`Rename instrument ${r.inst.toString(16).toUpperCase().padStart(2, '0')} (module name: ${r.name || 'none'}). The name is used in the pattern editor and saved with the mapping; empty = module name.`} aria-label={`Name of instrument ${r.inst}`} onCommit={(v) => rename(r.inst, v)} /></td>
                         <td>{r.cls}</td>
                         <td>{r.c4Hz ? `${r.c4Hz.toFixed(0)} Hz` : ''}</td>
                         <td>
@@ -492,7 +497,7 @@ export function App() {
                           ) : ''}
                         </td>
                         <td>
-                          <select value={mode} onChange={(e) => setMode(r.inst, e.target.value as InstMode)}>
+                          <select title="How this instrument is played on the chip: automatic, as written tone, a synthetic kick / snare / hat, a digidrum sample, a custom macro, or muted" value={mode} onChange={(e) => setMode(r.inst, e.target.value as InstMode)}>
                             <option value="auto">{r.digi ? 'auto: digidrum' : r.drum ? `auto: ${r.drum}` : 'auto: tone'}</option>
                             <option value="tone">tone (written note)</option>
                             <option value="kick">kick</option><option value="snare">snare</option><option value="hat">hat</option>
@@ -500,7 +505,7 @@ export function App() {
                             <option value="macro">custom macro…</option>
                             <option value="mute">mute</option>
                           </select>
-                          {mode === 'macro' && <button className="btn tiny" onClick={() => setMacroSel(macroSel === r.inst ? null : r.inst)}>edit</button>}
+                          {mode === 'macro' && <button title="Edit the per-tick macro of this instrument" className="btn tiny" onClick={() => setMacroSel(macroSel === r.inst ? null : r.inst)}>edit</button>}
                         </td>
                         <td>
                           <input type="number" className="txt num" min={-48} max={48} value={cur?.transpose ?? 0} disabled={mode === 'kick' || mode === 'snare' || mode === 'hat' || mode === 'mute'}
@@ -528,9 +533,9 @@ export function App() {
                         {opts.arpFill > 1 && <td>{tot ? Math.round((fo / tot) * 100) : 0}%</td>}
                         <td className={dr / (tot || 1) > 0.1 ? 'warn' : ''}>{tot ? Math.round((dr / tot) * 100) : 0}%</td>
                         <td>
-                          <button className="btn tiny" onClick={() => setPrio({ ...prio, [ch]: (prio[ch] ?? 0) - 1 })}>−</button>
+                          <button title="Lower this channel's priority by 1" className="btn tiny" onClick={() => setPrio({ ...prio, [ch]: (prio[ch] ?? 0) - 1 })}>−</button>
                           <span className="pv">{prio[ch] ?? 0}</span>
-                          <button className="btn tiny" onClick={() => setPrio({ ...prio, [ch]: (prio[ch] ?? 0) + 1 })}>+</button>
+                          <button title="Raise this channel's priority by 1" className="btn tiny" onClick={() => setPrio({ ...prio, [ch]: (prio[ch] ?? 0) + 1 })}>+</button>
                         </td>
                       </tr>
                     );
@@ -546,17 +551,17 @@ export function App() {
             const setStep = (k: number, patch: Partial<MacroStep>) => editMacro(i, (m) => { m.steps[k] = { ...m.steps[k], ...patch }; return m; });
             return (
               <section className="panel">
-                <h2>Macro editor — instrument {i.toString(16).toUpperCase().padStart(2, '0')} {instRows.find((r) => r.inst === i)?.name} <small>one step = 20 ms</small></h2>
+                <h2>Macro editor — instrument {i.toString(16).toUpperCase().padStart(2, '0')} {names[i] ?? instRows.find((r) => r.inst === i)?.name} <small>one step = 20 ms</small></h2>
                 <div className="macrobar">
-                  <label>Preset <select value="" onChange={(e) => e.target.value && patchInst(i, { macro: cloneMacro(MACRO_PRESETS[e.target.value]) })}>
+                  <label title="Start from a ready-made macro">Preset <select value="" onChange={(e) => e.target.value && patchInst(i, { macro: cloneMacro(MACRO_PRESETS[e.target.value]) })}>
                     <option value="">load…</option>
                     {Object.keys(MACRO_PRESETS).map((k) => <option key={k}>{k}</option>)}
                   </select></label>
                   <label title="Step to jump back to after the last step; −1 = play once, then silent">Loop from <input type="number" className="txt num" min={-1} max={mac.steps.length - 1} value={mac.loopFrom}
                     onChange={(e) => editMacro(i, (m) => { m.loopFrom = Math.max(-1, Math.min(m.steps.length - 1, Math.trunc(+e.target.value))); return m; })} /></label>
                   <label title="Scale by the note volume of the source module"><input type="checkbox" checked={mac.velocity} onChange={(e) => editMacro(i, (m) => { m.velocity = e.target.checked; return m; })} /> follow note volume</label>
-                  <button className="btn small" onClick={() => editMacro(i, (m) => { m.steps.push({ ...m.steps[m.steps.length - 1] ?? { vol: 15, semi: 0, noise: 0, tone: true } }); return m; })}>+ step</button>
-                  <button className="btn small" disabled={mac.steps.length <= 1} onClick={() => editMacro(i, (m) => { m.steps.pop(); m.loopFrom = Math.min(m.loopFrom, m.steps.length - 1); return m; })}>− step</button>
+                  <button title="Append a copy of the last step" className="btn small" onClick={() => editMacro(i, (m) => { m.steps.push({ ...m.steps[m.steps.length - 1] ?? { vol: 15, semi: 0, noise: 0, tone: true } }); return m; })}>+ step</button>
+                  <button title="Remove the last step" className="btn small" disabled={mac.steps.length <= 1} onClick={() => editMacro(i, (m) => { m.steps.pop(); m.loopFrom = Math.min(m.loopFrom, m.steps.length - 1); return m; })}>− step</button>
                 </div>
                 <div className="macrogrid">
                   <table>

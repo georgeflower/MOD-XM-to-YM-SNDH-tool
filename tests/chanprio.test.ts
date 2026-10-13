@@ -63,3 +63,29 @@ describe('manual import: channel statistics', () => {
     expect(Object.values(p).filter((v) => v === 8).length).toBe(1);
   });
 });
+
+describe('renamed instruments', () => {
+  const firstUsed = (() => {
+    const r = moduleToSong(m, {});
+    return r.instMap.find((x) => x.kind !== 'drum' && x.src > 0)?.src ?? 1;
+  })();
+  it('the pattern song uses the custom name for the instruments made from a source instrument', () => {
+    const plain = moduleToSong(m, {});
+    const named = moduleToSong(m, { names: { [firstUsed]: 'My lead' } });
+    const ay = named.instMap.filter((x) => x.src === firstUsed).map((x) => x.ay);
+    expect(ay.length).toBeGreaterThan(0);
+    for (const i of ay) expect(named.song.instruments[i].name).toMatch(/My lead/);
+    for (const i of ay) expect(plain.song.instruments[i].name).not.toMatch(/My lead/);
+    expect(named.song.patterns.length).toBe(plain.song.patterns.length);
+  });
+  it('names are saved in the mapping file, cleaned and clamped', () => {
+    const info = { title: 't', kind: 'xm', channels: 8, instruments: 9 };
+    const text = mappingToJson({ opts: DEFAULT_OPTS, prio: {}, inst: {}, names: { 2: 'Bass', 3: 'x'.repeat(60) } }, info);
+    const r = parseMapping(text, info);
+    expect(r.names![2]).toBe('Bass');
+    expect(r.names![3].length).toBe(24);
+    const bad = JSON.parse(text); bad.names = { 0: 'zero', 999: 'big', 4: 5, 5: ' \u0001  ' };
+    expect(parseMapping(JSON.stringify(bad), info).names).toEqual({});
+    expect(parseMapping(mappingToJson({ opts: DEFAULT_OPTS, prio: {}, inst: {} }, info), info).names).toEqual({});
+  });
+});

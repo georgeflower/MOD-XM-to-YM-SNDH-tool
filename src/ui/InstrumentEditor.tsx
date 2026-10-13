@@ -71,7 +71,7 @@ function StepTable({ ed, idx, seq }: { ed: Editor; idx: number; seq: StepSeq }) 
   return (
     <div>
       <div className="macrobar">
-        <label>Preset <select value="" onChange={(e) => {
+        <label title="Replace the steps with a ready-made macro (keeps the release setting)">Preset <select value="" onChange={(e) => {
           const p = MACRO_PRESETS[e.target.value]; if (!p) return;
           ed.updateInstrument({ seq: { steps: p.steps.map((s) => ({ ...s })), loopFrom: p.loopFrom, velocity: p.velocity, release: seq.release } }, idx);
         }}>
@@ -127,11 +127,11 @@ export function InstrumentEditor({ ed, idx, onClose }: { ed: Editor; idx: number
     <section className="panel ie">
       <h2>Instrument {idx.toString(16).toUpperCase().padStart(2, '0')}
         <small>edits are undoable · hold the Test button or press any note key to hear it</small>
-        <button className="btn tiny right" onClick={onClose}>close</button></h2>
+        <button title="Close the instrument editor" className="btn tiny right" onClick={onClose}>close</button></h2>
       <div className="ie-cols">
         <div>
           <Field label="Name"><TextField value={inst.name} maxLength={22} onCommit={(v) => up({ name: v })} /></Field>
-          <Field label="Test"><button className="btn" onPointerDown={() => test(true)} onPointerUp={() => test(false)} onPointerLeave={() => test(false)}>Play C-5 (hold)</button></Field>
+          <Field label="Test"><button title="Hold to hear the instrument at C-5" className="btn" onPointerDown={() => test(true)} onPointerUp={() => test(false)} onPointerLeave={() => test(false)}>Play C-5 (hold)</button></Field>
           <Field label="Preset" hint="Replaces this instrument with a ready-made sound: chord ornaments, drums, acid bass. Undoable.">
             <select value="" onChange={(e) => { const p = INSTRUMENT_PRESETS[+e.target.value]; if (p) ed.replaceInstrument(p.make(), idx); }}>
               <option value="">choose…</option>

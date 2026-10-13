@@ -360,14 +360,14 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
       <section className="panel tk-bar">
         <h2>Song <small>pattern editor for one YM2149 · FastTracker 2 keys</small></h2>
         <div className="tk-line">
-          <button className="btn" onClick={() => { if (!ed.dirty || confirm('Discard the current song?')) ed.newSong(); }}>New</button>
-          <label className="btn">Load .ymt…<input type="file" accept=".ymt,.YMT" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadYmt(f); e.target.value = ''; }} /></label>
+          <button title="Start an empty song" className="btn" onClick={() => { if (!ed.dirty || confirm('Discard the current song?')) ed.newSong(); }}>New</button>
+          <label title="Open a YM Tracker song (.ymt)" className="btn">Load .ymt…<input type="file" accept=".ymt,.YMT" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadYmt(f); e.target.value = ''; }} /></label>
           <label className="btn" title="maxYMiser song (.mys, with its .myv voice bank selected too) or a single instrument (.myi)">Load maxYMiser…<input type="file" multiple accept=".mys,.MYS,.myv,.MYV,.myi,.MYI" hidden onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) void loadMaxymiser(fs); e.target.value = ''; }} /></label>
           <label className="btn" title="Arkos Tracker 3 song (.aks)">Load Arkos…<input type="file" accept=".aks,.AKS" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadAks(f); e.target.value = ''; }} /></label>
-          <button className="btn" onClick={() => void saveYmt()} title="Ctrl+S">Save .ymt</button>
+          <button className="btn" onClick={() => void saveYmt()} title="Save the song as a .ymt file (Ctrl+S)">Save .ymt</button>
           <span className="sep" />
-          <button className="btn" disabled={!ed.canUndo} onClick={() => ed.undo()} title="Ctrl+Z">Undo</button>
-          <button className="btn" disabled={!ed.canRedo} onClick={() => ed.redo()} title="Ctrl+Y">Redo</button>
+          <button className="btn" disabled={!ed.canUndo} onClick={() => ed.undo()} title="Undo the last change (Ctrl+Z)">Undo</button>
+          <button className="btn" disabled={!ed.canRedo} onClick={() => ed.redo()} title="Redo (Ctrl+Y)">Redo</button>
           <span className="sep" />
           <label>Title <TextField className="txt" value={song.name} maxLength={32} onCommit={(v) => ed.setName(v)} /></label>
           <label>Author <TextField className="txt" value={song.author ?? ''} maxLength={32} onCommit={(v) => ed.setAuthor(v)} /></label>
@@ -375,19 +375,19 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
           <label title="Ticks per row">Speed <NumField value={song.speed} min={1} max={31} onCommit={(v) => ed.setSpeed(v)} /></label>
         </div>
         <div className="tk-line">
-          <button className={`btn${ed.playing && ed.playMode === 'song' ? ' primary' : ''}`} onClick={() => void ed.play('song', false)} title="Right Ctrl">▶ Song</button>
-          <button className={`btn${ed.playing && ed.playMode === 'pattern' ? ' primary' : ''}`} onClick={() => void ed.play('pattern', false)} title="Right Alt">▶ Pattern</button>
+          <button className={`btn${ed.playing && ed.playMode === 'song' ? ' primary' : ''}`} onClick={() => void ed.play('song', false)} title="Play the whole song (Right Ctrl)">▶ Song</button>
+          <button className={`btn${ed.playing && ed.playMode === 'pattern' ? ' primary' : ''}`} onClick={() => void ed.play('pattern', false)} title="Play this pattern in a loop (Right Alt)">▶ Pattern</button>
           <button className="btn" onClick={() => void ed.play(ed.playMode, true)} title="Play from the cursor row">▶ From cursor</button>
-          <button className="btn" onClick={() => ed.stop()} title="Space">■ Stop</button>
-          <button className={`btn${ed.editing ? ' rec' : ''}`} onClick={() => ed.toggleEdit()} title="Space (when stopped)">{ed.editing ? '● Editing' : '○ Edit'}</button>
+          <button className="btn" onClick={() => ed.stop()} title="Stop playback (Space)">■ Stop</button>
+          <button className={`btn${ed.editing ? ' rec' : ''}`} onClick={() => ed.toggleEdit()} title="Switch edit mode on or off: notes are written into the pattern only in edit mode (Space when stopped)">{ed.editing ? '● Editing' : '○ Edit'}</button>
           <span className="sep" />
-          <label title="F1-F8">Octave <button className="btn tiny" onClick={() => ed.setOctave(ed.octave - 1)}>−</button><span className="val">{ed.octave}</span><button className="btn tiny" onClick={() => ed.setOctave(ed.octave + 1)}>+</button></label>
+          <label title="Base octave of the note keys (F1-F8)">Octave <button className="btn tiny" onClick={() => ed.setOctave(ed.octave - 1)}>−</button><span className="val">{ed.octave}</span><button className="btn tiny" onClick={() => ed.setOctave(ed.octave + 1)}>+</button></label>
           <label title="Rows the cursor moves after a note is entered (` or § key)">Add <button className="btn tiny" onClick={() => ed.cycleStep(-1)}>−</button><span className="val">{ed.step}</span><button className="btn tiny" onClick={() => ed.cycleStep(1)}>+</button></label>
           <label title="Instrument used for the notes you type">Instrument <button className="btn tiny" onClick={() => ed.selectInstrument(ed.instrument - 1)}>−</button><span className="val">{toHex2(ed.instrument)}</span><button className="btn tiny" onClick={() => ed.selectInstrument(ed.instrument + 1)}>+</button></label>
           <label className="chk" title="Adds a fourth column for digidrums: a note there plays that drum of the instrument on voice C"><input type="checkbox" checked={ed.hasDrumChannel} onChange={(e) => ed.setDrumChannel(e.target.checked)} /> Drum channel</label>
-          <button className="btn" onClick={() => setDialog({ kind: 'transpose' })}>Transpose…</button>
+          <button title="Shift notes by semitones in the block, track, pattern or whole song" className="btn" onClick={() => setDialog({ kind: 'transpose' })}>Transpose…</button>
           <button className="btn" onClick={() => setDialog({ kind: 'echo' })} title="Copy notes a few rows later at a lower volume (the AY F-A echo)">Echo…</button>
-          <button className="btn" onClick={() => setDialog({ kind: 'scale', scope: sel ? 'block' : 'pattern' })} title="Ctrl/Alt/Shift+V">Scale volume…</button>
+          <button className="btn" onClick={() => setDialog({ kind: 'scale', scope: sel ? 'block' : 'pattern' })} title="Scale the volume column in the block, track, pattern or song (Ctrl/Alt/Shift+V)">Scale volume…</button>
           <span className="time">{ed.playing ? `${toHex2(ed.playOrder)}:${toHex2(ed.playRow)}` : `${secs ? Math.floor(secs / 60) + ':' + String(Math.floor(secs % 60)).padStart(2, '0') : '—'}`}</span>
         </div>
       </section>
@@ -408,11 +408,11 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
             <button className="btn small" onClick={() => ed.addPattern()} title="Insert a new empty pattern after this position">New pat</button>
             <button className="btn small" onClick={() => ed.clonePattern()} title="Copy this pattern into a new one">Clone pat</button>
             <button className="btn small" onClick={() => ed.addOrderEntry()} title="Insert the same pattern again after this position">Repeat</button>
-            <button className="btn small" disabled={song.order.length < 2} onClick={() => ed.removeOrderEntry()}>Remove</button>
-            <button className="btn small" disabled={ed.orderPos === 0} onClick={() => ed.moveOrderEntry(ed.orderPos, ed.orderPos - 1)}>Move ↑</button>
-            <button className="btn small" disabled={ed.orderPos >= song.order.length - 1} onClick={() => ed.moveOrderEntry(ed.orderPos, ed.orderPos + 1)}>Move ↓</button>
+            <button title="Remove this position from the song order" className="btn small" disabled={song.order.length < 2} onClick={() => ed.removeOrderEntry()}>Remove</button>
+            <button title="Move this position up in the order" className="btn small" disabled={ed.orderPos === 0} onClick={() => ed.moveOrderEntry(ed.orderPos, ed.orderPos - 1)}>Move ↑</button>
+            <button title="Move this position down in the order" className="btn small" disabled={ed.orderPos >= song.order.length - 1} onClick={() => ed.moveOrderEntry(ed.orderPos, ed.orderPos + 1)}>Move ↓</button>
             <button className="btn small" onClick={() => ed.setRestartPos(ed.orderPos)} title="Where the song jumps back to at its end">Loop here</button>
-            <button className="btn small" onClick={() => ed.setOrderEntry(ed.orderPos, ed.patIdx + 1)} title="Ctrl+→">Pat +</button>
+            <button className="btn small" onClick={() => ed.setOrderEntry(ed.orderPos, ed.patIdx + 1)} title="Play the next pattern number at this position (Ctrl+→)">Pat +</button>
           </div>
           <label className="plen">Pattern {toHex2(ed.patIdx)} length <NumField value={pat.rows} min={1} max={256} onCommit={(v) => ed.setPatternLength(v)} /></label>
         </section>
@@ -456,10 +456,10 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
             ))}
           </div>
           <div className="btns">
-            <button className="btn small" onClick={() => setInstOpen((v) => !v)}>{instOpen ? 'Hide editor' : 'Edit…'}</button>
+            <button title="Show or hide the instrument editor (or double-click an instrument)" className="btn small" onClick={() => setInstOpen((v) => !v)}>{instOpen ? 'Hide editor' : 'Edit…'}</button>
             <button className="btn small" onClick={() => setDrumOpen((v) => !v)} title="Digidrum samples of this instrument">{drumOpen ? 'Hide drums' : 'Drums…'}</button>
             <button className="btn small" onClick={() => ed.addInstrument(song.instruments[ed.instrument])} title="Copy the selected instrument">Duplicate</button>
-            <button className="btn small" onClick={() => ed.addInstrument()}>New</button>
+            <button title="Add a new default instrument" className="btn small" onClick={() => ed.addInstrument()}>New</button>
           </div>
         </section>
       </div>
@@ -470,15 +470,15 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
       <section className="panel">
         <h2>Export <small>{secs ? `${secs.toFixed(1)} s · ${Math.round(secs * 50)} frames` : ''}</small></h2>
         <div className="tk-line">
-          <button className="btn primary" onClick={exp.sndh}>SNDH (.sndh)</button>
-          <button className="btn" onClick={exp.ym}>YM (.ym)</button>
-          <button className="btn" onClick={exp.game}>Game kit (.zip)</button>
+          <button title="Atari ST music file with a built-in 68000 player" className="btn primary" onClick={exp.sndh}>SNDH (.sndh)</button>
+          <button title="YM register dump (YM6 when the song has digidrums or timer effects)" className="btn" onClick={exp.ym}>YM (.ym)</button>
+          <button title="C header with the packed stream and a small replayer for your own game" className="btn" onClick={exp.game}>Game kit (.zip)</button>
           <button className="btn" onClick={exp.mym} title="song + voice bank for gwEm's maxYMiser tracker">maxYMiser (.mys + .myv)</button>
           <button className="btn" onClick={exp.aks} title="song for Arkos Tracker 3 (envelopes, arpeggios, slides and speed baked into Arkos instruments and effects)">Arkos Tracker (.aks)</button>
           <button className="btn" onClick={exp.fur} title="song for Furnace (AY-3-8910 / YM2149 chip: instruments become macros, effects and speed carry over)">Furnace (.fur)</button>
           <button className="btn" onClick={exp.myi} title="the selected instrument as a maxYMiser .myi">Instrument (.myi)</button>
-          <button className="btn" onClick={exp.wav}>Preview (.wav)</button>
-          <button className="btn" onClick={exp.regs}>Registers (.regs)</button>
+          <button title="44.1 kHz audio of the YM2149 emulation" className="btn" onClick={exp.wav}>Preview (.wav)</button>
+          <button title="The 14 YM registers of every 50 Hz frame as raw bytes" className="btn" onClick={exp.regs}>Registers (.regs)</button>
         </div>
         {warns.length > 0 && <ul className="warnlist">{warns.map((w, i) => <li key={i}>{w}</li>)}</ul>}
       </section>

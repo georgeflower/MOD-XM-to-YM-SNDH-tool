@@ -42,6 +42,8 @@ export interface SongConvertOptions {
   arpMinVol?: number;
   /** merge identical patterns (default true) */
   dedupe?: boolean;
+  /** custom names for source instruments (1-based instrument number -> name), used for the AY instruments made from them */
+  names?: Record<number, string>;
   /** percussion-like instruments become digidrum samples on a fourth (drum) channel; default on: the drum channel appears when the module has percussion (false = synthetic drum macros) */
   digiDrums?: boolean;
   digiRate?: number;
@@ -235,7 +237,7 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
   const instruments: Instrument[] = [defaultInstrument('--')];
   const plans = new Map<string, Plan>();
   const instMapOut: SongConvertResult['instMap'] = [];
-  const nameOf = (i: number, k: number) => `${i.toString(16).toUpperCase().padStart(2, '0')}${k ? '.' + k : ''} ${m.instruments[i]?.name ?? ''}`.trim().slice(0, 30);
+  const nameOf = (i: number, k: number) => `${i.toString(16).toUpperCase().padStart(2, '0')}${k ? '.' + k : ''} ${options.names?.[i] ?? m.instruments[i]?.name ?? ''}`.trim().slice(0, 30);
 
   function mkSeq(steps: MacroStep[], loopFrom: number, release: number): Instrument {
     const ins = defaultInstrument();

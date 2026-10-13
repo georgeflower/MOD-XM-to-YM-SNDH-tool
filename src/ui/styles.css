@@ -197,7 +197,14 @@ tr.loopmark td { background: #14203a; }
 .imp-t td.insts { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .imp-t tr.offrow td { opacity: .45; }
 .imp-t tr.offrow td:nth-last-child(2), .imp-t tr.offrow td:last-child { opacity: 1; }
-.act { display: flex; align-items: flex-end; width: 192px; height: 22px; background: #0a0d20; }
+.act { position: relative; display: flex; align-items: flex-end; width: 192px; height: 22px; background: #0a0d20; }
+.act.seekable { cursor: pointer; outline: 1px solid transparent; }
+.act.seekable:hover { outline-color: var(--accent); }
+.act .ph { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #fff; pointer-events: none; text-decoration: none; }
+.txt.rn { width: 150px; text-align: left; }
+.irow { display: flex; align-items: center; gap: 4px; margin: 1px 0; }
+.irow .oi { font-family: monospace; font-size: 11px; color: #4a5070; }
+td.name .txt.rn { width: 170px; }
 .act i { flex: 1; min-height: 0; background: var(--accent); }
 .seg { display: inline-flex; }
 .seg button { font: inherit; font-size: 12px; color: var(--ink); background: #2b3150; border: 0; border-right: 1px solid #11142a; padding: 1px 7px; cursor: pointer; }

@@ -18,10 +18,10 @@ export const DEFAULT_OPTS: Opts = {
 
 export const MAPPING_FORMAT = 'mod-xm-to-ym-mapping';
 export interface MappingModuleInfo { title: string; kind: string; channels: number; instruments: number }
-export interface Mapping { opts: Opts; prio: Record<number, number>; inst: Record<number, InstMap> }
+export interface Mapping { opts: Opts; prio: Record<number, number>; inst: Record<number, InstMap>; /** custom instrument names (instrument number -> name) */ names?: Record<number, string> }
 
 export function mappingToJson(m: Mapping, mod: MappingModuleInfo): string {
-  return JSON.stringify({ format: MAPPING_FORMAT, version: 1, module: mod, opts: m.opts, prio: m.prio, inst: m.inst }, null, 2) + '\n';
+  return JSON.stringify({ format: MAPPING_FORMAT, version: 1, module: mod, opts: m.opts, prio: m.prio, inst: m.inst, names: m.names && Object.keys(m.names).length ? m.names : undefined }, null, 2) + '\n';
 }
 
 const MODES: InstMode[] = ['auto', 'mute', 'tone', 'kick', 'snare', 'hat', 'macro', 'digi'];
@@ -39,6 +39,9 @@ function cleanMacro(v: unknown): Macro | null {
   const lf = int(v.loopFrom, -1, steps.length - 1, -1);
   return { steps, loopFrom: lf, velocity: v.velocity !== false };
 }
+
+/** an instrument name as the UI keeps it: no control characters, at most 24 characters */
+export const cleanName = (v: string) => v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 24);
 
 export interface ParsedMapping extends Mapping { warnings: string[] }
 
@@ -85,5 +88,10 @@ export function parseMapping(text: string, mod?: MappingModuleInfo): ParsedMappi
     }
   }
   if (dropped) warnings.push(`${dropped} instrument entr${dropped === 1 ? 'y' : 'ies'} could not be read and were left on auto`);
-  return { opts, prio, inst, warnings };
+  const names: Record<number, string> = {};
+  if (isObj(j.names)) for (const [k, v] of Object.entries(j.names)) {
+    const n = Number(k);
+    if (Number.isInteger(n) && n >= 1 && n <= 255 && typeof v === 'string' && cleanName(v)) names[n] = cleanName(v);
+  }
+  return { opts, prio, inst, names, warnings };
 }

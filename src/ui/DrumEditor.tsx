@@ -104,9 +104,9 @@ export function DrumEditor({ ed, idx, onClose }: { ed: Editor; idx: number; onCl
         </div>
         <div className="dctl">
           <div className="btns">
-            <button className="btn small" onClick={() => fileRef.current?.click()}>Load WAV…</button>
+            <button title="Add one or more WAV files as digidrums" className="btn small" onClick={() => fileRef.current?.click()}>Load WAV…</button>
             <input ref={fileRef} type="file" accept=".wav,audio/wav" multiple hidden onChange={(e) => void addFiles(e.target.files)} />
-            <button className="btn small" onClick={() => { if (room()) { const kit = starterKit(defs.rateHz); put([...bank, ...kit].slice(0, MAX_DRUMS), bank.length); } }}>Add starter kit</button>
+            <button title="Add six synthesised drums: kick, snare, hi-hat, open hat, tom, clap" className="btn small" onClick={() => { if (room()) { const kit = starterKit(defs.rateHz); put([...bank, ...kit].slice(0, MAX_DRUMS), bank.length); } }}>Add starter kit</button>
             <select className="sel" value="" aria-label="Add a synthesised drum" onChange={(e) => { if (e.target.value && room()) put([...bank, synthDrum(e.target.value, defs.rateHz)], bank.length); }}>
               <option value="">Add synth drum…</option>
               {SYNTH_DRUM_NAMES.map((n) => <option key={n} value={n}>{n}</option>)}
@@ -115,10 +115,10 @@ export function DrumEditor({ ed, idx, onClose }: { ed: Editor; idx: number; onCl
           {cur && (
             <>
               <div className="btns">
-                <button className="btn small" disabled={curIdx === 0} onClick={() => { const n = bank.slice(); [n[curIdx - 1], n[curIdx]] = [n[curIdx], n[curIdx - 1]]; put(n, curIdx - 1); }}>↑</button>
-                <button className="btn small" disabled={curIdx >= bank.length - 1} onClick={() => { const n = bank.slice(); [n[curIdx + 1], n[curIdx]] = [n[curIdx], n[curIdx + 1]]; put(n, curIdx + 1); }}>↓</button>
-                <button className="btn small" onClick={() => { if (room()) { const n = bank.slice(); const d = { ...cur, name: cur.name + ' copy', pcm: cur.pcm.slice() }; const s = SOURCES.get(cur.pcm); if (s) SOURCES.set(d.pcm, s); n.splice(curIdx + 1, 0, d); put(n, curIdx + 1); } }}>Duplicate</button>
-                <button className="btn small" onClick={() => { const n = bank.slice(); n.splice(curIdx, 1); put(n, curIdx); }}>Remove</button>
+                <button title="Move the selected drum up (changes its number)" className="btn small" disabled={curIdx === 0} onClick={() => { const n = bank.slice(); [n[curIdx - 1], n[curIdx]] = [n[curIdx], n[curIdx - 1]]; put(n, curIdx - 1); }}>↑</button>
+                <button title="Move the selected drum down (changes its number)" className="btn small" disabled={curIdx >= bank.length - 1} onClick={() => { const n = bank.slice(); [n[curIdx + 1], n[curIdx]] = [n[curIdx], n[curIdx + 1]]; put(n, curIdx + 1); }}>↓</button>
+                <button title="Duplicate the selected drum" className="btn small" onClick={() => { if (room()) { const n = bank.slice(); const d = { ...cur, name: cur.name + ' copy', pcm: cur.pcm.slice() }; const s = SOURCES.get(cur.pcm); if (s) SOURCES.set(d.pcm, s); n.splice(curIdx + 1, 0, d); put(n, curIdx + 1); } }}>Duplicate</button>
+                <button title="Delete the selected drum" className="btn small" onClick={() => { const n = bank.slice(); n.splice(curIdx, 1); put(n, curIdx); }}>Remove</button>
                 <button className="btn small" title="Play backwards" onClick={() => { const d = { ...cur, pcm: cur.pcm.slice().reverse() }; const n = bank.slice(); n[curIdx] = d; put(n, curIdx); }}>Reverse</button>
               </div>
               <label className="row"><span className="lbl">Name</span><TextField value={cur.name} maxLength={24} onCommit={(v) => { const n = bank.slice(); n[curIdx] = { ...cur, name: v }; put(n, curIdx); }} /></label>

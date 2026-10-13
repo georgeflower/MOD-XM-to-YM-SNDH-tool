@@ -1,7 +1,7 @@
 /** One-line explanations of cell contents for the pattern editor's status line. */
 import { type Pattern, NOTE_OFF, EFFECT_LETTERS, noteName, toHex2 } from './types';
 
-const LETTER_HELP: Record<string, string> = {
+export const LETTER_HELP: Record<string, string> = {
   '0': 'Arpeggio: x and y are semitones added in turn (0xy)',
   '1': 'Slide up (1xx) per tick',
   '2': 'Slide down (2xx) per tick',
@@ -10,6 +10,8 @@ const LETTER_HELP: Record<string, string> = {
   '5': 'Slide to note + volume slide',
   '6': 'Vibrato + volume slide',
   '7': 'Tremolo: x speed, y depth',
+  '8': 'Not played (panning in FastTracker 2)',
+  '9': 'Not played (sample offset in FastTracker 2)',
   'A': 'Volume slide: x up, y down',
   'B': 'Jump to song position (Bxx)',
   'C': 'Set volume 00-40',
@@ -23,6 +25,12 @@ const LETTER_HELP: Record<string, string> = {
   'Q': 'SID voice: the voice volume toggles on/off at a timer rate, 20 Hz * 2^(octave y + pitch x/16). Q00 or a new note ends it',
   'S': 'Sinus-SID: like Q, but the "on" half is a sine wave. S00 or a new note ends it',
   'U': 'Sync-buzzer: the hardware envelope restarts at a timer rate (use an envelope instrument). U00 or a new note ends it',
+  'M': 'Envelope period, low byte (Mxx; period = Y*256 + M, overrides the instrument)',
+  'P': 'Envelope divisor (Pxx): envelope period = tone period / xx',
+  'R': 'Retrigger every y ticks with volume change x (Rxy); R00 restarts the envelope shape',
+  'T': 'Reserved (YM Tracker compatibility), not played',
+  'X': 'Force hardware envelope with shape y (Xxy)',
+  'Y': 'Envelope period, high byte (Yxx; period = Y*256 + M, overrides the instrument)',
   'Z': 'Trigger digidrum (Z00 stops)',
 };
 

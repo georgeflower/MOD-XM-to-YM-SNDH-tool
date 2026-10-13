@@ -1,6 +1,9 @@
 /// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { readFileSync } from 'node:fs';
+
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
 // The page must also work when index.html is simply double-clicked (file://), where browsers refuse
 // module scripts and `crossorigin` requests. So: one classic (IIFE) script loaded with `defer`.
@@ -18,6 +21,7 @@ const classicScript = (): Plugin => ({
 // (e.g. https://user.nekoweb.org/apps/mod2ym/ AND .../apps/mod2ym/index.html) and from file://.
 export default defineConfig({
   base: './',
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [react(), classicScript()],
   assetsInclude: ['**/*.mod', '**/*.xm'],
   build: {

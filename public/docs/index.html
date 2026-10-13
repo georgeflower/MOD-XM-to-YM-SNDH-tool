@@ -1,0 +1,3714 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MOD/XM to YM2149 Help</title>
+<meta name="description" content="Manual, how-to guide, effects reference, architecture and technical specifications of the MOD/XM to YM2149 tool, version 0.3.0.">
+<style>
+:root { --bg:#fbfbfd; --ink:#1b1f2a; --dim:#5a6074; --line:#d9dce6; --accent:#2c5fd4; --side:#f0f2f8; --code:#eef0f6; --mark:#fff3b0; --head:#1d2342; --headink:#fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#10131f; --ink:#dfe3f1; --dim:#9aa2bd; --line:#2a3050; --accent:#7ea8ff; --side:#161a2c; --code:#1b2037; --mark:#5b4c00; --head:#0a0d1e; } }
+:root[data-theme="dark"] { --bg:#10131f; --ink:#dfe3f1; --dim:#9aa2bd; --line:#2a3050; --accent:#7ea8ff; --side:#161a2c; --code:#1b2037; --mark:#5b4c00; --head:#0a0d1e; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header.top { position: sticky; top: 0; z-index: 5; display: flex; gap: 12px; align-items: center; padding: 8px 16px; background: var(--head); color: var(--headink); }
+header.top h1 { font-size: 16px; margin: 0; font-weight: 600; white-space: nowrap; }
+header.top h1 small { font-weight: 400; opacity: .75; margin-left: 6px; }
+header.top input { flex: 1; min-width: 80px; max-width: 360px; padding: 5px 9px; border-radius: 4px; border: 1px solid #5a6390; background: #fff; color: #111; font: inherit; }
+header.top a, header.top button { color: var(--headink); background: transparent; border: 1px solid #5a6390; border-radius: 4px; padding: 4px 9px; font: inherit; cursor: pointer; text-decoration: none; }
+header.top .sp { flex: 1; }
+.layout { display: grid; grid-template-columns: 270px minmax(0, 1fr); }
+nav.toc { position: sticky; top: 45px; align-self: start; height: calc(100vh - 45px); overflow: auto; padding: 14px 12px 40px 16px; background: var(--side); border-right: 1px solid var(--line); font-size: 13.5px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; }
+nav.toc li.ch { margin-top: 12px; font-weight: 600; }
+nav.toc li.ch a { color: var(--ink); }
+nav.toc li.sec { font-weight: 400; padding-left: 10px; margin: 1px 0; }
+nav.toc a { color: var(--dim); text-decoration: none; display: block; padding: 1px 0; }
+nav.toc a:hover, nav.toc a.on { color: var(--accent); }
+main { padding: 8px 28px 80px; max-width: 980px; }
+main section.chapter > h1 { font-size: 28px; margin: 36px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--accent); }
+main section.sec > h2 { font-size: 20px; margin: 28px 0 8px; }
+h3 { font-size: 16px; margin: 20px 0 6px; }
+a { color: var(--accent); }
+.anchor { color: var(--dim); text-decoration: none; margin-left: 6px; opacity: 0; font-weight: 400; }
+h1:hover .anchor, h2:hover .anchor { opacity: 1; }
+table { border-collapse: collapse; margin: 12px 0; width: 100%; font-size: 14px; display: block; overflow-x: auto; }
+th, td { border: 1px solid var(--line); padding: 5px 9px; vertical-align: top; text-align: left; }
+th { background: var(--side); }
+code { background: var(--code); border-radius: 3px; padding: 1px 4px; font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+pre { background: var(--code); padding: 10px 12px; border-radius: 6px; overflow-x: auto; }
+pre code { background: none; padding: 0; }
+blockquote { margin: 10px 0; padding: 4px 14px; border-left: 4px solid var(--accent); background: var(--side); }
+mark { background: var(--mark); color: inherit; }
+.hidden { display: none; }
+.none { color: var(--dim); padding: 20px 0; }
+footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top: 1px solid var(--line); }
+#menu { display: none; }
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  nav.toc { position: fixed; left: 0; top: 45px; width: 280px; max-width: 85vw; z-index: 4; transform: translateX(-105%); transition: transform .15s; box-shadow: 2px 0 12px #0006; }
+  body.menu nav.toc { transform: none; }
+  #menu { display: inline-block; }
+  header.top { gap: 6px; padding: 8px 10px; }
+  header.top h1 small, header.top .sp { display: none; }
+  header.top input { min-width: 0; }
+  header.top a, header.top button { padding: 4px 7px; }
+  main { padding: 6px 16px 60px; }
+}
+@media print {
+  header.top, nav.toc { display: none; }
+  .layout { display: block; }
+  main { max-width: none; padding: 0; }
+  main section.chapter { break-before: page; }
+  a { color: inherit; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <button id="menu" aria-label="Contents">☰</button>
+  <h1>MOD/XM → YM2149 <small>Help · v0.3.0</small></h1>
+  <input id="q" type="search" placeholder="Search the documentation  ( / )" aria-label="Search the documentation">
+  <span class="sp"></span>
+  <button id="theme" title="Switch between light and dark">◐</button>
+  <a href="../index.html" title="Back to the tool">Open the tool</a>
+</header>
+<div class="layout">
+<nav class="toc" aria-label="Contents"><ol><li class="ch"><a href="#start-here">Start here</a></li><li class="sec"><a href="#the-two-tabs">The two tabs</a></li><li class="sec"><a href="#ten-minute-quick-start">Ten-minute quick start</a></li><li class="sec"><a href="#what-s-new-in-0-3">What's new in 0.3</a></li><li class="sec"><a href="#how-to-read-this-documentation">How to read this documentation</a></li><li class="sec"><a href="#glossary">Glossary</a></li><li class="ch"><a href="#concepts">Concepts</a></li><li class="sec"><a href="#concepts-chip">The YM2149 in one page</a></li><li class="sec"><a href="#concepts-convert">How the automatic conversion works</a></li><li class="sec"><a href="#concepts-ways">Two ways to get to a result</a></li><li class="sec"><a href="#concepts-instruments">Instruments in the editor</a></li><li class="sec"><a href="#concepts-digidrums">Digidrums</a></li><li class="sec"><a href="#concepts-timer">Timer effects: Q, S, U</a></li><li class="sec"><a href="#concepts-matrix">What survives in which export</a></li><li class="ch"><a href="#manual-converter">Manual: Converter</a></li><li class="sec"><a href="#manual-loading">Header and loading</a></li><li class="sec"><a href="#manual-module">Module panel</a></li><li class="sec"><a href="#manual-conversion">Conversion panel</a></li><li class="sec"><a href="#manual-roles">Instruments → AY role</a></li><li class="sec"><a href="#manual-channels">Source channels → 3 voices</a></li><li class="sec"><a href="#manual-import">Manual import dialog</a></li><li class="sec"><a href="#manual-export">Export panel</a></li><li class="sec"><a href="#manual-preview">Preview panel</a></li><li class="sec"><a href="#manual-tune">Loaded SNDH / YM panel</a></li><li class="sec"><a href="#manual-report">Conversion report</a></li><li class="ch"><a href="#manual-editor">Manual: Pattern editor</a></li><li class="sec"><a href="#manual-editor-layout">Layout</a></li><li class="sec"><a href="#manual-editor-bar">Song bar</a></li><li class="sec"><a href="#manual-editor-grid">The pattern grid</a></li><li class="sec"><a href="#manual-editor-drumcol">Drum channel</a></li><li class="ch"><a href="#manual-instruments">Manual: Instrument editor</a></li><li class="sec"><a href="#manual-instruments-common">Common fields</a></li><li class="sec"><a href="#manual-instruments-classic">Classic instruments</a></li><li class="sec"><a href="#manual-instruments-both">Fields for both types</a></li><li class="sec"><a href="#manual-instruments-step">Step-table instruments</a></li><li class="sec"><a href="#manual-presets">Presets</a></li><li class="ch"><a href="#manual-drums">Manual: Digidrum editor</a></li><li class="ch"><a href="#howto">How-to recipes</a></li><li class="sec"><a href="#howto-load">Load a MOD or XM</a></li><li class="sec"><a href="#howto-auto">Import automatically, then adjust the priority</a></li><li class="sec"><a href="#howto-manual-import">Manual import with channel priorities</a></li><li class="sec"><a href="#howto-instruments-convert">Change how a module instrument is played</a></li><li class="sec"><a href="#howto-rename">Rename instruments</a></li><li class="sec"><a href="#howto-drums-convert">Make drums sound right</a></li><li class="sec"><a href="#howto-mapping">Save and reuse a conversion</a></li><li class="sec"><a href="#howto-edit">Continue in the pattern editor</a></li><li class="sec"><a href="#howto-change-inst">Change an instrument in the editor</a></li><li class="sec"><a href="#howto-new-inst">Create a new instrument</a></li><li class="sec"><a href="#howto-digidrum">Add and use digidrums</a></li><li class="sec"><a href="#howto-timer">Use the timer effects Q, S and U</a></li><li class="sec"><a href="#howto-scratch">Write a tune from scratch</a></li><li class="sec"><a href="#howto-load-sndh">Load SNDH and YM files</a></li><li class="sec"><a href="#howto-load-other">Load maxYMiser, Arkos and `.ymt` files</a></li><li class="sec"><a href="#howto-export">Export</a></li><li class="sec"><a href="#howto-cli">Use the command line</a></li><li class="ch"><a href="#effects">Effects reference</a></li><li class="sec"><a href="#effects-timing">Timing: rows, ticks and frames</a></li><li class="sec"><a href="#effects-lifetime">How long an effect lasts</a></li><li class="sec"><a href="#effects-pitch">Pitch effects</a></li><li class="sec"><a href="#effects-volume">Volume effects</a></li><li class="sec"><a href="#effects-envelope">Hardware envelope (buzzer) effects</a></li><li class="sec"><a href="#effects-flow">Flow effects</a></li><li class="sec"><a href="#effects-timer">Timer and sample effects</a></li><li class="sec"><a href="#effects-matrix">Which effects survive in which export</a></li><li class="ch"><a href="#tooltips">Tooltips and keys</a></li><li class="sec"><a href="#tooltips-converter">Converter</a></li><li class="sec"><a href="#tooltips-manual-import-dialog">Manual import dialog</a></li><li class="sec"><a href="#tooltips-pattern-editor">Pattern editor</a></li><li class="sec"><a href="#tooltips-instrument-editor">Instrument editor</a></li><li class="sec"><a href="#tooltips-digidrum-editor">Digidrum editor</a></li><li class="sec"><a href="#tooltips-status">Status line explanations (effects)</a></li><li class="sec"><a href="#tooltips-keys">Keyboard reference</a></li><li class="ch"><a href="#architecture">Architecture</a></li><li class="sec"><a href="#architecture-overview">Overview</a></li><li class="sec"><a href="#architecture-data">Data model</a></li><li class="sec"><a href="#architecture-layout">Source layout</a></li><li class="sec"><a href="#architecture-converter">The converter pipeline in detail</a></li><li class="sec"><a href="#architecture-renderer">The pattern renderer</a></li><li class="sec"><a href="#architecture-editor">The editor store</a></li><li class="sec"><a href="#architecture-audio">Audio</a></li><li class="sec"><a href="#architecture-sndh-import">SNDH import</a></li><li class="sec"><a href="#architecture-exporters">Exporters</a></li><li class="sec"><a href="#architecture-68000">The 68000 engine</a></li><li class="sec"><a href="#architecture-build">Build and delivery</a></li><li class="sec"><a href="#architecture-verification">Verification strategy</a></li><li class="ch"><a href="#specs">Technical specifications</a></li><li class="sec"><a href="#specs-time">Time base and registers</a></li><li class="sec"><a href="#specs-regs">Register dump (`.regs`, internal)</a></li><li class="sec"><a href="#specs-stream">Packed stream (SNDH and game kit)</a></li><li class="sec"><a href="#specs-sndh">SNDH file</a></li><li class="sec"><a href="#specs-ym">YM5! and YM6! files</a></li><li class="sec"><a href="#specs-drums">Digidrum table and engine</a></li><li class="sec"><a href="#specs-fx">Timer-effect engine</a></li><li class="sec"><a href="#specs-gamekit">Game kit</a></li><li class="sec"><a href="#specs-ymt">`.ymt` song file</a></li><li class="sec"><a href="#specs-mapping">Mapping file (`.json`)</a></li><li class="sec"><a href="#specs-trackers">Exports to other trackers</a></li><li class="sec"><a href="#specs-limits">Limits at a glance</a></li><li class="sec"><a href="#specs-scenarios">Scenarios</a></li><li class="ch"><a href="#troubleshooting">Troubleshooting</a></li><li class="sec"><a href="#troubleshooting-load">Loading and playback</a></li><li class="sec"><a href="#troubleshooting-sound">The conversion sounds wrong</a></li><li class="sec"><a href="#troubleshooting-editor">Pattern editor</a></li><li class="sec"><a href="#troubleshooting-export">Export</a></li><li class="sec"><a href="#troubleshooting-privacy">Files and privacy</a></li><li class="sec"><a href="#troubleshooting-help">Getting help</a></li></ol></nav>
+<main>
+<section class="chapter" id="start-here"><h1>Start here<a class="anchor" href="#start-here" aria-label="link">#</a></h1>
+<div class="intro"><p><strong>MOD/XM → YM2149 · SNDH · game stream — version 0.3</strong></p>
+<p>A browser tool that turns ProTracker <code>.mod</code> and FastTracker II <code>.xm</code> modules into music for the <strong>Atari ST&#39;s YM2149</strong> sound chip (one chip: three square-wave voices, one noise generator, one envelope generator, updated 50 times a second). It also loads <code>.sndh</code>, <code>.ym</code>, <code>.ymt</code>, maxYMiser and Arkos files, has an FT2-style pattern editor for the chip, and exports to SNDH, YM, a C game kit, maxYMiser, Arkos Tracker 3, Furnace, WAV and raw registers.</p>
+<p>Everything runs in your browser. There is no server and nothing is uploaded.</p>
+</div>
+<section class="sec" id="the-two-tabs"><h2>The two tabs<a class="anchor" href="#the-two-tabs" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Tab</th>
+<th>What it is for</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Converter</strong></td>
+<td>Load a module, let the tool convert it automatically, listen to the original and the YM version side by side, tune the conversion (priorities, instrument roles, options) and export.</td>
+</tr>
+<tr>
+<td><strong>AY pattern editor</strong></td>
+<td>Edit the song as patterns for the three YM voices, with your own instruments, digidrums and timer effects. Reached with <em>Edit as AY patterns →</em>, <em>New</em>, or by loading a <code>.ymt</code>, maxYMiser or Arkos file.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="ten-minute-quick-start"><h2>Ten-minute quick start<a class="anchor" href="#ten-minute-quick-start" aria-label="link">#</a></h2><ol>
+<li>Press <strong>Demo: Omar&#39;s Bazaar</strong> (or <strong>Load MOD / XM / SNDH / YM / YMT…</strong>, or drop a file anywhere on the page).</li>
+<li>Press <strong>Space</strong> to play. Press <strong>Tab</strong> to flip between the <em>original</em> (played by libopenmpt) and the <em>YM version</em>. The difference is the conversion.</li>
+<li>If the melody gets lost, open <strong>Manual import…</strong>, give the melody channel the priority <strong>Lead</strong>, press <strong>▶ Full preview</strong>, and listen. See <a href="#howto-manual-import">Manual import</a>.</li>
+<li>If a drum sounds thin, set the instrument&#39;s <strong>AY role</strong> to <em>digidrum (sample)</em> (or tick <em>Percussion as digidrums</em>).</li>
+<li>Choose an export: <strong>SNDH</strong> plays in any Atari ST player; <strong>YM</strong> plays in ST-Sound and similar players.</li>
+<li>To keep working on the song by hand, press <strong>Edit as AY patterns →</strong>.</li>
+</ol>
+</section>
+<section class="sec" id="what-s-new-in-0-3"><h2>What's new in 0.3<a class="anchor" href="#what-s-new-in-0-3" aria-label="link">#</a></h2><ul>
+<li><strong>Manual import dialog</strong> — per-channel priority (<em>Off / Low / Normal / High / Lead</em>), <em>▶ Solo</em> for each channel, <em>▶ Full preview</em> that updates while you change priorities, click-to-seek on every channel&#39;s activity graph, instrument renaming, and <em>Suggest</em>.</li>
+<li><strong>Automatic drum channel</strong> — <em>Edit as AY patterns</em> adds the drum column (digidrum samples) by itself when the module has percussion.</li>
+<li><strong>Arkos Tracker 3</strong> export and import (<code>.aks</code>), with release tails, fractional pitch and vibrato.</li>
+<li><strong>Furnace</strong> export (<code>.fur</code>) with exact vibrato and buzzer envelopes.</li>
+<li><strong>Demo song</strong> replaced by <em>Omar&#39;s Bazaar</em> (Qumran).</li>
+<li><strong>Stable layout</strong> in the pattern view (the instrument and pattern panels no longer change size).</li>
+<li><strong>This documentation</strong>, available from the <em>Help</em> link in the header and as the single file <code>docs/index.html</code> next to the app.</li>
+</ul>
+</section>
+<section class="sec" id="how-to-read-this-documentation"><h2>How to read this documentation<a class="anchor" href="#how-to-read-this-documentation" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>If you want…</th>
+<th>Read</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>to understand what the tool does and why</td>
+<td><a href="#concepts">Concepts</a></td>
+</tr>
+<tr>
+<td>a description of every button and field</td>
+<td><a href="#manual-converter">Converter manual</a>, <a href="#manual-editor">Pattern editor manual</a>, <a href="#manual-instruments">Instrument editor</a></td>
+</tr>
+<tr>
+<td>step-by-step recipes</td>
+<td><a href="#howto">How-to</a></td>
+</tr>
+<tr>
+<td>what every effect letter does</td>
+<td><a href="#effects">Effects reference</a></td>
+</tr>
+<tr>
+<td>the text of every tooltip and key</td>
+<td><a href="#tooltips">Tooltips and keys</a></td>
+</tr>
+<tr>
+<td>how it is built</td>
+<td><a href="#architecture">Architecture</a></td>
+</tr>
+<tr>
+<td>formats, limits and verification</td>
+<td><a href="#specs">Technical specifications</a></td>
+</tr>
+<tr>
+<td>help when something sounds wrong</td>
+<td><a href="#troubleshooting">Troubleshooting</a></td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="glossary"><h2>Glossary<a class="anchor" href="#glossary" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>YM2149 / AY</strong></td>
+<td>The sound chip of the Atari ST (pin-compatible with the General Instrument AY-3-8910). Three tone voices (A, B, C), one noise generator, one hardware envelope.</td>
+</tr>
+<tr>
+<td><strong>Frame</strong></td>
+<td>One 20 ms update (50 Hz). Each frame is 14 register values (R0–R13).</td>
+</tr>
+<tr>
+<td><strong>Tick</strong></td>
+<td>The editor&#39;s time step. At 125 BPM one tick is exactly one frame.</td>
+</tr>
+<tr>
+<td><strong>Row / speed</strong></td>
+<td>A pattern row lasts <em>speed</em> ticks. BPM sets the tick length: 2.5 / BPM seconds.</td>
+</tr>
+<tr>
+<td><strong>Voice</strong></td>
+<td>One of the chip&#39;s three tone channels (A, B, C). A module has more <em>source channels</em> than the chip has voices.</td>
+</tr>
+<tr>
+<td><strong>Priority</strong></td>
+<td>A bonus added to a source channel when the converter decides which three events win the three voices in a frame.</td>
+</tr>
+<tr>
+<td><strong>Buzzer</strong></td>
+<td>The chip&#39;s hardware envelope run at audible pitch: a buzzy saw/triangle bass sound. One envelope is shared by all voices.</td>
+</tr>
+<tr>
+<td><strong>Sync-square</strong></td>
+<td>A trick that restarts the square wave at the start of each note so every note begins in the same phase.</td>
+</tr>
+<tr>
+<td><strong>Step table</strong></td>
+<td>An instrument defined tick by tick: volume, pitch offset, noise and tone for every 20 ms.</td>
+</tr>
+<tr>
+<td><strong>Digidrum</strong></td>
+<td>A short 4-bit sample played by writing a voice&#39;s volume register from a timer interrupt.</td>
+</tr>
+<tr>
+<td><strong>MFP</strong></td>
+<td>The Atari ST&#39;s timer chip (MC68901). Timer A drives the Q/S/U effects, Timer D the digidrums.</td>
+</tr>
+<tr>
+<td><strong>SID voice / sinus-SID / sync-buzzer</strong></td>
+<td>The three timer effects: <code>Q</code>, <code>S</code>, <code>U</code>.</td>
+</tr>
+<tr>
+<td><strong>SNDH</strong></td>
+<td>The Atari ST music file format: a small 68000 program plus data.</td>
+</tr>
+<tr>
+<td><strong>YM</strong></td>
+<td>The register-dump format of ST-Sound (<code>YM5!</code>, <code>YM6!</code>).</td>
+</tr>
+<tr>
+<td><strong><code>.ymt</code></strong></td>
+<td>The YM Tracker&#39;s native song file, read and written byte-compatibly.</td>
+</tr>
+<tr>
+<td><strong>Mapping</strong></td>
+<td>A <code>.json</code> file with the instrument roles, channel priorities and options of a conversion.</td>
+</tr>
+</tbody></table>
+</section>
+</section>
+<section class="chapter" id="concepts"><h1>Concepts<a class="anchor" href="#concepts" aria-label="link">#</a></h1>
+<div class="intro"></div>
+<section class="sec" id="concepts-chip"><h2>The YM2149 in one page<a class="anchor" href="#concepts-chip" aria-label="link">#</a></h2><p>The chip has <strong>14 registers</strong> that you write 50 times a second (once per video frame on an Atari ST).</p>
+<table>
+<thead>
+<tr>
+<th>Registers</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>R0/R1, R2/R3, R4/R5</td>
+<td>Tone period (12 bit) for voices A, B, C. Frequency = 2 000 000 / (16 × period).</td>
+</tr>
+<tr>
+<td>R6</td>
+<td>Noise period (0–31). One noise generator for all voices.</td>
+</tr>
+<tr>
+<td>R7</td>
+<td>Mixer: tone/noise on or off for each voice.</td>
+</tr>
+<tr>
+<td>R8, R9, R10</td>
+<td>Volume (0–15) for A, B, C. Bit 4 = &quot;use the hardware envelope instead&quot;.</td>
+</tr>
+<tr>
+<td>R11/R12</td>
+<td>Envelope period (16 bit).</td>
+</tr>
+<tr>
+<td>R13</td>
+<td>Envelope shape (0–15). Writing it restarts the envelope.</td>
+</tr>
+</tbody></table>
+<p>Consequences that shape everything in this tool:</p>
+<ul>
+<li><strong>Three voices only.</strong> A module with eight channels must be reduced to three events per frame.</li>
+<li><strong>One noise generator and one envelope generator</strong> are shared by all voices, so two drums with different noise periods cannot sound at once, and a buzzer bass uses the envelope for the whole chip.</li>
+<li><strong>Volume has 16 steps</strong> of about 3 dB each. A module&#39;s 64 volume levels are mapped onto them.</li>
+<li><strong>50 Hz resolution.</strong> Anything faster than a frame (digidrums, SID voices) needs a timer interrupt on the ST — see <a href="#concepts-digidrums">Digidrums</a> and <a href="#concepts-timer">Timer effects</a>.</li>
+</ul>
+</section>
+<section class="sec" id="concepts-convert"><h2>How the automatic conversion works<a class="anchor" href="#concepts-convert" aria-label="link">#</a></h2><ol>
+<li><strong>Replay.</strong> The module is played tick-accurately in a model of the original tracker (all MOD/XM effects, envelopes, auto-vibrato, loop detection). Every 20 ms the state of each source channel is captured: instrument, pitch, loudness, sample position.</li>
+<li><strong>Classify.</strong> For each source instrument the tool measures the sample&#39;s pitch from its waveform cycle and decides whether it is <em>tonal</em> (a note) or <em>percussive</em> (a kick, snare, hat…).</li>
+<li><strong>Turn into AY events.</strong> A tonal channel becomes a tone period plus a level. A drum becomes a macro (a short burst of noise and falling tone) or, if you choose, a digidrum sample.</li>
+<li><strong>Allocate.</strong> Every frame, each candidate event gets a <strong>score</strong>: its AY volume, plus the channel&#39;s <strong>priority</strong>, plus the drum bonus for percussion, plus a stickiness bonus if it was on that voice last frame. The best three win the three voices. Events that lose are dropped — or, with <em>Arp fill</em>, folded into a fast arpeggio on the nearest voice.</li>
+<li><strong>Write registers.</strong> The three winners and the shared noise/envelope state become the 14 register bytes of the frame.</li>
+</ol>
+<p>The result is a register dump; every export (SNDH, YM, game kit, WAV…) is built from the same dump, so they all sound the same.</p>
+<h3>The score, in detail {#concepts-score}</h3>
+<pre><code>score = AY volume (0–15)
+      + channel priority            (Off = channel left out, Low −3, Normal 0, High +3, Lead +8)
+      + drum priority bonus         (only for percussion, slider &quot;Drum priority&quot;, default +3)
+      + stickiness bonus            (if this event was on that voice in the last frame, default +1.5)
+</code></pre>
+<p>Example: a <em>Lead</em> note at volume 7 scores 15, the same as a <em>Normal</em> note at full volume, and with the stickiness bonus it keeps its voice. A <em>Lead</em> note beats a <em>Normal</em> one unless the normal one is more than 8 steps louder, which on a 16-step scale means almost never. The numbers behind the five levels are listed in the <a href="#manual-import">Manual import</a> chapter; the +/− buttons in the Converter&#39;s channel table set any other value.</p>
+</section>
+<section class="sec" id="concepts-ways"><h2>Two ways to get to a result<a class="anchor" href="#concepts-ways" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Way</th>
+<th>Use it when</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Converter only</strong></td>
+<td>You want a quick YM/SNDH of a tune and a few tweaks are enough.</td>
+<td>Exports are produced directly from the frame converter.</td>
+</tr>
+<tr>
+<td><strong>Edit as AY patterns</strong></td>
+<td>You want to fix things by hand, make your own instruments, add drums, add timer effects, or export to maxYMiser/Arkos/Furnace.</td>
+<td>An editable pattern song (3 voices + optional drum column) that you can save as <code>.ymt</code>.</td>
+</tr>
+</tbody></table>
+<p><em>Edit as AY patterns</em> uses the same priorities and roles you set in the Converter. The converter is a <em>rendering</em> of the module; the pattern song is an <em>editable approximation</em> of it, with row-level voice allocation and step-table instruments, and all editor effects available.</p>
+</section>
+<section class="sec" id="concepts-instruments"><h2>Instruments in the editor<a class="anchor" href="#concepts-instruments" aria-label="link">#</a></h2><p>The editor has two kinds of instrument:</p>
+<ul>
+<li><strong>Classic</strong> (the YM Tracker&#39;s own kind): tone and/or noise on, a volume <strong>ADSR</strong> or a <strong>volume table</strong>, an optional <strong>hardware envelope</strong> (buzzer), arpeggio and pitch tables, vibrato.</li>
+<li><strong>Step table</strong> (this tool&#39;s extension): one row per 20 ms tick with volume, pitch offset (semitones, decimals allowed), noise period and a tone on/off switch, plus <em>loop from</em> and a <em>release</em>. This is what the converter produces for module instruments, and what the presets (drums, acid bass…) use.</li>
+</ul>
+<p>A step table plus the hardware-envelope option gives a <strong>gated buzzer</strong>; plus <em>sync-square</em> gives the punchy bass attack; with <em>digidrums</em> attached an instrument becomes a drum bank.</p>
+</section>
+<section class="sec" id="concepts-digidrums"><h2>Digidrums<a class="anchor" href="#concepts-digidrums" aria-label="link">#</a></h2><p>A digidrum is a <strong>4-bit sample</strong> (16 amplitude levels) played by writing a voice&#39;s volume register thousands of times a second from an MFP <strong>Timer D</strong> interrupt. While a drum plays, its voice carries the sample (tone and noise off).</p>
+<ul>
+<li><strong>One drum at a time.</strong> A new drum cuts the one before it.</li>
+<li>Rates between 1 kHz and 24 kHz are possible; the ST can make only certain rates, so the nearest MFP rate is used (8 kHz becomes 7989 Hz).</li>
+<li>A drum is at most 16 000 bytes; an instrument carries at most 63 drums.</li>
+<li>Digidrums need a real timer interrupt, so they exist only in exports that carry the drum engine: <strong>SNDH, YM6, game kit, <code>.ymt</code>, maxYMiser</strong>. Arkos, Furnace and the register dump cannot carry them.</li>
+</ul>
+</section>
+<section class="sec" id="concepts-timer"><h2>Timer effects: Q, S, U<a class="anchor" href="#concepts-timer" aria-label="link">#</a></h2><p>Three YM Tracker effects use the MFP <strong>Timer A</strong> to change the chip faster than 50 Hz. Their parameter <code>xx</code> is pitch (high nibble) and octave (low nibble): the timer runs at <code>20 Hz · 2^(octave + pitch/16)</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Effect</th>
+<th>What the timer does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Qxx</code> SID voice</td>
+<td>Toggles the voice volume between its value and 0 — the classic raspy &quot;SID&quot; sound.</td>
+</tr>
+<tr>
+<td><code>Sxx</code> sinus-SID</td>
+<td>Same, but the <em>on</em> half is a rectified sine — a smoother, softer wobble.</td>
+</tr>
+<tr>
+<td><code>Uxx</code> sync-buzzer</td>
+<td>Rewrites the envelope shape register at the timer rate, restarting the envelope — a harsh hard-sync buzz.</td>
+</tr>
+</tbody></table>
+<p>Only <strong>one</strong> timer effect and <strong>one</strong> drum can run at a time.</p>
+</section>
+<section class="sec" id="concepts-matrix"><h2>What survives in which export<a class="anchor" href="#concepts-matrix" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>SNDH</th>
+<th>YM</th>
+<th>Game kit</th>
+<th>WAV</th>
+<th>maxYMiser</th>
+<th>Arkos</th>
+<th>Furnace</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Tone, noise, volume, envelope</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Hardware envelope (buzzer)</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Sync-square</td>
+<td>✓</td>
+<td>–</td>
+<td>✓</td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+</tr>
+<tr>
+<td>Digidrums</td>
+<td>✓</td>
+<td>YM6</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+</tr>
+<tr>
+<td>Q / S / U timer effects</td>
+<td>✓</td>
+<td>YM6</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+</tr>
+<tr>
+<td>Editable instruments / patterns</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Loop point</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>–</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+</tbody></table>
+<p><em>YM</em> means the file stays a plain <code>YM5!</code> dump unless the song has drums or timer effects, in which case a <code>YM6!</code> file is written.</p>
+</section>
+</section>
+<section class="chapter" id="manual-converter"><h1>Manual: Converter<a class="anchor" href="#manual-converter" aria-label="link">#</a></h1>
+<div class="intro"><p>The <strong>Converter</strong> tab is where a module (or an existing SNDH/YM tune) is loaded, converted, auditioned and exported. Panels appear as you need them: before anything is loaded you see only the <em>Start here</em> box.</p>
+</div>
+<section class="sec" id="manual-loading"><h2>Header and loading<a class="anchor" href="#manual-loading" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Load MOD / XM / SNDH / YM / YMT…</strong></td>
+<td>Opens a file. Accepted: <code>.mod</code>, <code>.xm</code>, <code>.sndh</code> / <code>.snd</code> (also ICE!-packed), <code>.ym</code> (YM2!, YM3!, YM3b!, YM5!, YM6!, also LHA-packed) and <code>.ymt</code>. The type is detected from the file contents, not the extension.</td>
+</tr>
+<tr>
+<td><strong>Drop a file</strong></td>
+<td>Dropping a file anywhere on the page does the same.</td>
+</tr>
+<tr>
+<td><strong>Demo: Omar&#39;s Bazaar</strong></td>
+<td>Loads the bundled XM song <em>Omar&#39;s Bazaar</em> by Qumran.</td>
+</tr>
+<tr>
+<td><strong>Converter / AY pattern editor</strong> tabs</td>
+<td>Switch between the two halves of the tool. The loaded module stays in memory when you switch.</td>
+</tr>
+</tbody></table>
+<p>What happens after loading depends on the file type:</p>
+<ul>
+<li><strong>MOD / XM</strong> — converted automatically with default settings. The <em>Module</em>, <em>Conversion</em>, <em>Export</em>, <em>Preview</em>, <em>Instruments</em>, <em>Source channels</em> and <em>Report</em> panels appear.</li>
+<li><strong>SNDH / YM</strong> — not converted, only <em>played</em>: a <code>.ym</code> is read as the register dump it is, a <code>.sndh</code> is run in a built-in 68000 emulator. You get the <em>Loaded tune</em> panel, the preview and the exports. See <a href="#howto-load-sndh">Loading SNDH and YM</a>.</li>
+<li><strong>YMT</strong> — opens in the AY pattern editor.</li>
+</ul>
+</section>
+<section class="sec" id="manual-module"><h2>Module panel<a class="anchor" href="#manual-module" aria-label="link">#</a></h2><p>Read-only facts about the module: file name, title, type (MOD or XM) and channel count, patterns and orders, initial speed/BPM and the length of the YM version. <strong>Composer</strong> is a text field whose content is written into the SNDH <code>COMM</code> tag and the YM author field.</p>
+</section>
+<section class="sec" id="manual-conversion"><h2>Conversion panel<a class="anchor" href="#manual-conversion" aria-label="link">#</a></h2><p>All conversion controls re-render the preview automatically: the change is applied after a quarter of a second and the conversion of a long song takes one to three seconds (the status text shows <em>Converting…</em> and <em>Rendering…</em>).</p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Range / default</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Level</strong></td>
+<td>−12…+12 dB, 0</td>
+<td>Overall loudness mapped onto the chip&#39;s 16 volume steps. Raise it if the YM version sounds quiet, lower it if many notes sit at the maximum level.</td>
+</tr>
+<tr>
+<td><strong>Drum priority</strong></td>
+<td>0…6, 3</td>
+<td>Bonus added to percussion when voices are handed out. Higher = drums win over melody notes more often.</td>
+</tr>
+<tr>
+<td><strong>Voice stickiness</strong></td>
+<td>0…4, 1.5</td>
+<td>Bonus for an event that stays on the voice it had in the previous frame. Higher = fewer voice jumps and clicks, but a new important note may wait.</td>
+</tr>
+<tr>
+<td><strong>Sample waveform → buzzer (saw / triangle)</strong></td>
+<td>off</td>
+<td>Analyses each tonal sample&#39;s cycle; a sawtooth, thin pulse or triangle/sine becomes the chip&#39;s <em>buzzer</em> (hardware envelope at the note&#39;s pitch) instead of a square wave. Only for loud bass notes, one voice at a time. Per-instrument override in the table.</td>
+</tr>
+<tr>
+<td><strong>Bass + drums on the middle voice</strong></td>
+<td>off</td>
+<td>The layout AY composers use: bass (median pitch below 200 Hz) and synthetic drums prefer voice B; melody and arpeggios go on A and C. Digidrums stay on voice C.</td>
+</tr>
+<tr>
+<td><strong>Arpeggio</strong></td>
+<td><code>0 → x → y</code></td>
+<td>Order in which an arpeggio cycles its notes (FT2/ProTracker order, or reversed).</td>
+</tr>
+<tr>
+<td><strong>Arp fill</strong></td>
+<td>off</td>
+<td>Notes that would be dropped are folded into a 2- or 3-note fast arpeggio on the voice with the closest pitch.</td>
+</tr>
+<tr>
+<td><strong>Min. volume</strong></td>
+<td>1…12, 3</td>
+<td>(Shown with Arp fill.) Dropped notes quieter than this AY volume are not worth an arpeggio slot.</td>
+</tr>
+<tr>
+<td><strong>Percussion as digidrums</strong></td>
+<td>off</td>
+<td>Percussion samples are played as real 4-bit samples through a timer interrupt instead of a noise/tone macro.</td>
+</tr>
+<tr>
+<td><strong>Drum rate</strong></td>
+<td>4…16 kHz, 8</td>
+<td>(Shown with digidrums.) Sample rate of the drums. Higher is clearer but costs CPU time and memory.</td>
+</tr>
+<tr>
+<td><strong>Drum length</strong></td>
+<td>50…1500 ms, 500</td>
+<td>(Shown with digidrums.) Longer drums are cut with a short fade.</td>
+</tr>
+</tbody></table>
+<p>Buttons at the bottom of the panel:</p>
+<table>
+<thead>
+<tr>
+<th>Button</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Reset to auto</strong></td>
+<td>Restores all options, priorities, instrument roles and instrument names to the automatic defaults.</td>
+</tr>
+<tr>
+<td><strong>Save mapping</strong></td>
+<td>Writes <code>&lt;module&gt;_mapping.json</code> with the options, channel priorities, instrument names and per-instrument roles, transposes, waveforms and custom macros.</td>
+</tr>
+<tr>
+<td><strong>Load mapping…</strong></td>
+<td>Reads such a file back (also one made for a similar module — a warning tells you when the module differs). The file is validated and clamped, so hand-edited files cannot break the converter.</td>
+</tr>
+<tr>
+<td><strong>Manual import…</strong></td>
+<td>Opens the <a href="#manual-import">manual import dialog</a>.</td>
+</tr>
+<tr>
+<td><strong>Edit as AY patterns →</strong></td>
+<td>Converts the module into an editable pattern song (using all the settings above) and opens the AY pattern editor.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="manual-roles"><h2>Instruments → AY role<a class="anchor" href="#manual-roles" aria-label="link">#</a></h2><p>One row per source instrument.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>#</strong>, <strong>Name</strong></td>
+<td>Instrument number (hex) and its name. The name is a <strong>text field: type over it to rename the instrument</strong> (up to 24 characters; Enter or leaving the field confirms, Esc cancels, an empty field goes back to the module&#39;s own name). The new name appears in the manual import dialog, the macro editor, the saved mapping and — in the pattern editor — as the name of the AY instruments made from it (e.g. <code>03 Bass lead</code>). Renaming does not change the sound.</td>
+</tr>
+<tr>
+<td><strong>Detected</strong></td>
+<td>What the analysis decided: <em>tonal</em> (a clearly periodic, pitched sound), <em>kick</em> (unpitched, low zero-crossing rate), <em>noise</em> (unpitched and noisy: snares, hats, cymbals) or <em>empty</em>. The AY role&#39;s <em>auto</em> entry shows what the converter then plays (e.g. <code>auto: hat</code>, <code>auto: digidrum</code>).</td>
+</tr>
+<tr>
+<td><strong>C-4</strong></td>
+<td>The measured pitch of the sample when played at note C-4.</td>
+</tr>
+<tr>
+<td><strong>Wave</strong></td>
+<td>(Tonal instruments.) The cycle&#39;s waveform: <em>auto</em> (use the analysis, shown in brackets), <em>square tone</em>, <em>saw buzzer ↘</em>, <em>saw buzzer ↗</em>, <em>triangle buzzer</em>. Buzzers are used only where the chip can do them (see the option above).</td>
+</tr>
+<tr>
+<td><strong>AY role</strong></td>
+<td>How the instrument is played on the chip:</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>auto</strong> — tone at the measured pitch, a drum macro, or (with <em>digidrums</em>) a sample;</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>tone (written note)</strong> — uses the written note&#39;s pitch with the sample&#39;s own volume curve;</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>kick / snare / hat</strong> — forces a synthetic drum macro;</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>digidrum (sample)</strong> — plays the sample as a 4-bit drum;</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>custom macro…</strong> — a per-tick table you edit in the <em>Macro editor</em> below;</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>mute</strong> — leaves the instrument out.</td>
+</tr>
+<tr>
+<td><strong>Tr.</strong></td>
+<td>Transpose in semitones (−48…+48). Disabled for drums and mute.</td>
+</tr>
+</tbody></table>
+<h3>Macro editor {#manual-macro}</h3>
+<p>Appears below the tables when an instrument is set to <em>custom macro</em> and you press <strong>edit</strong>. One row = one step = <strong>20 ms</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Preset</strong></td>
+<td>Pluck, Organ (sustain), Lead + vibrato, Bass thump, Tom, Hat (noise), Snare (tone+noise), Arpeggio major, Arpeggio minor.</td>
+</tr>
+<tr>
+<td><strong>Loop from</strong></td>
+<td>Step the sound jumps back to after the last one; −1 = play once, then silent.</td>
+</tr>
+<tr>
+<td><strong>follow note volume</strong></td>
+<td>Scales the steps by the source note&#39;s volume.</td>
+</tr>
+<tr>
+<td><strong>+ step / − step</strong></td>
+<td>Appends a copy of the last step / removes the last one.</td>
+</tr>
+<tr>
+<td>Per step: <strong>Vol</strong> (0–15), <strong>Semitones</strong> (pitch offset, decimals allowed — a fraction makes vibrato), <strong>Noise</strong> (1–31, 0 = none), <strong>Tone</strong> (on/off)</td>
+<td></td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="manual-channels"><h2>Source channels → 3 voices<a class="anchor" href="#manual-channels" aria-label="link">#</a></h2><p>For each source channel: <strong>Played</strong> (share of its events that got a voice), <strong>In arp</strong> (share folded into arpeggios, when <em>Arp fill</em> is on), <strong>Dropped</strong> (share lost; shown in red above 10 %) and a <strong>Priority</strong> value with −/+ buttons (steps of 1). These are the same priority values the <a href="#manual-import">manual import dialog</a> sets with its five levels.</p>
+</section>
+<section class="sec" id="manual-import"><h2>Manual import dialog<a class="anchor" href="#manual-import" aria-label="link">#</a></h2><p>Opened with <strong>Manual import…</strong>. Use it when the automatic result loses a part you care about.</p>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>▶ Full preview (YM2149)</strong></td>
+<td>Plays the whole conversion with the priorities currently set. You can keep changing priorities while it plays: after a short delay (0.25 s plus 1–3 s of conversion for a long song; the status text next to the buttons shows <em>Converting…</em>) the new version replaces the old one.</td>
+</tr>
+<tr>
+<td><strong>▶ Original</strong></td>
+<td>Plays the original module for comparison (only when original playback is available — see <a href="#troubleshooting">Troubleshooting</a>).</td>
+</tr>
+<tr>
+<td><strong>Suggest</strong></td>
+<td>First guess: the busiest pitched channel becomes <em>Lead</em>, nearly silent channels (active &lt; 5 % of the song) become <em>Low</em>, the rest <em>Normal</em>.</td>
+</tr>
+<tr>
+<td><strong>Reset</strong></td>
+<td>Removes all priorities.</td>
+</tr>
+<tr>
+<td><strong>Channel table</strong></td>
+<td>One row per source channel: <strong>Activity over the song</strong> (a loudness bar chart in 96 slices; <em>click it to listen from that point</em>), <strong>Active</strong> (% of frames sounding), <strong>Notes</strong> (number of note starts), <strong>Pitch</strong> (median note), <strong>Main instruments</strong> (up to three, with their numbers; the names are text fields you can rename).</td>
+</tr>
+<tr>
+<td><strong>Priority</strong></td>
+<td>A five-way switch per channel — see below.</td>
+</tr>
+<tr>
+<td><strong>Solo ▶</strong></td>
+<td>Plays that channel <em>alone</em> on the three voices as the chip will play it, with the current instrument settings. Disabled for silent channels.</td>
+</tr>
+<tr>
+<td><strong>Click on the activity graph</strong></td>
+<td>Plays that channel alone from the clicked point of the song (the graph spans the whole song, left = start). A white line shows the position. Clicking while the channel plays jumps there; clicking another channel&#39;s graph moves to that channel; while the <em>Full preview</em> plays, a click on any graph jumps the full preview to that point. Silent channels cannot be clicked.</td>
+</tr>
+<tr>
+<td><strong>Edit as AY patterns →</strong></td>
+<td>Converts with these priorities and opens the pattern editor.</td>
+</tr>
+<tr>
+<td><strong>Done</strong></td>
+<td>Closes the dialog; the priorities stay applied to the exports. <strong>Esc</strong> also closes it.</td>
+</tr>
+</tbody></table>
+<p>The five priority levels:</p>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Value added to the score</th>
+<th>Use for</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Off</strong></td>
+<td>channel removed entirely</td>
+<td>Channels you do not want at all (a second pad, ambience).</td>
+</tr>
+<tr>
+<td><strong>Low</strong></td>
+<td>−3</td>
+<td>Background parts that should give way when voices run short.</td>
+</tr>
+<tr>
+<td><strong>Normal</strong></td>
+<td>0</td>
+<td>No preference (default).</td>
+</tr>
+<tr>
+<td><strong>High</strong></td>
+<td>+3</td>
+<td>Parts that should usually win over normal channels (bass line).</td>
+</tr>
+<tr>
+<td><strong>Lead</strong></td>
+<td>+8</td>
+<td>The melody: keeps its voice almost always.</td>
+</tr>
+</tbody></table>
+<p>A priority that does not match a level (set with the +/− buttons) is shown as <em>custom +n</em>.</p>
+</section>
+<section class="sec" id="manual-export"><h2>Export panel<a class="anchor" href="#manual-export" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Button</th>
+<th>Output</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>SNDH (.sndh)</strong></td>
+<td>Atari ST music file with a built-in 68000 player</td>
+<td>Plays in any SNDH player. Includes the digidrum and timer-effect engines when needed.</td>
+</tr>
+<tr>
+<td><strong>YM (.ym)</strong></td>
+<td><code>YM5!</code> register dump; <code>YM6!</code> with digidrums/timer effects</td>
+<td>For ST-Sound and similar players.</td>
+</tr>
+<tr>
+<td><strong>Game kit (.zip)</strong></td>
+<td>C header with the packed stream, <code>ymplay.h</code> replayer</td>
+<td>For your own Atari ST game; the game owns the PSG, so sound effects can steal a voice.</td>
+</tr>
+<tr>
+<td><strong>Preview (.wav)</strong></td>
+<td>44.1 kHz audio of the YM emulation</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Raw regs (.regs)</strong></td>
+<td>14 bytes per frame</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Report (.txt)</strong></td>
+<td>The conversion report</td>
+<td></td>
+</tr>
+</tbody></table>
+<p>Under the buttons: the size of the packed stream and the SNDH player. Arkos, Furnace and maxYMiser exports are in the pattern editor (<em>Edit as AY patterns</em>).</p>
+</section>
+<section class="sec" id="manual-preview"><h2>Preview panel<a class="anchor" href="#manual-preview" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>⏮</strong></td>
+<td>Back to the start.</td>
+</tr>
+<tr>
+<td><strong>▶ Play / ■ Stop</strong> (or <strong>Space</strong>)</td>
+<td>Plays the selected source.</td>
+</tr>
+<tr>
+<td><strong>A · Original / B · YM2149</strong> (or <strong>Tab</strong>)</td>
+<td>Switches source while playing, keeping the position. <em>Original</em> uses libopenmpt and needs the page served over http(s).</td>
+</tr>
+<tr>
+<td><strong>Piano roll</strong></td>
+<td>Pitch (vertical) and brightness (volume) of the three voices; orange = noise. Under it a strip shows dropped notes (red) and arpeggio notes (cyan).</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="manual-tune"><h2>Loaded SNDH / YM panel<a class="anchor" href="#manual-tune" aria-label="link">#</a></h2><p>Shown instead of <em>Module</em> when a <code>.sndh</code> or <code>.ym</code> is loaded.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>File, Title, Author, Comment</td>
+<td>From the file&#39;s tags/header.</td>
+</tr>
+<tr>
+<td>Length, Loop</td>
+<td>Frames at 50 Hz; loop frame or &quot;none detected (plays once)&quot;.</td>
+</tr>
+<tr>
+<td>Timer</td>
+<td>(SNDH) VBL or Timer A–D and its rate; non-50 Hz tunes are resampled to 50 Hz.</td>
+</tr>
+<tr>
+<td><strong>Subtune</strong></td>
+<td>(SNDH with several subtunes.) Choose which one to run.</td>
+</tr>
+<tr>
+<td><strong>Seconds</strong></td>
+<td>Length to run the emulator for; 0 = use the file&#39;s <code>TIME</code> tag.</td>
+</tr>
+<tr>
+<td><strong>Composer</strong></td>
+<td>Written to the exports.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="manual-report"><h2>Conversion report<a class="anchor" href="#manual-report" aria-label="link">#</a></h2><p>Lists what the converter did and what it could not do: dropped notes per channel, unsupported effects, clamped parameters. Warnings start with <code>warning:</code>.</p>
+</section>
+</section>
+<section class="chapter" id="manual-editor"><h1>Manual: Pattern editor<a class="anchor" href="#manual-editor" aria-label="link">#</a></h1>
+<div class="intro"><p>The <strong>AY pattern editor</strong> tab is a FastTracker 2-style editor for <strong>one YM2149</strong>: three voices (A, B, C), optionally a fourth <em>drum</em> column. It is based on the <a href="https://github.com/georgeflower/st-tune-master">YM Tracker</a> data model: the same cells, the same effect letters and the same <code>.ymt</code> song files in both directions.</p>
+</div>
+<section class="sec" id="manual-editor-layout"><h2>Layout<a class="anchor" href="#manual-editor-layout" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Song bar</strong> (top)</td>
+<td>File buttons, undo/redo, title, instrument selector, <em>Drum channel</em> switch, Transpose / Echo / Scale volume, BPM and speed, transport, octave and <em>Add</em> step.</td>
+</tr>
+<tr>
+<td><strong>Order</strong> (left)</td>
+<td>The song order: a list of pattern numbers. Click a position to jump to it. The ↻ mark shows the loop (restart) position.</td>
+</tr>
+<tr>
+<td><strong>Pattern</strong> (middle)</td>
+<td>The grid. One row per line, one block of columns per voice. The status line below it explains the cell under the cursor.</td>
+</tr>
+<tr>
+<td><strong>Instruments</strong> (right)</td>
+<td>The 16+ instruments, with usage counts. Double-click opens the instrument editor.</td>
+</tr>
+<tr>
+<td><strong>Instrument / Drum editor</strong> (below, optional)</td>
+<td>The editors described in <a href="#manual-instruments">Instrument editor</a> and <a href="#manual-drums">Digidrum editor</a>.</td>
+</tr>
+<tr>
+<td><strong>Export</strong></td>
+<td>SNDH, YM, game kit, maxYMiser, Arkos, Furnace, instrument <code>.myi</code>, WAV, registers. A list of warnings appears under the buttons when something cannot be exported exactly.</td>
+</tr>
+<tr>
+<td><strong>Keyboard reference</strong></td>
+<td>A collapsible list of all keys (also in <a href="#tooltips">Tooltips and keys</a>).</td>
+</tr>
+</tbody></table>
+<p>When you arrive from the Converter, a collapsed <em>Converted from … — report</em> panel above the song bar lists what was done.</p>
+</section>
+<section class="sec" id="manual-editor-bar"><h2>Song bar<a class="anchor" href="#manual-editor-bar" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>New</strong></td>
+<td>Empty song (asks first if there are unsaved changes).</td>
+</tr>
+<tr>
+<td><strong>Load .ymt…</strong></td>
+<td>Opens a YM Tracker song.</td>
+</tr>
+<tr>
+<td><strong>Load maxYMiser…</strong></td>
+<td>Opens a <code>.mys</code> (select its <code>.myv</code> voice bank at the same time) or a single <code>.myi</code> instrument.</td>
+</tr>
+<tr>
+<td><strong>Load Arkos…</strong></td>
+<td>Opens an Arkos Tracker 3 <code>.aks</code> song (Arkos Tracker 2 files are rejected with a message).</td>
+</tr>
+<tr>
+<td><strong>Save .ymt</strong> (Ctrl+S)</td>
+<td>Saves the song as a gzip-compressed <code>.ymt</code>.</td>
+</tr>
+<tr>
+<td><strong>Undo / Redo</strong> (Ctrl+Z, Ctrl+Y)</td>
+<td>Up to 200 steps. Instrument edits and imports are undoable too.</td>
+</tr>
+<tr>
+<td><strong>Title</strong></td>
+<td>Song name (up to 32 characters; goes into the exports).</td>
+</tr>
+<tr>
+<td><strong>BPM</strong></td>
+<td>Tempo, 32–255. A tick lasts 2.5 / BPM seconds, so <strong>125 BPM = exactly 50 Hz = one chip update per tick</strong>.</td>
+</tr>
+<tr>
+<td><strong>Speed</strong></td>
+<td>Ticks per row, 1–31.</td>
+</tr>
+<tr>
+<td><strong>▶ Song / ▶ Pattern / ▶ From cursor / ■ Stop</strong></td>
+<td>Transport (Right Ctrl, Right Alt, –, Space).</td>
+</tr>
+<tr>
+<td><strong>○ Edit / ● Editing</strong></td>
+<td>Edit mode on/off (Space when stopped). Note keys always audition; they are written into the pattern only in edit mode.</td>
+</tr>
+<tr>
+<td><strong>Octave</strong> (F1–F8)</td>
+<td>Base octave for note keys.</td>
+</tr>
+<tr>
+<td><strong>Add</strong></td>
+<td>How many rows the cursor moves down after you enter a note (0–16, cycles around; <code>`</code> or <code>§</code> cycles it).</td>
+</tr>
+<tr>
+<td><strong>Instrument</strong></td>
+<td>The instrument used for notes you type.</td>
+</tr>
+<tr>
+<td><strong>Drum channel</strong></td>
+<td>Adds or removes the fourth column — see <a href="#manual-editor-drumcol">Drum channel</a>.</td>
+</tr>
+<tr>
+<td><strong>Transpose…</strong></td>
+<td>Shifts notes by −48…+48 semitones in the block, track, pattern or whole song; optionally only notes of the current instrument.</td>
+</tr>
+<tr>
+<td><strong>Echo…</strong></td>
+<td>Copies each note a few rows later at lower volume: delay (1–32 rows), volume % (1–100), repeats (1–8). Only empty cells are filled. This is the classic AY <em>F-A echo</em>.</td>
+</tr>
+<tr>
+<td><strong>Scale volume…</strong> (Ctrl/Alt/Shift+V)</td>
+<td>Multiplies the volume column of every note in the range by a percentage; different start and end values make a fade.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="manual-editor-grid"><h2>The pattern grid<a class="anchor" href="#manual-editor-grid" aria-label="link">#</a></h2><p>Each voice has these columns, from left to right:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Digits</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Note</strong></td>
+<td><code>C-4</code>, <code>F#5</code>, <code>===</code></td>
+<td>Note <code>C-1</code>…<code>B-8</code>. <code>===</code> is key-off (release). <code>...</code> is empty.</td>
+</tr>
+<tr>
+<td><strong>Instrument</strong></td>
+<td>2 hex digits</td>
+<td>Instrument 01–FF. Empty = keep the previous one.</td>
+</tr>
+<tr>
+<td><strong>Volume</strong></td>
+<td>2 hex digits</td>
+<td><code>10</code>…<code>50</code> sets volume 0…64 (<code>10</code> = silent, <code>50</code> = full). Empty = leave unchanged.</td>
+</tr>
+<tr>
+<td><strong>Effect</strong></td>
+<td>1 character</td>
+<td>An effect letter, see <a href="#effects">Effects reference</a>.</td>
+</tr>
+<tr>
+<td><strong>Parameter</strong></td>
+<td>2 hex digits</td>
+<td>The effect&#39;s value.</td>
+</tr>
+</tbody></table>
+<p>Notes and volumes sound on the chip as: a note at the <em>volume column</em> level, scaled by the instrument&#39;s envelope; the 64 volume levels map to the chip&#39;s 16 amplitude steps.</p>
+<h3>Entering notes {#manual-editor-notes}</h3>
+<p>The two keyboard rows work like a piano, exactly as in FastTracker 2 and the YM Tracker:</p>
+<pre><code>upper row:   2   3       5   6   7       9
+           Q   W   E   R   T   Y   U   I   O        → C-(n+1) … D-(n+2)
+lower row:   S   D       G   H   J       L
+           Z   X   C   V   B   N   M   ,   .        → C-n … D-(n+1)
+</code></pre>
+<ul>
+<li><strong>F1–F8</strong> select the octave n. <strong>Caps Lock</strong> or <strong>1</strong> (in the note column) enters a key-off <code>===</code>.</li>
+<li>In a <em>drum</em> column the same keys pick <strong>digidrum 1–27</strong> of the instrument&#39;s bank (the octave does not matter).</li>
+<li>Hex digits go into the instrument, volume and parameter columns; effect letters into the effect column.</li>
+<li><strong>Digits typed into the parameter without an effect make an arpeggio</strong> (as in FT2): <code>047</code> is a major chord.</li>
+</ul>
+<h3>Selecting and editing blocks {#manual-editor-blocks}</h3>
+<p>Mouse drag or <strong>Shift+click</strong> selects; <strong>Alt+arrows</strong> or <strong>Shift+↑/↓</strong> extend the selection. Then:</p>
+<table>
+<thead>
+<tr>
+<th>Keys</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>F3 / F4 / F5</strong> with <strong>Shift</strong> (track), <strong>Ctrl+Shift</strong> (pattern) or <strong>Alt</strong> (block)</td>
+<td>Cut / copy / paste</td>
+</tr>
+<tr>
+<td><strong>Delete</strong></td>
+<td>Clears the column under the cursor; <strong>Shift+Del</strong> the whole cell, <strong>Ctrl+Del</strong> volume + effect, <strong>Alt+Del</strong> the effect</td>
+</tr>
+<tr>
+<td><strong>Insert / Backspace</strong></td>
+<td>Insert / remove a cell in the track; with <strong>Shift</strong> the whole row</td>
+</tr>
+<tr>
+<td><strong>Ctrl/Alt/Shift+V</strong></td>
+<td>Scale volume in block / track / pattern (Ctrl+Shift: song)</td>
+</tr>
+</tbody></table>
+<h3>The order list {#manual-editor-order}</h3>
+<table>
+<thead>
+<tr>
+<th>Button</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>New pat</strong></td>
+<td>Insert a new empty pattern after this position.</td>
+</tr>
+<tr>
+<td><strong>Clone pat</strong></td>
+<td>Copy this pattern into a new one.</td>
+</tr>
+<tr>
+<td><strong>Repeat</strong></td>
+<td>Insert the same pattern again after this position.</td>
+</tr>
+<tr>
+<td><strong>Remove</strong></td>
+<td>Remove this position from the order (at least one stays).</td>
+</tr>
+<tr>
+<td><strong>Move ↑ / Move ↓</strong></td>
+<td>Move this position up or down in the order.</td>
+</tr>
+<tr>
+<td><strong>Pat +</strong> (Ctrl+→) / Ctrl+←</td>
+<td>Change which pattern this position plays.</td>
+</tr>
+<tr>
+<td><strong>Loop here</strong></td>
+<td>Make this position the restart point (where the song jumps back to at its end).</td>
+</tr>
+<tr>
+<td><strong>Pattern length</strong></td>
+<td>Rows in the pattern, 1–256.</td>
+</tr>
+</tbody></table>
+<p>A <code>.ymt</code> holds at most 255 patterns and 255 instruments.</p>
+<h3>Channels: mute and solo {#manual-editor-mute}</h3>
+<p>Each channel header has <strong>M</strong> (mute) and <strong>S</strong> (solo) buttons. They affect only playback, not the exports.</p>
+<h3>The status line {#manual-editor-status}</h3>
+<p>Under the grid a line explains the cell: <code>0xy</code> shows the note names of the arpeggio, <code>1xx</code>/<code>2xx</code> the slide in period units per row, <code>Fxx</code> the speed or tempo, and every other effect its meaning. When the cursor is on a drum-channel cell it names the drum.</p>
+</section>
+<section class="sec" id="manual-editor-drumcol"><h2>Drum channel<a class="anchor" href="#manual-editor-drumcol" aria-label="link">#</a></h2><p>Tick <strong>Drum channel</strong> to add a fourth column. A note there plays a digidrum of the <em>instrument written in that column</em> (or the last one used) on <strong>voice C</strong>. The key picks the drum number (Z = 1, S = 2, X = 3 …); <code>===</code> stops it. The drum silences voice C while it plays and only one drum plays at a time.</p>
+<p><em>Edit as AY patterns</em> adds this column automatically when the module has percussion; the converted drums are in a <em>Digidrums</em> bank instrument.</p>
+</section>
+</section>
+<section class="chapter" id="manual-instruments"><h1>Manual: Instrument editor<a class="anchor" href="#manual-instruments" aria-label="link">#</a></h1>
+<div class="intro"><p>Select an instrument in the list and press <strong>Edit…</strong> (or double-click it). Every change is undoable. Hold <strong>Play C-5 (hold)</strong> or press any note key to hear the instrument.</p>
+</div>
+<section class="sec" id="manual-instruments-common"><h2>Common fields<a class="anchor" href="#manual-instruments-common" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Name</strong></td>
+<td>Up to 22 characters.</td>
+</tr>
+<tr>
+<td><strong>Preset</strong></td>
+<td>Replaces the instrument with a ready-made sound — see <a href="#manual-presets">Presets</a>.</td>
+</tr>
+<tr>
+<td><strong>Sound type</strong></td>
+<td><strong>classic (ADSR / envelope)</strong> or <strong>step table</strong>. Switching to step table starts from the <em>Pluck</em> macro.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="manual-instruments-classic"><h2>Classic instruments<a class="anchor" href="#manual-instruments-classic" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Tone</strong></td>
+<td>Square wave on/off.</td>
+</tr>
+<tr>
+<td><strong>Noise</strong> + period</td>
+<td>Noise on/off; period 0–31 (low = bright, high = dull). The noise generator is shared by all voices.</td>
+</tr>
+<tr>
+<td><strong>Volume: ADSR</strong></td>
+<td>When on: <strong>A</strong>ttack, <strong>D</strong>ecay (ticks, 0–255), <strong>S</strong>ustain (AY level 0–15), <strong>R</strong>elease (ticks). 1 tick = 20 ms at 125 BPM.</td>
+</tr>
+<tr>
+<td><strong>Volume table</strong></td>
+<td>When ADSR is off: AY levels 0–15, one per tick; the last one is held.</td>
+</tr>
+<tr>
+<td><strong>After key-off</strong></td>
+<td>A volume table played after a key-off.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="manual-instruments-both"><h2>Fields for both types<a class="anchor" href="#manual-instruments-both" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Arpeggio</strong></td>
+<td>Semitone offsets stepped through while the note plays, e.g. <code>0 4 7</code>.</td>
+</tr>
+<tr>
+<td><strong>Arp speed</strong></td>
+<td>Ticks per arpeggio step (1–31).</td>
+</tr>
+<tr>
+<td><strong>Pitch table</strong></td>
+<td>Period offsets added per tick (positive = lower pitch).</td>
+</tr>
+<tr>
+<td><strong>Vibrato</strong> speed / depth</td>
+<td>Applied to every note of the instrument (depth 0 = off). 0–15 each.</td>
+</tr>
+<tr>
+<td><strong>Sync-square</strong></td>
+<td>Restarts the square wave at the start of every note — tight, punchy attacks. Real YM2149 hardware, SNDH, game kit and WAV only.</td>
+</tr>
+<tr>
+<td><strong>Hard envelope</strong></td>
+<td>The chip&#39;s own envelope generator (buzzer). <strong>use</strong> turns it on, <strong>also play the tone (sync buzz)</strong> adds the square wave.</td>
+</tr>
+<tr>
+<td><strong>Shape</strong></td>
+<td>Envelope shape: 8 saw down, 10 triangle (down first), 12 saw up, 14 triangle (up first), 9 one decay, 13 one attack then hold, 11 decay then high, 15 attack then silent (0 and 4 equal 9 and 15).</td>
+</tr>
+<tr>
+<td><strong>Env. period</strong></td>
+<td><strong>follow the note</strong> (period = tone period ÷ divisor) or a fixed 1–65535.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="manual-instruments-step"><h2>Step-table instruments<a class="anchor" href="#manual-instruments-step" aria-label="link">#</a></h2><p>The table lists one row per tick (20 ms):</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>#</strong></td>
+<td>Step number (↻ marks the loop-from step).</td>
+</tr>
+<tr>
+<td><strong>Vol</strong></td>
+<td>AY volume 0–15.</td>
+</tr>
+<tr>
+<td><strong>Semitones</strong></td>
+<td>Pitch offset, −48…+48, decimals allowed (e.g. 0.35).</td>
+</tr>
+<tr>
+<td><strong>Noise</strong></td>
+<td>Noise period 1–31; 0 = no noise.</td>
+</tr>
+<tr>
+<td><strong>Tone</strong></td>
+<td>Tone on/off.</td>
+</tr>
+<tr>
+<td><strong>+ / −</strong></td>
+<td>Duplicate / remove the step.</td>
+</tr>
+</tbody></table>
+<p>Above the table: <strong>Preset</strong> (macro presets), <strong>Loop from step</strong> (−1 = play once), <strong>Release</strong> (ticks of fade-out after a key-off, 0 = cut), <strong>Follow note volume</strong> (scale by the note&#39;s volume at 3 dB per AY step). The <strong>bar chart</strong> shows the step volumes: click or drag to draw them.</p>
+<p>Arpeggio, pitch table, vibrato, sync-square and the hard envelope still apply on top of a step table.</p>
+</section>
+<section class="sec" id="manual-presets"><h2>Presets<a class="anchor" href="#manual-presets" aria-label="link">#</a></h2><p>All presets are plain 50 Hz register writes: no timer is needed and they play the same in every export.</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Presets</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Chord ornaments</strong></td>
+<td>Minor <code>0 3 7</code>, Major <code>0 4 7</code>, Minor doubled <code>0 0 3 3 7 7</code>, Major doubled <code>0 0 4 4 7 7</code>, Minor + octave <code>0 3 7 12</code>, Major + octave <code>0 4 7 12</code>, Blip <code>19</code> then note.</td>
+</tr>
+<tr>
+<td><strong>Drums</strong></td>
+<td>Kick, Snare, Hat closed, Hat open, Hat F-A echo, Tom (fast slide).</td>
+</tr>
+<tr>
+<td><strong>Bass</strong></td>
+<td>Punchy bass (sync-square), Acid bass (buzzer + swept square), Acid bass (slow sweep).</td>
+</tr>
+</tbody></table>
+</section>
+</section>
+<section class="chapter" id="manual-drums"><h1>Manual: Digidrum editor<a class="anchor" href="#manual-drums" aria-label="link">#</a></h1>
+<div class="intro"><p>Open it with <strong>Drums…</strong> below the instrument list. A bank belongs to an <strong>instrument</strong>: up to 63 drums, at most 16 000 bytes each.</p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Drum list</strong></td>
+<td>Number (hex), name, rate, size and length in frames; ▶ auditions.</td>
+</tr>
+<tr>
+<td><strong>Load WAV…</strong></td>
+<td>Adds one or more WAV files (PCM or float, 8/16/24/32-bit, any rate; stereo is mixed down).</td>
+</tr>
+<tr>
+<td><strong>Add starter kit</strong></td>
+<td>Kick, Snare, Hi-hat, Open hat, Tom, Clap — synthesised.</td>
+</tr>
+<tr>
+<td><strong>Add synth drum…</strong></td>
+<td>One synthesised drum from the list.</td>
+</tr>
+<tr>
+<td><strong>↑ / ↓ / Duplicate / Remove / Reverse</strong></td>
+<td>Reorder, duplicate, delete or play backwards.</td>
+</tr>
+<tr>
+<td><strong>Name</strong></td>
+<td>Up to 24 characters.</td>
+</tr>
+<tr>
+<td><strong>Rate Hz</strong></td>
+<td>1000–24000. The ST makes only some rates; the nearest is used and shown.</td>
+</tr>
+<tr>
+<td><strong>Gain dB</strong></td>
+<td>−24…+24.</td>
+</tr>
+<tr>
+<td><strong>Max ms</strong></td>
+<td>Longest drum, 0 = limited only by the 16 000-byte cap.</td>
+</tr>
+<tr>
+<td><strong>normalise / trim silence / noise shaping / fade out</strong></td>
+<td>Processing options. Changing one re-processes the <em>original</em> audio, so you can try settings without losing quality.</td>
+</tr>
+<tr>
+<td><strong>Waveform</strong></td>
+<td>The 4-bit result as the chip&#39;s volume DAC will play it.</td>
+</tr>
+</tbody></table>
+<p>Play a drum with <strong><code>Z0n</code></strong> in an effect column (drum <em>n</em> of the cell&#39;s instrument, on that voice) or with the <a href="#manual-editor-drumcol">drum channel</a>.</p>
+</div>
+</section>
+<section class="chapter" id="howto"><h1>How-to recipes<a class="anchor" href="#howto" aria-label="link">#</a></h1>
+<div class="intro"><p>Each recipe is self-contained. Words in <strong>bold</strong> are buttons or fields; the full description of each is in the manuals.</p>
+</div>
+<section class="sec" id="howto-load"><h2>Load a MOD or XM<a class="anchor" href="#howto-load" aria-label="link">#</a></h2><ol>
+<li>Press <strong>Load MOD / XM / SNDH / YM / YMT…</strong> at the top, or drag the file anywhere onto the page. (To try it first, press <strong>Demo: Omar&#39;s Bazaar</strong>.)</li>
+<li>The file type is detected from its contents. ProTracker <code>.mod</code> (M.K., 4CHN, 6CHN, 8CHN, FLT4/8, OCTA, nnCH and similar tags) and FastTracker II <code>.xm</code> are supported. The module is analysed and converted at once; a status text next to the buttons shows <em>Converting…</em> and <em>Rendering…</em>.</li>
+<li>Press <strong>Space</strong> to play the YM version. Press <strong>Tab</strong> to switch to the original and back. If <strong>A · Original</strong> is greyed out, you opened the page from disk — see <a href="#troubleshooting">Troubleshooting</a>.</li>
+<li>The <strong>Conversion report</strong> at the bottom lists what the converter did and any warnings.</li>
+</ol>
+<p>If the file does not load, the red box under the tabs says why (e.g. &quot;not a MOD or XM file&quot;, or a truncated file).</p>
+</section>
+<section class="sec" id="howto-auto"><h2>Import automatically, then adjust the priority<a class="anchor" href="#howto-auto" aria-label="link">#</a></h2><p>The automatic import keeps the three most important notes every 20 ms. When it loses something you care about:</p>
+<ol>
+<li>Look at <strong>Source channels → 3 voices</strong>. A high <strong>Dropped</strong> percentage (red above 10 %) means that channel is being cut down.</li>
+<li>Press <strong>+</strong> next to the channel you want to protect (each press adds 1 to its priority); <strong>−</strong> for a channel that may give way. Or press <strong>Manual import…</strong> for a better view (<a href="#howto-manual-import">next recipe</a>).</li>
+<li>Listen again. The preview refreshes by itself one or two seconds after every change.</li>
+<li>Useful companions: <strong>Arp fill</strong> (folds dropped notes into a fast arpeggio so chords survive), <strong>Voice stickiness</strong> (fewer voice jumps), <strong>Drum priority</strong> (how hard drums push melody notes out), <strong>Level</strong> (overall loudness).</li>
+<li><strong>Reset to auto</strong> goes back to the defaults.</li>
+</ol>
+</section>
+<section class="sec" id="howto-manual-import"><h2>Manual import with channel priorities<a class="anchor" href="#howto-manual-import" aria-label="link">#</a></h2><ol>
+<li>Load the module and press <strong>Manual import…</strong> in the Conversion panel.</li>
+<li>Wait for the <em>Analysing the channels…</em> line to be replaced by the table. Each row is one source channel with a loudness graph, how often it sounds, how many notes it plays, its median pitch and its main instruments — enough to tell the melody from the bass and the drums.</li>
+<li>Press <strong>Suggest</strong> for a first guess (busiest pitched channel = <em>Lead</em>, nearly silent = <em>Low</em>).</li>
+<li>Press <strong>▶</strong> in the <em>Solo</em> column of a channel to hear that channel alone, converted for the chip. Press it again (■) to stop. To start somewhere else in the song, <strong>click the channel&#39;s activity graph</strong> at the point you want to hear: that channel plays from there, and a white line follows the playing position. Clicking again while it plays jumps to the new point; clicking another channel&#39;s graph switches to that channel; while the <em>Full preview</em> is running a click on any graph jumps the full preview instead.</li>
+<li>Set each channel&#39;s <strong>Priority</strong>: <strong>Lead</strong> for the melody, <strong>High</strong> for a bass line, <strong>Normal</strong> for the rest, <strong>Low</strong> for background parts, <strong>Off</strong> for channels you do not want at all.</li>
+<li>Press <strong>▶ Full preview (YM2149)</strong> to hear the whole result. While it plays, keep changing priorities; the new version replaces the old after a moment. <strong>▶ Original</strong> compares with the real module.</li>
+<li>Press <strong>Done</strong> to keep the priorities for the exports on the Converter tab, or <strong>Edit as AY patterns →</strong> to continue in the editor with the same priorities.</li>
+</ol>
+<p>Tips:</p>
+<ul>
+<li>A drum channel with priority <strong>Off</strong> leaves its percussion out entirely; keep drums at <strong>Normal</strong> and use <strong>Drum priority</strong> to adjust their weight.</li>
+<li>If two channels fight for the lead role, make one <strong>High</strong> and the other <strong>Normal</strong>: the difference decides who wins a contested voice.</li>
+<li>The priorities are part of the mapping file — see <a href="#howto-mapping">Save and reuse a conversion</a>.</li>
+</ul>
+</section>
+<section class="sec" id="howto-instruments-convert"><h2>Change how a module instrument is played<a class="anchor" href="#howto-instruments-convert" aria-label="link">#</a></h2><p>In the <strong>Instruments → AY role</strong> table:</p>
+<ol>
+<li>Find the instrument (the <strong>Detected</strong> column tells you whether it was classified as tonal or as a drum; <strong>C-4</strong> shows its measured pitch).</li>
+<li>Choose its <strong>AY role</strong>:<ul>
+<li><em>tone (written note)</em> — if the measured pitch is wrong (a sample with no clear pitch), this plays the note as written;</li>
+<li><em>kick / snare / hat</em> — if a drum was classified as tonal, or the wrong drum;</li>
+<li><em>digidrum (sample)</em> — to play the sample itself as a 4-bit drum;</li>
+<li><em>mute</em> — to leave it out;</li>
+<li><em>custom macro…</em> — to design its sound tick by tick (see below).</li>
+</ul>
+</li>
+<li>Use <strong>Tr.</strong> to transpose it by semitones (e.g. −12 if a bass sits too high for the chip).</li>
+<li>For a tonal instrument with a <strong>Wave</strong> column, choose <em>saw buzzer</em> or <em>triangle buzzer</em> if you want the chip&#39;s hardware-envelope bass sound, or <em>square tone</em> to forbid it. (The checkbox <strong>Sample waveform → buzzer</strong> applies the analysis to all instruments.)</li>
+</ol>
+<p><strong>Custom macro:</strong> choose <em>custom macro…</em> in AY role, press <strong>edit</strong> next to it. The Macro editor shows one row per 20 ms. Pick a <strong>Preset</strong> as a starting point (Pluck, Organ, Bass thump…), then change the <strong>Vol</strong>, <strong>Semitones</strong> (a fraction such as 0.35 makes vibrato), <strong>Noise</strong> and <strong>Tone</strong> values. Set <strong>Loop from</strong> to the step that should repeat while the note is held (−1 = play once). Use <strong>+ step / − step</strong> to lengthen or shorten.</p>
+</section>
+<section class="sec" id="howto-rename"><h2>Rename instruments<a class="anchor" href="#howto-rename" aria-label="link">#</a></h2><p>Module instrument names are often cryptic (<code>** Omar&#39;s Bazaar **</code>, <code>and Qumran</code>). Give them names you recognise:</p>
+<ol>
+<li>In the Converter&#39;s <strong>Instruments → AY role</strong> table, click the name field of an instrument, type the new name and press <strong>Enter</strong> (or click elsewhere). Esc cancels; an empty field goes back to the module&#39;s own name.</li>
+<li>The same names are shown — and can be edited — in the <strong>Main instruments</strong> column of the manual import dialog, so you can rename an instrument the moment you recognise it while soloing a channel.</li>
+<li>The names are used in the macro editor, saved with <strong>Save mapping</strong>, and become the names of the instruments in the pattern editor after <strong>Edit as AY patterns →</strong> (<code>03 Bass lead</code>; the number prefix stays so you can tell instruments apart).</li>
+<li>In the pattern editor, rename any instrument in its editor (<strong>Edit…</strong> → <em>Name</em>).</li>
+</ol>
+<p>Renaming never changes the sound, so it does not re-render the preview.</p>
+</section>
+<section class="sec" id="howto-drums-convert"><h2>Make drums sound right<a class="anchor" href="#howto-drums-convert" aria-label="link">#</a></h2><p>Two approaches exist:</p>
+<ul>
+<li><strong>Synthetic drums (default).</strong> Kicks, snares and hats become short noise-and-pitch macros. They are cheap and work in every export. Switch an instrument&#39;s role between <em>kick / snare / hat</em> to fix a wrong classification.</li>
+<li><strong>Digidrums.</strong> Tick <strong>Percussion as digidrums</strong>. Percussion samples are resampled to 4 kHz–16 kHz and played as real 4-bit samples. Choose the <strong>Drum rate</strong> and the <strong>Drum length</strong>. Individual instruments can be forced with the <em>digidrum (sample)</em> role.</li>
+</ul>
+<p>Digidrums need a timer interrupt: they work in SNDH, YM6, the game kit and maxYMiser exports (not Arkos or Furnace). Only one plays at a time; they take voice C while they play. If drums and a melody on voice C fight, raise <strong>Drum priority</strong> or lower that channel&#39;s priority.</p>
+</section>
+<section class="sec" id="howto-mapping"><h2>Save and reuse a conversion<a class="anchor" href="#howto-mapping" aria-label="link">#</a></h2><ul>
+<li><strong>Save mapping</strong> writes <code>&lt;module&gt;_mapping.json</code> with the options, channel priorities and per-instrument roles/transposes/waveforms/macros.</li>
+<li><strong>Load mapping…</strong> restores it, also for a different module of the same kind (a warning is shown when the module differs).</li>
+<li>The mapping is plain JSON and can be edited by hand; values outside the allowed ranges are clamped when it is loaded.</li>
+</ul>
+</section>
+<section class="sec" id="howto-edit"><h2>Continue in the pattern editor<a class="anchor" href="#howto-edit" aria-label="link">#</a></h2><ol>
+<li>Press <strong>Edit as AY patterns →</strong> (in the Conversion panel or in the manual import dialog).</li>
+<li>The module becomes an editable song: patterns with row-level voice allocation, one step-table instrument per module instrument, arpeggios folded into <code>0xy</code>, <code>Fxx</code> speed changes for exact row timing, slides and vibrato translated into <code>1xx</code>/<code>2xx</code>/<code>4xy</code>. If the module has percussion, a <strong>drum channel</strong> (fourth column) and a <em>Digidrums</em> bank instrument are added.</li>
+<li>The conversion report is kept in a collapsed panel above the song bar.</li>
+<li>Press <strong>Space</strong> to start edit mode and <strong>Right Ctrl</strong> to play the song.</li>
+<li>Save with <strong>Ctrl+S</strong> as <code>.ymt</code> to keep the song for later.</li>
+</ol>
+</section>
+<section class="sec" id="howto-change-inst"><h2>Change an instrument in the editor<a class="anchor" href="#howto-change-inst" aria-label="link">#</a></h2><p><em>To use a different instrument for existing notes:</em> put the cursor on the note&#39;s instrument column and type the new two-digit instrument number. To change many notes at once, select a block and use <strong>Transpose…</strong> with <em>only notes of instrument …</em> to move just one instrument&#39;s notes.</p>
+<p><em>To change how an instrument sounds:</em></p>
+<ol>
+<li>Click the instrument in the <strong>Instruments</strong> list.</li>
+<li>Press <strong>Edit…</strong>. Hold <strong>Play C-5 (hold)</strong> to hear it while you work.</li>
+<li>Change what you need — everything is undoable with <strong>Ctrl+Z</strong>. Changes apply everywhere the instrument is used, in the pattern playback and in all exports.</li>
+<li>Use <strong>Duplicate</strong> first if you want to keep the old version as well, then point the notes you want to change at the copy.</li>
+</ol>
+</section>
+<section class="sec" id="howto-new-inst"><h2>Create a new instrument<a class="anchor" href="#howto-new-inst" aria-label="link">#</a></h2><p><strong>From a preset (fastest).</strong> Press <strong>New</strong> below the instrument list, then <strong>Edit…</strong>, and choose a <strong>Preset</strong>: chord ornaments (a whole chord on one voice), kick/snare/hats/tom, punchy sync-square bass, acid bass.</p>
+<p><strong>A classic plucked lead.</strong></p>
+<ol>
+<li><strong>New</strong>, then <strong>Edit…</strong>. Keep <em>Sound type</em> on <em>classic</em>.</li>
+<li>Tone on, noise off. Tick <strong>ADSR</strong>. Set A = 0, D = 6, S = 8, R = 8 (decay and release in ticks of 20 ms, sustain is the chip level 0–15).</li>
+<li>Optional: <strong>Vibrato</strong> speed 4 and depth 3 gives a gentle wobble; <strong>Arpeggio</strong> <code>0 12</code> adds an octave flutter.</li>
+<li>Name it, write a few notes in the pattern with this instrument selected (the <strong>Instrument</strong> counter in the song bar), and play.</li>
+</ol>
+<p><strong>A buzzer bass.</strong></p>
+<ol>
+<li><strong>New</strong>, <strong>Edit…</strong>. Tick <strong>Hard envelope: use</strong>.</li>
+<li><strong>Shape</strong> 8 (saw down) for the classic buzz, 10 for a smoother triangle sound. <strong>Env. period</strong>: leave on <em>follow the note</em>, divisor 1; larger divisors play lower.</li>
+<li>Untick <strong>Tone</strong> for a pure buzzer, or tick <strong>also play the tone (sync buzz)</strong> for a harsher blend.</li>
+<li>The envelope generator is <strong>shared by all voices</strong>: only one buzzer can sound at a time, and its volume cannot be scaled.</li>
+</ol>
+<p><strong>A step-table instrument (draw the sound tick by tick).</strong></p>
+<ol>
+<li><strong>New</strong>, <strong>Edit…</strong>, set <em>Sound type</em> to <strong>step table</strong>.</li>
+<li>Choose a macro <strong>Preset</strong> as the starting point, then draw the volume with the mouse in the bar chart (click and drag).</li>
+<li>In the table set <strong>Semitones</strong> for pitch sweeps (e.g. 24 at step 0 falling to 0 for a kick), <strong>Noise</strong> for noise bursts and <strong>Tone</strong> to switch the square wave off for noise-only steps.</li>
+<li><strong>Loop from step</strong> repeats the tail while the note is held; <strong>Release</strong> sets the fade after a key-off; <em>Follow note volume</em> lets the volume column scale it.</li>
+<li>For a kick: step 0 = vol 15, semitones 24, noise 6; then vol 15→2 falling over 8 steps, pitch 14→−6. (That is the <em>Kick</em> preset.)</li>
+</ol>
+<p><strong>A punchy bass with sync-square.</strong> Tick <strong>Sync-square: restart the tone at each note</strong> — every note then starts at the same phase of the square wave. It is audible on real hardware, in the SNDH/game-kit exports and in the WAV preview, and is left out of YM, maxYMiser, Arkos and Furnace.</p>
+</section>
+<section class="sec" id="howto-digidrum"><h2>Add and use digidrums<a class="anchor" href="#howto-digidrum" aria-label="link">#</a></h2><ol>
+<li>Choose (or create) an instrument to hold the drums and press <strong>Drums…</strong>.</li>
+<li>Add drums: <strong>Load WAV…</strong> (several files at once), <strong>Add starter kit</strong>, or <strong>Add synth drum…</strong>. Select a drum and adjust <strong>Rate Hz</strong> (8000 is a good start), <strong>Gain dB</strong>, <strong>Max ms</strong>, <em>normalise</em>, <em>trim silence</em>, <em>noise shaping</em> and <em>fade out</em>; press ▶ to audition. The waveform shows the 4-bit result.</li>
+<li>Use drums in the song in one of two ways:<ul>
+<li><strong>Z effect:</strong> in the effect column type <code>Z</code> and a drum number in the parameter, e.g. <code>Z01</code> = drum 1 of the cell&#39;s instrument, played on that voice. <code>Z00</code> stops the drum.</li>
+<li><strong>Drum channel:</strong> tick <strong>Drum channel</strong>, then type notes in the fourth column. Z = drum 1, S = drum 2, X = drum 3 and so on; the instrument number in that column picks the bank. <code>===</code> stops.</li>
+</ul>
+</li>
+<li>Remember the limits: <strong>one drum at a time</strong> (a new one cuts the old one), the drum silences its voice while it plays, at most 63 drums per instrument and 16 000 bytes per drum.</li>
+<li>Exports that carry digidrums: SNDH, YM (as YM6), game kit, maxYMiser, <code>.ymt</code>. Arkos, Furnace, raw registers and the register dump cannot carry them (a warning says so).</li>
+</ol>
+</section>
+<section class="sec" id="howto-timer"><h2>Use the timer effects Q, S and U<a class="anchor" href="#howto-timer" aria-label="link">#</a></h2><ol>
+<li>Write a note with sound on a voice (tone or buzzer).</li>
+<li>In the same cell (or a later row, while the note is held) type the effect, for example <code>Q4C</code>.</li>
+<li>The parameter is <code>xy</code>: <code>y</code> is the octave, <code>x</code> the pitch step inside it. The timer rate is <code>20 Hz · 2^(y + x/16)</code>. A higher number means a faster, higher-pitched effect. <code>Q00</code> ends it; so does a new note without an effect.</li>
+<li><code>Q</code> = SID voice (rough), <code>S</code> = sinus-SID (smooth), <code>U</code> = sync-buzzer (use it on an envelope instrument).</li>
+<li>Only one timer effect runs at a time; the status line warns when the rate is out of the MFP&#39;s range and clamps it.</li>
+</ol>
+<p>Timer effects work in SNDH, YM6, game kit, WAV and maxYMiser exports. They need real hardware or an emulator that runs the timer.</p>
+</section>
+<section class="sec" id="howto-scratch"><h2>Write a tune from scratch<a class="anchor" href="#howto-scratch" aria-label="link">#</a></h2><ol>
+<li>Open the <strong>AY pattern editor</strong> tab and press <strong>New</strong> (or just start; the editor opens with an empty song).</li>
+<li>Set <strong>BPM</strong> (125 is one tick per frame) and <strong>Speed</strong> (6 is a common start).</li>
+<li>Press <strong>Space</strong> (Edit on), choose an <strong>Instrument</strong>, type notes with the piano keys, <strong>F1–F8</strong> for the octave.</li>
+<li>Use the <strong>Add</strong> step to move more than one row per note; use <code>===</code> (Caps Lock) to release a note.</li>
+<li>Add rows of effects: <code>0xy</code> arpeggio, <code>1xx</code>/<code>2xx</code> slides, <code>4xy</code> vibrato, <code>C</code> volume. See the <a href="#effects">Effects reference</a>.</li>
+<li>Add patterns with <strong>New pat</strong>, <strong>Clone pat</strong>, <strong>Repeat</strong>. Set the loop point with <strong>Loop here</strong>.</li>
+<li>Save with <strong>Ctrl+S</strong>.</li>
+</ol>
+</section>
+<section class="sec" id="howto-load-sndh"><h2>Load SNDH and YM files<a class="anchor" href="#howto-load-sndh" aria-label="link">#</a></h2><ul>
+<li><strong>SNDH</strong> (<code>.sndh</code>, <code>.snd</code>, also ICE!-packed): the file is <em>run</em> in a built-in 68000 emulator and the chip writes are captured at 50 Hz. Use <strong>Subtune</strong> to pick one, <strong>Seconds</strong> to set the length (0 = use the TIME tag). Tunes whose player never returns or waits for hardware that is not emulated report <em>did not return</em>.</li>
+<li><strong>YM</strong> (<code>.ym</code>: YM2!, YM3!, YM3b!, YM5!, YM6!, LHA-packed): read as the register dump it is. YM5/YM6 digidrums and YM6 timer effects are imported with their samples.</li>
+<li>You get the piano roll, the YM preview and the exports SNDH / YM5 / game kit / WAV / regs. SNDH timer-interrupt effects are recognised and classified (digidrum, Q, S, U); one drum and one effect at a time, so overlapping ones keep the first and the import says how many it dropped.</li>
+</ul>
+</section>
+<section class="sec" id="howto-load-other"><h2>Load maxYMiser, Arkos and `.ymt` files<a class="anchor" href="#howto-load-other" aria-label="link">#</a></h2><p>All three are in the <strong>AY pattern editor</strong> tab:</p>
+<ul>
+<li><strong>Load .ymt…</strong> — YM Tracker songs. Step tables written by this tool are kept; the YM Tracker ignores them (it shows plain default instruments).</li>
+<li><strong>Load maxYMiser…</strong> — select the <code>.mys</code> song <strong>and</strong> its <code>.myv</code> voice bank in the same dialog (Ctrl/Shift-click), or a single <code>.myi</code> instrument. Instruments are played tick by tick into step tables.</li>
+<li><strong>Load Arkos…</strong> — an Arkos Tracker 3 <code>.aks</code>. Arkos Tracker 2 files are rejected with a message. After loading, the warnings list what was not imported (sample instruments, notes outside C-1…B-8, mid-note arpeggio/pitch-table changes, extra PSGs).</li>
+</ul>
+</section>
+<section class="sec" id="howto-export"><h2>Export<a class="anchor" href="#howto-export" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Do this</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Play on a real Atari ST or emulator</td>
+<td><strong>SNDH (.sndh)</strong>. Copy it to the ST (or an emulator&#39;s disk) and play it with an SNDH player, or open it in a PC player that supports SNDH. Timer C 50 Hz is declared in the header (<code>TC50</code>).</td>
+</tr>
+<tr>
+<td>Play in ST-Sound, YM player or Winamp plugin</td>
+<td><strong>YM (.ym)</strong>. A plain <code>YM5!</code> file, or <code>YM6!</code> if the song has drums or timer effects.</td>
+</tr>
+<tr>
+<td>Put the music into your own Atari game</td>
+<td><strong>Game kit (.zip)</strong>: <code>&lt;name&gt;.h</code> + <code>ymplay.h</code>. Call <code>ymplay_start(&lt;name&gt;_data, &lt;NAME&gt;_FRAMES, &lt;NAME&gt;_LOOP_FRAME, &lt;NAME&gt;_LOOP_OFFSET)</code> once, then <code>ymplay_step(); ymplay_write();</code> every 50 Hz tick in supervisor mode. With digidrums or timer effects also call <code>ymdrum_init(&lt;name&gt;_drums)</code> once and <code>ymdrum_exit()</code> at the end. Read the comment at the top of <code>ymplay.h</code>.</td>
+</tr>
+<tr>
+<td>Hear it on your PC</td>
+<td><strong>Preview (.wav)</strong>.</td>
+</tr>
+<tr>
+<td>Continue in maxYMiser</td>
+<td><strong>maxYMiser (.mys + .myv)</strong> from the pattern editor. Load both files in maxYMiser.</td>
+</tr>
+<tr>
+<td>Continue in Arkos Tracker 3</td>
+<td><strong>Arkos Tracker (.aks)</strong> from the pattern editor.</td>
+</tr>
+<tr>
+<td>Continue in Furnace</td>
+<td><strong>Furnace (.fur)</strong> from the pattern editor.</td>
+</tr>
+<tr>
+<td>Share one instrument</td>
+<td><strong>Instrument (.myi)</strong> — the selected instrument as a maxYMiser instrument.</td>
+</tr>
+<tr>
+<td>Analyse or re-import</td>
+<td><strong>Raw regs (.regs)</strong> (converter) / <strong>Registers (.regs)</strong> (editor): 14 bytes per frame.</td>
+</tr>
+</tbody></table>
+<p>The Converter tab exports the converted module directly; the pattern editor exports the edited song. After <em>Edit as AY patterns</em> only the editor&#39;s exports include your manual changes.</p>
+</section>
+<section class="sec" id="howto-cli"><h2>Use the command line<a class="anchor" href="#howto-cli" aria-label="link">#</a></h2><p>The same exporters run in Node (<code>npm install</code> first):</p>
+<pre><code class="language-sh">npx tsx scripts/export-cli.ts song.mod out/          # .ym .sndh .h .regs (set WAV=1 to also write .wav)
+npx tsx scripts/convert-cli.ts song.xm out/song      # frame converter: register dump + report
+npx tsx scripts/song-cli.ts song.xm [arpFill]        # convert to a pattern song and compare with the frame converter
+npx tsx scripts/import-cli.ts tune.sndh out.regs     # run an SNDH / read a YM into a register dump (optional: subtune seconds)
+</code></pre>
+</section>
+</section>
+<section class="chapter" id="effects"><h1>Effects reference<a class="anchor" href="#effects" aria-label="link">#</a></h1>
+<div class="intro"><p>An effect is one letter and two hex digits (the <em>parameter</em>) in the effect column of a pattern cell: <code>4 37</code> means vibrato, speed 3, depth 7. The effect letters are those of the YM Tracker: <code>0123456789ABCDEFGHKLMPRTXYQSUZ</code>. The status line under the pattern explains the effect under the cursor.</p>
+</div>
+<section class="sec" id="effects-timing"><h2>Timing: rows, ticks and frames<a class="anchor" href="#effects-timing" aria-label="link">#</a></h2><ul>
+<li>A <strong>row</strong> lasts <em>speed</em> <strong>ticks</strong>. A tick lasts 2.5 / BPM seconds.</li>
+<li>At <strong>125 BPM a tick is exactly one 50 Hz frame</strong>, which is what an Atari ST player does. At other tempos the renderer samples the tick stream at 50 Hz: below 125 BPM a tick spans more than one frame, above it some ticks fall between two frames and are not heard.</li>
+<li>Effects that &quot;run every tick&quot; do so from the <strong>second</strong> tick of the row on (tick 1, 2 …), not on tick 0, except where noted.</li>
+</ul>
+</section>
+<section class="sec" id="effects-lifetime"><h2>How long an effect lasts<a class="anchor" href="#effects-lifetime" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Lifetime</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>0xy</code> arpeggio, <code>1xx</code> and <code>2xx</code> slides</td>
+<td>Only on the row where they are written. Repeat them on every row for a longer arpeggio or slide.</td>
+</tr>
+<tr>
+<td><code>3xx</code> tone portamento, <code>4xy</code> vibrato, <code>7xy</code> tremolo, <code>Axy</code> volume slide, <code>5xy</code>, <code>6xy</code>, <code>H</code> global volume slide</td>
+<td>Stay active until a new note (without the effect) is played.</td>
+</tr>
+<tr>
+<td><code>Rxy</code> and <code>E9y</code> retrigger</td>
+<td>Until the next note.</td>
+</tr>
+<tr>
+<td><code>Qxx</code>, <code>Sxx</code>, <code>Uxx</code></td>
+<td>Until <code>Q00</code> / <code>S00</code> / <code>U00</code>, or until the next note that does not set a timer effect again.</td>
+</tr>
+<tr>
+<td><code>Xxx</code>, <code>Mxx</code>, <code>Yxx</code>, <code>Pxx</code></td>
+<td>Until the next note (a new note restores the instrument&#39;s own envelope settings).</td>
+</tr>
+<tr>
+<td><code>Cxx</code>, <code>Gxx</code>, <code>Fxx</code>, <code>Bxx</code>, <code>Dxx</code>, <code>Kxx</code>, <code>Lxx</code>, <code>E1y</code>, <code>E2y</code>, <code>EAy</code>, <code>EBy</code>, <code>ECy</code>, <code>EDy</code>, <code>Zxx</code></td>
+<td>Happen once, on the row.</td>
+</tr>
+</tbody></table>
+<p>A parameter of <code>00</code> for <code>1xx</code>, <code>2xx</code>, <code>3xx</code>, <code>4xy</code>, <code>Axy</code> continues with the previous value.</p>
+</section>
+<section class="sec" id="effects-pitch"><h2>Pitch effects<a class="anchor" href="#effects-pitch" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Effect</th>
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>0xy</code></td>
+<td><strong>Arpeggio</strong></td>
+<td>Cycles the note, note + <code>x</code> semitones, note + <code>y</code> semitones, one step per tick (or per <em>Arp speed</em> ticks of the instrument). Typing digits into the parameter column with no effect creates this effect: <code>047</code> is a major chord, <code>037</code> a minor chord. <code>00</code> is no arpeggio.</td>
+</tr>
+<tr>
+<td><code>1xx</code></td>
+<td><strong>Slide up</strong></td>
+<td>Lowers the period by <code>xx</code> units every tick (after tick 0), raising the pitch. A row of speed 6 moves <code>5 × xx</code> units. Units are <strong>period units</strong>, not semitones: the same slide moves higher notes by a larger musical interval.</td>
+</tr>
+<tr>
+<td><code>2xx</code></td>
+<td><strong>Slide down</strong></td>
+<td>Raises the period by <code>xx</code> every tick.</td>
+</tr>
+<tr>
+<td><code>3xx</code></td>
+<td><strong>Slide to note</strong> (tone portamento)</td>
+<td>Slides from the current pitch to the note written in the same cell at <code>xx</code> period units per tick, then stops. Without a note it continues toward the previous target. A <code>3xx</code> with a note on a silent voice just starts the note.</td>
+</tr>
+<tr>
+<td><code>4xy</code></td>
+<td><strong>Vibrato</strong></td>
+<td><code>x</code> = speed (0–F), <code>y</code> = depth (0–F). Sine wave on the period, peak ±<code>y × 0.5</code> period units. Restarts at each new note. If the instrument has its own vibrato it is applied automatically to every note and <code>4xy</code> overrides it.</td>
+</tr>
+<tr>
+<td><code>5xy</code></td>
+<td><strong>Slide to note + volume slide</strong></td>
+<td>Continues the current <code>3xx</code> and applies the volume slide <code>xy</code> (<code>x</code> up, <code>y</code> down).</td>
+</tr>
+<tr>
+<td><code>6xy</code></td>
+<td><strong>Vibrato + volume slide</strong></td>
+<td>Continues the current vibrato and applies the volume slide <code>xy</code>.</td>
+</tr>
+<tr>
+<td><code>E1y</code></td>
+<td><strong>Fine slide up</strong></td>
+<td>Lowers the period by <code>y</code> once.</td>
+</tr>
+<tr>
+<td><code>E2y</code></td>
+<td><strong>Fine slide down</strong></td>
+<td>Raises the period by <code>y</code> once.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="effects-volume"><h2>Volume effects<a class="anchor" href="#effects-volume" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Effect</th>
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Volume column <code>10</code>…<code>50</code></td>
+<td><strong>Set volume</strong></td>
+<td><code>10</code> = 0, <code>50</code> = 64 (full). Volume 64 levels are mapped to the chip&#39;s 16 steps (about 3 dB each).</td>
+</tr>
+<tr>
+<td><code>Cxx</code></td>
+<td><strong>Set volume</strong></td>
+<td>Same, <code>00</code>–<code>40</code> hex.</td>
+</tr>
+<tr>
+<td><code>Axy</code></td>
+<td><strong>Volume slide</strong></td>
+<td><code>x</code> up or <code>y</code> down by that many units per tick (the first non-zero nibble wins).</td>
+</tr>
+<tr>
+<td><code>7xy</code></td>
+<td><strong>Tremolo</strong></td>
+<td><code>x</code> speed, <code>y</code> depth. A sine wave on the volume, peak ±<code>y</code> of 64.</td>
+</tr>
+<tr>
+<td><code>EAy</code> / <code>EBy</code></td>
+<td><strong>Fine volume up / down</strong></td>
+<td>Change the volume once by <code>y</code>.</td>
+</tr>
+<tr>
+<td><code>Gxx</code></td>
+<td><strong>Global volume</strong></td>
+<td><code>00</code>–<code>40</code>, scales all voices.</td>
+</tr>
+<tr>
+<td><code>Hxy</code></td>
+<td><strong>Global volume slide</strong></td>
+<td><code>x</code> up / <code>y</code> down per tick.</td>
+</tr>
+<tr>
+<td><code>ECy</code></td>
+<td><strong>Note cut</strong></td>
+<td>Silences the note after <code>y</code> ticks.</td>
+</tr>
+<tr>
+<td><code>EDy</code></td>
+<td><strong>Note delay</strong></td>
+<td>Starts the cell&#39;s note after <code>y</code> ticks.</td>
+</tr>
+<tr>
+<td><code>Kxx</code></td>
+<td><strong>Key off</strong></td>
+<td>Releases the note (starts the instrument&#39;s release). Same as <code>===</code> in the note column.</td>
+</tr>
+<tr>
+<td><code>Lxx</code></td>
+<td><strong>Envelope position</strong></td>
+<td>Jumps the instrument&#39;s volume table to position <code>xx</code> (classic instruments with a volume table only).</td>
+</tr>
+<tr>
+<td><code>E9y</code></td>
+<td><strong>Retrigger</strong></td>
+<td>Restarts the note every <code>y</code> ticks.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="effects-envelope"><h2>Hardware envelope (buzzer) effects<a class="anchor" href="#effects-envelope" aria-label="link">#</a></h2><p>These work on the chip&#39;s shared envelope generator. Because there is only one envelope, only the voice that most recently set it determines the shape and period.</p>
+<table>
+<thead>
+<tr>
+<th>Effect</th>
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Xxy</code></td>
+<td><strong>Force envelope shape</strong></td>
+<td>Turns the hardware envelope on for this note with shape <code>y</code> (the low nibble); <code>x</code> is ignored. Shapes: 8 saw down, 10 triangle, 12 saw up, 14 triangle (up first), 9 / 15 single decay or attack-then-silent, 11 / 13 single ramps that hold.</td>
+</tr>
+<tr>
+<td><code>Mxx</code></td>
+<td><strong>Envelope period, low byte</strong></td>
+<td>Overrides the period&#39;s low 8 bits.</td>
+</tr>
+<tr>
+<td><code>Yxx</code></td>
+<td><strong>Envelope period, high byte</strong></td>
+<td>Overrides the period&#39;s high 8 bits. Period = <code>Y × 256 + M</code>.</td>
+</tr>
+<tr>
+<td><code>Pxx</code></td>
+<td><strong>Envelope divisor</strong></td>
+<td>Overrides the instrument&#39;s divisor (period = tone period ÷ <code>xx</code>, min. 1).</td>
+</tr>
+<tr>
+<td><code>Rxy</code></td>
+<td><strong>Retrigger with volume change</strong></td>
+<td>Restarts the note every <code>y</code> ticks and changes the volume by code <code>x</code>: 1 −1, 2 −2, 3 −4, 4 −8, 5 −16, 6 ×⅔, 7 ×½, 9 +1, A +2, B +4, C +8, D +16, E ×1½, F ×2 (0 and 8: none). <code>R00</code> restarts the envelope shape once.</td>
+</tr>
+<tr>
+<td><code>T</code></td>
+<td><em>reserved</em></td>
+<td>Accepted for YM Tracker compatibility; ignored by the renderer.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="effects-flow"><h2>Flow effects<a class="anchor" href="#effects-flow" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Effect</th>
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Bxx</code></td>
+<td><strong>Jump</strong></td>
+<td>Jump to song position <code>xx</code> (hex).</td>
+</tr>
+<tr>
+<td><code>Dxx</code></td>
+<td><strong>Pattern break</strong></td>
+<td>Go to the next position, row <code>xx</code>. The two digits are <strong>decimal</strong> (<code>D32</code> = row 32), as in FT2.</td>
+</tr>
+<tr>
+<td><code>E6y</code></td>
+<td><strong>Loop</strong></td>
+<td><code>E60</code> marks the loop start in this channel; <code>E6y</code> loops back <code>y</code> times.</td>
+</tr>
+<tr>
+<td><code>Fxx</code></td>
+<td><strong>Speed / tempo</strong></td>
+<td><code>F01</code>–<code>F1F</code>: ticks per row. <code>F20</code>–<code>FFF</code>: BPM. <code>F00</code>: stop the song.</td>
+</tr>
+<tr>
+<td><code>E</code> other</td>
+<td>—</td>
+<td>Other <code>E</code> sub-effects (including <code>E3</code>–<code>E5</code>, <code>E7</code>, <code>E8</code>) are ignored.</td>
+</tr>
+<tr>
+<td><code>8</code>, <code>9</code></td>
+<td>—</td>
+<td>Accepted (panning and sample offset in FT2); not played.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="effects-timer"><h2>Timer and sample effects<a class="anchor" href="#effects-timer" aria-label="link">#</a></h2><p>These need an MFP timer interrupt, so they exist only where an engine or an emulated timer is present (SNDH, YM6, game kit, WAV, maxYMiser; not Arkos or Furnace).</p>
+<table>
+<thead>
+<tr>
+<th>Effect</th>
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Qxx</code></td>
+<td><strong>SID voice</strong></td>
+<td>The voice&#39;s volume toggles between its value and 0 at the timer rate. Parameter <code>xy</code>: <code>x</code> (high nibble) = pitch step, <code>y</code> (low nibble) = octave. Rate = <code>20 Hz × 2^(y + x/16)</code>, e.g. <code>Q43</code> = 20 × 2^(3 + 4/16) ≈ 190 Hz. <code>Q00</code> ends it.</td>
+</tr>
+<tr>
+<td><code>Sxx</code></td>
+<td><strong>Sinus-SID</strong></td>
+<td>The <em>on</em> half is a rectified sine, 32 steps per period (the interrupt runs 32× the musical rate).</td>
+</tr>
+<tr>
+<td><code>Uxx</code></td>
+<td><strong>Sync-buzzer</strong></td>
+<td>The envelope shape is rewritten at the timer rate, restarting it each time. Use on an instrument with a hardware envelope.</td>
+</tr>
+<tr>
+<td><code>Zxx</code></td>
+<td><strong>Digidrum</strong></td>
+<td>Plays drum <code>xx</code> (1–63, hex) of the cell&#39;s instrument on that voice. <code>Z00</code> stops the drum. A missing drum is reported as a warning.</td>
+</tr>
+</tbody></table>
+<p>Rates: a timer effect runs between about 48 Hz and 20 kHz (the sinus effect up to about 625 Hz, because its interrupt runs 32 times faster); anything outside is clamped to the nearest rate the MFP can make and a warning says so. The octave nibble <code>y</code> multiplies the base rate by two per step:</p>
+<table>
+<thead>
+<tr>
+<th><code>y</code> (octave)</th>
+<th>0</th>
+<th>1</th>
+<th>2</th>
+<th>3</th>
+<th>4</th>
+<th>5</th>
+<th>6</th>
+<th>7</th>
+<th>8</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Base rate (<code>x</code> = 0)</td>
+<td>20 Hz</td>
+<td>40 Hz</td>
+<td>80 Hz</td>
+<td>160 Hz</td>
+<td>320 Hz</td>
+<td>640 Hz</td>
+<td>1.3 kHz</td>
+<td>2.6 kHz</td>
+<td>5.1 kHz</td>
+</tr>
+</tbody></table>
+<p>The pitch step <code>x</code> (0–F) raises the rate within the octave by <code>2^(x/16)</code>, up to almost double. Low rates give slow, rhythmic pulses, high ones the metallic &quot;buzz&quot;.</p>
+</section>
+<section class="sec" id="effects-matrix"><h2>Which effects survive in which export<a class="anchor" href="#effects-matrix" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Effect</th>
+<th>SNDH / YM / game kit / WAV</th>
+<th>maxYMiser</th>
+<th>Arkos</th>
+<th>Furnace</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Notes, <code>===</code>, volume column, <code>Cxx</code></td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td><code>0xy</code> arpeggio</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td><code>1xx</code> <code>2xx</code> slides</td>
+<td>✓</td>
+<td>✓</td>
+<td>≈ (even over the row)</td>
+<td>✓</td>
+</tr>
+<tr>
+<td><code>3xx</code> portamento</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓ (to a note without instrument)</td>
+<td>✓</td>
+</tr>
+<tr>
+<td><code>4xy</code> vibrato</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓ (as pitch table)</td>
+<td>✓</td>
+</tr>
+<tr>
+<td><code>5xy</code> <code>6xy</code> <code>Axy</code> volume slides</td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>7xy</code> tremolo</td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>Fxx</code> speed</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td><code>Fxx</code> tempo (BPM)</td>
+<td>✓</td>
+<td>song tempo only (below 125 BPM is clamped to 50 Hz)</td>
+<td>song tempo only</td>
+<td>✓</td>
+</tr>
+<tr>
+<td><code>Dxx</code></td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td><code>Bxx</code></td>
+<td>✓</td>
+<td>✓</td>
+<td>–</td>
+<td>✓</td>
+</tr>
+<tr>
+<td><code>Gxx</code> <code>Hxy</code> global volume</td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>Kxx</code> key off</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td><code>ECy</code> cut, <code>EDy</code> delay</td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+<td>✓</td>
+</tr>
+<tr>
+<td><code>E1y</code> <code>E2y</code> fine slides</td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>E6y</code> loop</td>
+<td>✓</td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>E9y</code>, <code>EAy</code>, <code>EBy</code></td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>Lxx</code> <code>Mxx</code> <code>Pxx</code> <code>Rxy</code> <code>Yxx</code></td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>Xxy</code> forced buzzer</td>
+<td>✓</td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>Qxx</code> <code>Sxx</code> <code>Uxx</code></td>
+<td>✓</td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>Zxx</code> + drum channel</td>
+<td>✓</td>
+<td>✓</td>
+<td>–</td>
+<td>–</td>
+</tr>
+</tbody></table>
+<p>(YM files carry timer effects and drums only as <code>YM6!</code>.) Every export lists the effects it could not carry in its warning list; the export still completes.</p>
+</section>
+</section>
+<section class="chapter" id="tooltips"><h1>Tooltips and keys<a class="anchor" href="#tooltips" aria-label="link">#</a></h1>
+<div class="intro"><p>Hover over any control for a tooltip. This chapter lists every one of them (generated from the program source, so it is always current), the explanations shown on the pattern editor&#39;s status line, and the keyboard reference.</p>
+</div>
+<section class="sec" id="tooltips-converter"><h2>Converter<a class="anchor" href="#tooltips-converter" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Tooltip</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Load MOD / XM / SNDH / YM / YMT…</td>
+<td>Open a MOD, XM, SNDH, YM or YMT file (you can also drop a file anywhere on the page)</td>
+</tr>
+<tr>
+<td>Help</td>
+<td>Manual, how-to guide, effects reference and technical specifications (opens in a new tab)</td>
+</tr>
+<tr>
+<td>Demo: Omar&#39;s Bazaar</td>
+<td>Load the bundled demo song, Omar&#39;s Bazaar by Qumran</td>
+</tr>
+<tr>
+<td>Converter</td>
+<td>Load, convert, listen and export a module</td>
+</tr>
+<tr>
+<td>AY pattern editor</td>
+<td>Edit a song as patterns for one YM2149 (FastTracker 2 style)</td>
+</tr>
+<tr>
+<td>Subtune</td>
+<td>Which subtune of the SNDH file to run</td>
+</tr>
+<tr>
+<td>Seconds</td>
+<td>0 = use the length from the file&#39;s TIME tag</td>
+</tr>
+<tr>
+<td>Level</td>
+<td>Overall loudness mapped onto the 16 YM volume steps</td>
+</tr>
+<tr>
+<td>Drum priority</td>
+<td>How strongly kicks/snares/hats win a voice against melody notes</td>
+</tr>
+<tr>
+<td>Voice stickiness</td>
+<td>Higher = a note stays on the same YM voice (less jumping, fewer clicks)</td>
+</tr>
+<tr>
+<td>Sample waveform → buzzer</td>
+<td>Match the sample&#39;s waveform: sawtooth, triangle and sine-like tones become the YM&#39;s hardware-envelope buzzer (one voice at a time, bass range, loud notes) instead of a square wave. Square and complex samples stay square tones. Each instrument can be set by hand in the table.</td>
+</tr>
+<tr>
+<td>Bass + drums on the middle voice</td>
+<td>How AY composers lay out the three voices: bass and the synthetic drums on the middle voice (B), melody and arpeggios on A and C, so the voices sit in different frequency ranges. Digidrums stay on voice C.</td>
+</tr>
+<tr>
+<td>Arpeggio</td>
+<td>Order in which an arpeggio cycles its notes</td>
+</tr>
+<tr>
+<td>Arp fill</td>
+<td>Notes that would be dropped (more channels than YM voices) share a voice and alternate every 20 ms, like a chiptune chord</td>
+</tr>
+<tr>
+<td>Min. volume</td>
+<td>Dropped notes quieter than this AY volume are not worth an arpeggio slot</td>
+</tr>
+<tr>
+<td>Percussion as digidrums</td>
+<td>Percussion samples (not the tonal ones) are played as real 4-bit samples through a voice&#39;s volume register, driven by an MFP timer interrupt. They take voice C while they play.</td>
+</tr>
+<tr>
+<td>Drum rate</td>
+<td>Sample rate of the digidrums; the ST can only make some rates, the nearest one is used. Higher = clearer but costs more CPU and memory.</td>
+</tr>
+<tr>
+<td>Drum length</td>
+<td>Longest digidrum; longer samples are cut (with a short fade)</td>
+</tr>
+<tr>
+<td>Reset to auto</td>
+<td>Back to the automatic settings: options, priorities, instrument roles and names</td>
+</tr>
+<tr>
+<td>Save mapping</td>
+<td>Save the instrument mapping, channel priorities and these options as a .json file</td>
+</tr>
+<tr>
+<td>Load mapping…</td>
+<td>Load a mapping saved earlier (for this module or a similar one)</td>
+</tr>
+<tr>
+<td>Manual import…</td>
+<td>Choose which channels matter most, listen to each channel alone and to the full preview</td>
+</tr>
+<tr>
+<td>Edit as AY patterns →</td>
+<td>Turn the module into an editable pattern song for one YM2149 (uses the options above)</td>
+</tr>
+<tr>
+<td>SNDH (.sndh)</td>
+<td>Playable in any SNDH player (68000 player included, 50 Hz)</td>
+</tr>
+<tr>
+<td>YM (.ym)</td>
+<td>YM5! register dump — ST-Sound, Atari players</td>
+</tr>
+<tr>
+<td>Game kit (.zip)</td>
+<td>C header with the packed stream + ymplay.h replayer</td>
+</tr>
+<tr>
+<td>Preview (.wav)</td>
+<td>44.1 kHz audio of the YM2149 emulation</td>
+</tr>
+<tr>
+<td>Raw regs (.regs)</td>
+<td>The 14 YM registers of every 50 Hz frame as raw bytes</td>
+</tr>
+<tr>
+<td>Report (.txt)</td>
+<td>The conversion report as a text file</td>
+</tr>
+<tr>
+<td>⏮</td>
+<td>Back to the start</td>
+</tr>
+<tr>
+<td>■ Stop / ▶ Play</td>
+<td>Play or stop the preview (Space)</td>
+</tr>
+<tr>
+<td>B · YM2149</td>
+<td>The YM2149 version (Tab switches between A and B)</td>
+</tr>
+<tr>
+<td>Tr.</td>
+<td>Transpose in semitones</td>
+</tr>
+<tr>
+<td>Wave (column of the instrument table)</td>
+<td>Waveform of the sample&#39;s cycle. A sawtooth / triangle / sine-like tone can be played as the YM&#39;s hardware-envelope buzzer (one voice at a time, loud notes in the bass/low range only).</td>
+</tr>
+<tr>
+<td>AY role (column of the instrument table)</td>
+<td>How this instrument is played on the chip: automatic, as written tone, a synthetic kick / snare / hat, a digidrum sample, a custom macro, or muted</td>
+</tr>
+<tr>
+<td>edit</td>
+<td>Edit the per-tick macro of this instrument</td>
+</tr>
+<tr>
+<td>−</td>
+<td>Lower this channel&#39;s priority by 1</td>
+</tr>
+<tr>
+<td>+</td>
+<td>Raise this channel&#39;s priority by 1</td>
+</tr>
+<tr>
+<td>Preset</td>
+<td>Start from a ready-made macro</td>
+</tr>
+<tr>
+<td>Loop from</td>
+<td>Step to jump back to after the last step; −1 = play once, then silent</td>
+</tr>
+<tr>
+<td>follow note volume (macro editor)</td>
+<td>Scale by the note volume of the source module</td>
+</tr>
+<tr>
+<td>+ step</td>
+<td>Append a copy of the last step</td>
+</tr>
+<tr>
+<td>− step</td>
+<td>Remove the last step</td>
+</tr>
+<tr>
+<td>Instrument name field</td>
+<td>Rename instrument NN (module name: …). The name is used in the pattern editor and saved with the mapping; empty = module name.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="tooltips-manual-import-dialog"><h2>Manual import dialog<a class="anchor" href="#tooltips-manual-import-dialog" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Tooltip</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>▶ Full preview (YM2149)</td>
+<td>Play the whole conversion with the priorities set below; keep changing them while it plays</td>
+</tr>
+<tr>
+<td>▶ Original</td>
+<td>the original module, for comparison</td>
+</tr>
+<tr>
+<td>Suggest</td>
+<td>busiest pitched channel = Lead, nearly silent channels = Low</td>
+</tr>
+<tr>
+<td>Solo ▶ (channel table)</td>
+<td>Play this channel alone on the chip (click again to stop)</td>
+</tr>
+<tr>
+<td>Edit as AY patterns →</td>
+<td>convert with these priorities into the editable AY pattern view</td>
+</tr>
+<tr>
+<td>Done</td>
+<td>the priorities stay applied to the exports on the Converter tab</td>
+</tr>
+<tr>
+<td>Instrument name field</td>
+<td>Rename instrument NN: the name is used in the pattern editor and saved with the mapping</td>
+</tr>
+<tr>
+<td>Activity graph</td>
+<td>Click to listen to this channel from that point of the song (silent channels: &quot;This channel is silent&quot;)</td>
+</tr>
+<tr>
+<td>Priority levels</td>
+<td>Off: leave this channel out of the import · Low: gives way to the others when voices run short · Normal: no preference · High: wins over normal channels · Lead: the melody: keeps its voice almost always</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="tooltips-pattern-editor"><h2>Pattern editor<a class="anchor" href="#tooltips-pattern-editor" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Tooltip</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>New</td>
+<td>Start an empty song</td>
+</tr>
+<tr>
+<td>Load .ymt…</td>
+<td>Open a YM Tracker song (.ymt)</td>
+</tr>
+<tr>
+<td>Load maxYMiser…</td>
+<td>maxYMiser song (.mys, with its .myv voice bank selected too) or a single instrument (.myi)</td>
+</tr>
+<tr>
+<td>Load Arkos…</td>
+<td>Arkos Tracker 3 song (.aks)</td>
+</tr>
+<tr>
+<td>Save .ymt</td>
+<td>Save the song as a .ymt file (Ctrl+S)</td>
+</tr>
+<tr>
+<td>Undo</td>
+<td>Undo the last change (Ctrl+Z)</td>
+</tr>
+<tr>
+<td>Redo</td>
+<td>Redo (Ctrl+Y)</td>
+</tr>
+<tr>
+<td>BPM</td>
+<td>Tempo. One tick is 2.5/BPM s; at 125 BPM that is exactly one 50 Hz frame, the length of one YM2149 register update.</td>
+</tr>
+<tr>
+<td>Speed</td>
+<td>Ticks per row</td>
+</tr>
+<tr>
+<td>▶ Song</td>
+<td>Play the whole song (Right Ctrl)</td>
+</tr>
+<tr>
+<td>▶ Pattern</td>
+<td>Play this pattern in a loop (Right Alt)</td>
+</tr>
+<tr>
+<td>▶ From cursor</td>
+<td>Play from the cursor row</td>
+</tr>
+<tr>
+<td>■ Stop</td>
+<td>Stop playback (Space)</td>
+</tr>
+<tr>
+<td>● Editing / ○ Edit</td>
+<td>Switch edit mode on or off: notes are written into the pattern only in edit mode (Space when stopped)</td>
+</tr>
+<tr>
+<td>Octave</td>
+<td>Base octave of the note keys (F1-F8)</td>
+</tr>
+<tr>
+<td>Add</td>
+<td>Rows the cursor moves after a note is entered (` or § key)</td>
+</tr>
+<tr>
+<td>Instrument</td>
+<td>Instrument used for the notes you type</td>
+</tr>
+<tr>
+<td>Drum channel</td>
+<td>Adds a fourth column for digidrums: a note there plays that drum of the instrument on voice C</td>
+</tr>
+<tr>
+<td>Transpose…</td>
+<td>Shift notes by semitones in the block, track, pattern or whole song</td>
+</tr>
+<tr>
+<td>Echo…</td>
+<td>Copy notes a few rows later at a lower volume (the AY F-A echo)</td>
+</tr>
+<tr>
+<td>Scale volume…</td>
+<td>Scale the volume column in the block, track, pattern or song (Ctrl/Alt/Shift+V)</td>
+</tr>
+<tr>
+<td>↻ mark in the order list</td>
+<td>the song loops back here</td>
+</tr>
+<tr>
+<td>New pat</td>
+<td>Insert a new empty pattern after this position</td>
+</tr>
+<tr>
+<td>Clone pat</td>
+<td>Copy this pattern into a new one</td>
+</tr>
+<tr>
+<td>Repeat</td>
+<td>Insert the same pattern again after this position</td>
+</tr>
+<tr>
+<td>Remove</td>
+<td>Remove this position from the song order</td>
+</tr>
+<tr>
+<td>Move ↑</td>
+<td>Move this position up in the order</td>
+</tr>
+<tr>
+<td>Move ↓</td>
+<td>Move this position down in the order</td>
+</tr>
+<tr>
+<td>Loop here</td>
+<td>Where the song jumps back to at its end</td>
+</tr>
+<tr>
+<td>Pat +</td>
+<td>Play the next pattern number at this position (Ctrl+→)</td>
+</tr>
+<tr>
+<td>M</td>
+<td>Mute</td>
+</tr>
+<tr>
+<td>S</td>
+<td>Solo</td>
+</tr>
+<tr>
+<td>Edit… / Hide editor</td>
+<td>Show or hide the instrument editor (or double-click an instrument)</td>
+</tr>
+<tr>
+<td>Drums… / Hide drums</td>
+<td>Digidrum samples of this instrument</td>
+</tr>
+<tr>
+<td>Duplicate</td>
+<td>Copy the selected instrument</td>
+</tr>
+<tr>
+<td>New</td>
+<td>Add a new default instrument</td>
+</tr>
+<tr>
+<td>SNDH (.sndh)</td>
+<td>Atari ST music file with a built-in 68000 player</td>
+</tr>
+<tr>
+<td>YM (.ym)</td>
+<td>YM register dump (YM6 when the song has digidrums or timer effects)</td>
+</tr>
+<tr>
+<td>Game kit (.zip)</td>
+<td>C header with the packed stream and a small replayer for your own game</td>
+</tr>
+<tr>
+<td>maxYMiser (.mys + .myv)</td>
+<td>song + voice bank for gwEm&#39;s maxYMiser tracker</td>
+</tr>
+<tr>
+<td>Arkos Tracker (.aks)</td>
+<td>song for Arkos Tracker 3 (envelopes, arpeggios, slides and speed baked into Arkos instruments and effects)</td>
+</tr>
+<tr>
+<td>Furnace (.fur)</td>
+<td>song for Furnace (AY-3-8910 / YM2149 chip: instruments become macros, effects and speed carry over)</td>
+</tr>
+<tr>
+<td>Instrument (.myi)</td>
+<td>the selected instrument as a maxYMiser .myi</td>
+</tr>
+<tr>
+<td>Preview (.wav)</td>
+<td>44.1 kHz audio of the YM2149 emulation</td>
+</tr>
+<tr>
+<td>Registers (.regs)</td>
+<td>The 14 YM registers of every 50 Hz frame as raw bytes</td>
+</tr>
+<tr>
+<td>Status line</td>
+<td>Explains the cell under the cursor: arpeggio notes, slide size, speed / tempo, effect meaning, drum name (see the effect list below)</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="tooltips-instrument-editor"><h2>Instrument editor<a class="anchor" href="#tooltips-instrument-editor" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Tooltip</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Step volume chart</td>
+<td>click or drag to draw the volume of each step</td>
+</tr>
+<tr>
+<td>Preset</td>
+<td>Replace the steps with a ready-made macro (keeps the release setting)</td>
+</tr>
+<tr>
+<td>Loop from step</td>
+<td>Step the sound jumps back to after the last one. -1 = play once, then silent.</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>Ticks of fade-out after a key-off (0 = cut at once)</td>
+</tr>
+<tr>
+<td>Follow note volume</td>
+<td>Scale the steps by the note&#39;s volume column (3 dB per AY step)</td>
+</tr>
+<tr>
+<td>Vol</td>
+<td>AY volume 0-15</td>
+</tr>
+<tr>
+<td>Semitones</td>
+<td>Pitch offset in semitones (decimals allowed)</td>
+</tr>
+<tr>
+<td>Noise</td>
+<td>Noise period 1-31, 0 = no noise</td>
+</tr>
+<tr>
+<td>+</td>
+<td>Duplicate this step</td>
+</tr>
+<tr>
+<td>−</td>
+<td>Remove this step</td>
+</tr>
+<tr>
+<td>close</td>
+<td>Close the instrument editor</td>
+</tr>
+<tr>
+<td>Play C-5 (hold)</td>
+<td>Hold to hear the instrument at C-5</td>
+</tr>
+<tr>
+<td>Preset</td>
+<td>Replaces this instrument with a ready-made sound: chord ornaments, drums, acid bass. Undoable.</td>
+</tr>
+<tr>
+<td>Sound type</td>
+<td>A step table lets you draw the volume, pitch, noise and tone for every 50 Hz tick. The classic type is the YM Tracker&#39;s own ADSR / envelope instrument.</td>
+</tr>
+<tr>
+<td>Noise period (instrument editor)</td>
+<td>noise period 0-31 (low = bright)</td>
+</tr>
+<tr>
+<td>A D S R</td>
+<td>Attack, decay and release are in ticks (1 tick = 20 ms at the default tempo); sustain is the AY level 0-15.</td>
+</tr>
+<tr>
+<td>Volume table</td>
+<td>AY levels 0-15, one per tick; the last one is held</td>
+</tr>
+<tr>
+<td>Arpeggio</td>
+<td>Semitone offsets stepped through while the note plays, e.g. 0 4 7</td>
+</tr>
+<tr>
+<td>Arp speed</td>
+<td>Ticks per arpeggio step</td>
+</tr>
+<tr>
+<td>Pitch table</td>
+<td>Period offsets added per tick (positive = lower pitch)</td>
+</tr>
+<tr>
+<td>Vibrato</td>
+<td>Speed and depth applied to every note of this instrument (0 depth = off)</td>
+</tr>
+<tr>
+<td>Sync-square</td>
+<td>Restarts the square wave at the start of every note (a very short period is written for 8 PSG clocks, then the real one), so every note starts in the same phase: tight, punchy bass attacks and thin pulses. Needs the SNDH or game-kit player (not YM files) and an STFM-style 4:1 CPU/PSG clock; the STE can miss the edge.</td>
+</tr>
+<tr>
+<td>Hard envelope</td>
+<td>The YM2149&#39;s own envelope generator: buzzy bass and synth sounds. One envelope is shared by all three voices.</td>
+</tr>
+<tr>
+<td>Env. period divisor (÷)</td>
+<td>envelope period = tone period ÷ this</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="tooltips-digidrum-editor"><h2>Digidrum editor<a class="anchor" href="#tooltips-digidrum-editor" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Tooltip</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>▶</td>
+<td>Play</td>
+</tr>
+<tr>
+<td>Load WAV…</td>
+<td>Add one or more WAV files as digidrums</td>
+</tr>
+<tr>
+<td>Add starter kit</td>
+<td>Add six synthesised drums: kick, snare, hi-hat, open hat, tom, clap</td>
+</tr>
+<tr>
+<td>↑</td>
+<td>Move the selected drum up (changes its number)</td>
+</tr>
+<tr>
+<td>↓</td>
+<td>Move the selected drum down (changes its number)</td>
+</tr>
+<tr>
+<td>Duplicate</td>
+<td>Duplicate the selected drum</td>
+</tr>
+<tr>
+<td>Remove</td>
+<td>Delete the selected drum</td>
+</tr>
+<tr>
+<td>Reverse</td>
+<td>Play backwards</td>
+</tr>
+<tr>
+<td>Rate Hz</td>
+<td>Play rate. The ST can only make some rates (MFP timer); the nearest is used.</td>
+</tr>
+<tr>
+<td>Max ms</td>
+<td>Longest drum in ms, 0 = no limit</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="tooltips-status"><h2>Status line explanations (effects)<a class="anchor" href="#tooltips-status" aria-label="link">#</a></h2><p>The line under the pattern shows these when the cursor is on a cell with an effect:</p>
+<table>
+<thead>
+<tr>
+<th>Effect</th>
+<th>Explanation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>0</code></td>
+<td>Arpeggio: x and y are semitones added in turn (0xy)</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>Slide up (1xx) per tick</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td>Slide down (2xx) per tick</td>
+</tr>
+<tr>
+<td><code>3</code></td>
+<td>Slide to the note (3xx)</td>
+</tr>
+<tr>
+<td><code>4</code></td>
+<td>Vibrato: x speed, y depth (4xy)</td>
+</tr>
+<tr>
+<td><code>5</code></td>
+<td>Slide to note + volume slide</td>
+</tr>
+<tr>
+<td><code>6</code></td>
+<td>Vibrato + volume slide</td>
+</tr>
+<tr>
+<td><code>7</code></td>
+<td>Tremolo: x speed, y depth</td>
+</tr>
+<tr>
+<td><code>8</code></td>
+<td>Not played (panning in FastTracker 2)</td>
+</tr>
+<tr>
+<td><code>9</code></td>
+<td>Not played (sample offset in FastTracker 2)</td>
+</tr>
+<tr>
+<td><code>A</code></td>
+<td>Volume slide: x up, y down</td>
+</tr>
+<tr>
+<td><code>B</code></td>
+<td>Jump to song position (Bxx)</td>
+</tr>
+<tr>
+<td><code>C</code></td>
+<td>Set volume 00-40</td>
+</tr>
+<tr>
+<td><code>D</code></td>
+<td>Pattern break to row (Dxx, decimal digits)</td>
+</tr>
+<tr>
+<td><code>E</code></td>
+<td>Extended: E1y fine up, E2y fine down, ECy cut after y ticks, EDy delay y ticks, EAy/EBy fine volume</td>
+</tr>
+<tr>
+<td><code>F</code></td>
+<td>Speed (F01-F1F ticks per row) or tempo (F20-FFF BPM)</td>
+</tr>
+<tr>
+<td><code>G</code></td>
+<td>Global volume 00-40</td>
+</tr>
+<tr>
+<td><code>H</code></td>
+<td>Global volume slide</td>
+</tr>
+<tr>
+<td><code>K</code></td>
+<td>Key off (release the note)</td>
+</tr>
+<tr>
+<td><code>L</code></td>
+<td>Set envelope position</td>
+</tr>
+<tr>
+<td><code>M</code></td>
+<td>Envelope period, low byte (Mxx; period = Y*256 + M, overrides the instrument)</td>
+</tr>
+<tr>
+<td><code>P</code></td>
+<td>Envelope divisor (Pxx): envelope period = tone period / xx</td>
+</tr>
+<tr>
+<td><code>R</code></td>
+<td>Retrigger every y ticks with volume change x (Rxy); R00 restarts the envelope shape</td>
+</tr>
+<tr>
+<td><code>T</code></td>
+<td>Reserved (YM Tracker compatibility), not played</td>
+</tr>
+<tr>
+<td><code>X</code></td>
+<td>Force hardware envelope with shape y (Xxy)</td>
+</tr>
+<tr>
+<td><code>Y</code></td>
+<td>Envelope period, high byte (Yxx; period = Y*256 + M, overrides the instrument)</td>
+</tr>
+<tr>
+<td><code>Q</code></td>
+<td>SID voice: the voice volume toggles on/off at a timer rate, 20 Hz * 2^(octave y + pitch x/16). Q00 or a new note ends it</td>
+</tr>
+<tr>
+<td><code>S</code></td>
+<td>Sinus-SID: like Q, but the &quot;on&quot; half is a sine wave. S00 or a new note ends it</td>
+</tr>
+<tr>
+<td><code>U</code></td>
+<td>Sync-buzzer: the hardware envelope restarts at a timer rate (use an envelope instrument). U00 or a new note ends it</td>
+</tr>
+<tr>
+<td><code>Z</code></td>
+<td>Trigger digidrum (Z00 stops)</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="tooltips-keys"><h2>Keyboard reference<a class="anchor" href="#tooltips-keys" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Keys</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Z S X D C V G B H N J M , L .</td>
+<td>notes of the lower octave; Q 2 W 3 E R 5 T 6 Y 7 U I 9 O the octave above. F1–F8 set the octave.</td>
+</tr>
+<tr>
+<td>Space</td>
+<td>stop playback, or switch Edit on/off · <code>Right Ctrl</code> play song · <code>Right Alt</code> play pattern · <code>Right Shift</code> record pattern</td>
+</tr>
+<tr>
+<td>Caps Lock / 1</td>
+<td>note off (===) · ``` or <code>§</code> cycles the &quot;Add&quot; step (Shift = backwards)</td>
+</tr>
+<tr>
+<td>Arrows, Tab</td>
+<td>move cursor (Tab / Shift+Tab = next / previous channel), Home / End / PgUp / PgDn</td>
+</tr>
+<tr>
+<td>Shift+←/→ · Ctrl+←/→</td>
+<td>previous / next song position · previous / next pattern number at this position</td>
+</tr>
+<tr>
+<td>Alt+arrows</td>
+<td>select a block (Shift+↑/↓ too); mouse drag and Shift+click also work</td>
+</tr>
+<tr>
+<td>Del</td>
+<td>clear what the cursor column holds · Shift = whole cell · Ctrl = volume + effect · Alt = effect</td>
+</tr>
+<tr>
+<td>Insert / Backspace</td>
+<td>insert / delete a cell in this channel (Shift = whole row)</td>
+</tr>
+<tr>
+<td>Shift / Ctrl+Shift / Alt + F3 F4 F5</td>
+<td>cut / copy / paste the track / the pattern / the block</td>
+</tr>
+<tr>
+<td>Ctrl / Alt / Shift + V</td>
+<td>scale volume in block / track / pattern (Ctrl+Shift = whole song)</td>
+</tr>
+<tr>
+<td>Ctrl+Z · Ctrl+Y · Ctrl+S</td>
+<td>undo · redo · save .ymt</td>
+</tr>
+<tr>
+<td>Effect column</td>
+<td>type 0–9 A–H K L M P R T X Y Q S U Z (Q SID voice, S sinus-SID, U sync-buzzer: see the hint line). Digits typed in the parameter without an effect make an arpeggio (047 = major chord).</td>
+</tr>
+</tbody></table>
+</section>
+</section>
+<section class="chapter" id="architecture"><h1>Architecture<a class="anchor" href="#architecture" aria-label="link">#</a></h1>
+<div class="intro"></div>
+<section class="sec" id="architecture-overview"><h2>Overview<a class="anchor" href="#architecture-overview" aria-label="link">#</a></h2><p>The tool is a static single-page application (TypeScript, React, built with Vite). Everything — module parsing, conversion, 68000 emulation for SNDH import, audio rendering, file writing — runs in the browser. There is no server and no network traffic except loading the page itself and, for the &quot;original&quot; side of the A/B switch, the vendored libopenmpt worklet.</p>
+<p>Everything revolves around <strong>one intermediate representation: the register dump</strong> — 14 bytes per 20 ms frame — plus two small &quot;side tracks&quot; for the things a 50 Hz dump cannot express (digidrums and timer effects).</p>
+<pre><code> MOD / XM ──► loaders ──► Module ──┬─► replay ──► channel states ──► convert ──► ┐
+                                    │                                            │
+                                    └─► moduleToSong (pattern song) ──► render ──┤
+ .ymt / maxYMiser / Arkos ──► Song ───────────────────────────► render ──────────┤
+                                                                                 ▼
+ .sndh (68000 emulator) / .ym ───────────────────────────────────────►  RegisterDump
+                                                                       regs[nframes × 14]
+                                                                       + DrumTrack + FxTrack
+                                                                                 │
+        ┌──────────┬──────────┬───────────┬──────────┬───────────┐              │
+        ▼          ▼          ▼           ▼          ▼           ▼              │
+      SNDH     YM5!/YM6!   game kit     WAV      .regs      YM emulator ◄───────┘
+   (68000 +    (ST-Sound)  (.h + C)   (preview)            (browser preview)
+    stream)
+ Song ──► maxYMiser (.mys/.myv/.myi)    Song ──► Arkos (.aks)    Song ──► Furnace (.fur)
+          (instrument baking: src/export/bake.ts shared by Arkos and Furnace)
+</code></pre>
+<p>The register dump is the single truth: the preview, the WAV, the SNDH and the YM file are all derived from the same bytes, so what you hear is what the chip will get. The three tracker-format exports (maxYMiser, Arkos, Furnace) are different: they write the <em>song</em>, not the dump, because the target tools are editors.</p>
+</section>
+<section class="sec" id="architecture-data"><h2>Data model<a class="anchor" href="#architecture-data" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Where</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Module</code></td>
+<td><code>src/core/types.ts</code></td>
+<td>A parsed MOD/XM: orders, patterns, instruments with samples, channel count, initial speed/BPM.</td>
+</tr>
+<tr>
+<td>Replay frames</td>
+<td><code>src/core/replay.ts</code></td>
+<td>For every 50 Hz frame and every source channel: instrument, note, loudness, sample position, age. <code>null</code> for a skipped channel.</td>
+</tr>
+<tr>
+<td><code>ConvertResult</code></td>
+<td><code>src/core/convert.ts</code></td>
+<td><code>regs</code>, <code>nframes</code>, <code>loopFrame</code>, <code>drums</code> (DrumTrack), <code>fx</code> (FxTrack), the report, warnings, per-channel played/dropped/folded counts, instrument classification.</td>
+</tr>
+<tr>
+<td><code>Song</code></td>
+<td><code>src/tracker/types.ts</code></td>
+<td>The pattern song of the editor: order, patterns (cells of note, instrument, volume, effect, param), instruments, tempo, channel count and drum channel.</td>
+</tr>
+<tr>
+<td><code>Instrument</code></td>
+<td><code>src/tracker/types.ts</code></td>
+<td>Classic ADSR/envelope fields, optional <code>seq</code> (step table), <code>syncSquare</code>, <code>digiDrums</code> bank.</td>
+</tr>
+<tr>
+<td><code>DrumTrack</code></td>
+<td><code>src/core/drums.ts</code></td>
+<td>The digidrum sample table plus one trigger code per frame.</td>
+</tr>
+<tr>
+<td><code>FxTrack</code></td>
+<td><code>src/core/fx.ts</code></td>
+<td>One packed timer-effect state per frame (kind, voice, rate).</td>
+</tr>
+<tr>
+<td><code>Mapping</code></td>
+<td><code>src/core/mapping.ts</code></td>
+<td>The converter settings as a file: options, priorities, instrument roles, instrument names.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="architecture-layout"><h2>Source layout<a class="anchor" href="#architecture-layout" aria-label="link">#</a></h2><pre><code>src/core        module loaders (mod.ts, xm.ts), tracker replayer (replay.ts), AY converter (convert.ts),
+                sample analysis (samples.ts, pitch.ts, waveform.ts), digidrums (drums.ts, digi.ts),
+                timer effects (fx.ts), channel statistics (chanstats.ts), mapping file (mapping.ts)
+src/export      stream packer, YM5/YM6, SNDH, game kit, C header + replayer, YM emulator (ymemu.ts), WAV, ZIP,
+                instrument baking for other trackers (bake.ts)
+src/player68k   68000 SNDH player and the digidrum / timer-effect engine (player.s, drumeng.s, gamedrum.s → blob.ts)
+src/maxymiser   .MYS / .MYV / .MYI codec and the song ↔ maxYMiser converters, timer arithmetic
+src/arkos       song ↔ Arkos Tracker 3 (.aks)
+src/furnace     song → Furnace (.fur)
+src/import      SNDH import: 68000 emulator (m68k.ts), MFP timers (mfp.ts), timer-effect classifier (sndhfx.ts),
+                ICE / LHA depackers, YM reader, ZIP reader
+src/tracker     pattern-song model, renderer (render.ts), module → patterns (fromModule.ts), editor store (editor.ts),
+                .ymt reader/writer, presets, key map, status-line hints
+src/ui          React UI: App (converter), Tracker, ImportDialog, InstrumentEditor, DrumEditor, AyRoll, audio.ts
+public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the &quot;original&quot; side of the A/B switch
+public/docs     this documentation (generated)
+docs            the documentation sources (Markdown)
+scripts         command-line tools and checks; tools/ holds the external oracles
+</code></pre>
+</section>
+<section class="sec" id="architecture-converter"><h2>The converter pipeline in detail<a class="anchor" href="#architecture-converter" aria-label="link">#</a></h2><ol>
+<li><strong>Load</strong> — <code>loadModule</code> detects MOD or XM by content (<code>isMod</code>, XM header) and parses patterns, instruments and samples.</li>
+<li><strong>Analyse</strong> — <code>samples.ts</code> and <code>pitch.ts</code> measure each instrument&#39;s sample cycle by autocorrelation (a clear periodicity, quality ≥ 0.75, makes it <em>tonal</em>; otherwise a high zero-crossing rate makes it <em>noise</em> — snare/hat-like — and a low one a <em>kick</em>); <code>waveform.ts</code> compares the cycle&#39;s spectrum with square, pulse, saw and triangle templates.</li>
+<li><strong>Replay</strong> — <code>replay.ts</code> plays the module in a tick-accurate model (all MOD and XM effects, envelopes, auto-vibrato, loop detection) and snapshots every channel&#39;s state each 20 ms. A <code>skip</code> predicate (<code>channelSkipper</code>) excludes channels set to <em>Off</em> or not soloed, so those channels never enter the result.</li>
+<li><strong>Candidate events</strong> — each sounding channel becomes a candidate: a tone period plus level, or a drum macro, or a digidrum hit, according to the instrument mapping (<code>InstMap</code>: auto / tone / kick / snare / hat / digi / macro / mute, transpose, wave).</li>
+<li><strong>Allocation</strong> — per frame, <code>score = AY volume + priority + drum bonus + stickiness</code>; the best three win the three voices. Options adjust the rules: <em>middle layout</em> gives bass and drums voice B, <em>arp fill</em> folds the losers into arpeggios.</li>
+<li><strong>Register generation</strong> — noise period, mixer, volume (with envelope bit), envelope shape and period are merged into the 14 registers; sync-square marks bit 5 of a volume register.</li>
+<li><strong>Side tracks</strong> — digidrum hits become trigger codes in the <code>DrumTrack</code>, the voice is silenced in the registers while the sample plays.</li>
+</ol>
+<p><code>moduleToSong</code> (<code>src/tracker/fromModule.ts</code>) does the same analysis but allocates voices <strong>per row</strong> and writes a <em>pattern song</em> with step-table instruments instead of registers, so it can be edited. It shares the priorities, roles, names, transposes and options with the frame converter.</p>
+</section>
+<section class="sec" id="architecture-renderer"><h2>The pattern renderer<a class="anchor" href="#architecture-renderer" aria-label="link">#</a></h2><p><code>src/tracker/render.ts</code> is a pure function <code>Song → registers</code>, a port of the YM Tracker&#39;s player: per tick it processes the row (note triggers, instruments, effects), advances ADSR / step tables / arpeggio / pitch / vibrato / tremolo state, and writes registers. Ticks run at 2.5 / BPM seconds; frames are sampled from the tick stream at 50 Hz. Digidrums (<code>Z</code>, drum channel) and timer effects (<code>Q S U</code>) are produced as side tracks and the voice&#39;s register is silenced while a drum plays. Mute/solo in the editor are honoured here, so the editor&#39;s playback is the same renderer the exports use.</p>
+</section>
+<section class="sec" id="architecture-editor"><h2>The editor store<a class="anchor" href="#architecture-editor" aria-label="link">#</a></h2><p><code>src/tracker/editor.ts</code> is a small observable class: song, cursor, selection, clipboard, undo stack (references to previous <code>Song</code> objects; only touched rows are copied, 200 levels), order list, playback state. React components subscribe with <code>useSyncExternalStore(ed.subscribe, ed.getVersion)</code>. The editor&#39;s audio (<code>ed.play</code>, <code>ed.jam</code>) renders the song with the pure renderer and streams it through the same <code>Preview</code> class the converter uses.</p>
+</section>
+<section class="sec" id="architecture-audio"><h2>Audio<a class="anchor" href="#architecture-audio" aria-label="link">#</a></h2><p><code>src/ui/audio.ts</code> — <code>Preview</code> owns one Web Audio <code>AudioContext</code>:</p>
+<ul>
+<li><strong>YM side</strong>: the register dump is rendered to PCM by <code>src/export/ymemu.ts</code>, a register-level YM2149 emulation (tone counters, 17-bit noise LFSR, the 16 envelope shapes, the chip&#39;s non-linear volume table, the 4-bit digidrum DAC and the timer effects), and played as a looping <code>AudioBufferSource</code>.</li>
+<li><strong>Original side</strong>: libopenmpt in an <code>AudioWorklet</code> (chiptune3), vendored under <code>public/vendor/chiptune3</code>. It is loaded by URL at runtime because the worklet imports sibling files; it is therefore unavailable when the page is opened from <code>file://</code>.</li>
+<li>The A/B switch changes the gain of the two branches so position is preserved.</li>
+<li>The manual import dialog creates a second <code>Preview</code> for the <em>solo</em> preview of single channels, so a solo and the main preview never overlap.</li>
+</ul>
+</section>
+<section class="sec" id="architecture-sndh-import"><h2>SNDH import<a class="anchor" href="#architecture-sndh-import" aria-label="link">#</a></h2><p><code>src/import/sndh.ts</code> runs the tune in a built-in Motorola 68000 interpreter (<code>m68k.ts</code>, 4 MB RAM, I/O page at <code>$FF8000</code>): it loads the file (ICE!-depacked if needed) at a base address, calls the init routine for the chosen subtune, then calls the play routine at the tune&#39;s own rate (VBL or Timer A–D) and records the YM registers once per frame. The MFP model (<code>mfp.ts</code>) runs timer interrupts in virtual time; every YM write made inside an interrupt is logged with a timestamp, and <code>sndhfx.ts</code> classifies the log into digidrums and timer effects (see the table in <a href="#howto-load-sndh">How-to: load SNDH</a>). The interpreter was checked against the Musashi core in psgplay.</p>
+</section>
+<section class="sec" id="architecture-exporters"><h2>Exporters<a class="anchor" href="#architecture-exporters" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Exporter</th>
+<th>Input</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SNDH (<code>export/sndh.ts</code>)</td>
+<td>register dump + side tracks</td>
+<td>Header tags + position-independent 68000 player + packed stream + optional drum table.</td>
+</tr>
+<tr>
+<td>YM5 / YM6 (<code>export/ym.ts</code>)</td>
+<td>register dump + side tracks</td>
+<td>Plain <code>YM5!</code>, or <code>YM6!</code> when drums or effects exist.</td>
+</tr>
+<tr>
+<td>Game kit (<code>export/gamekit.ts</code>, <code>cheader.ts</code>, <code>replayer.ts</code>)</td>
+<td>register dump + side tracks</td>
+<td>C array + single-header C replayer with the same 68000 engine blob as <code>gamedrum.s</code>.</td>
+</tr>
+<tr>
+<td>WAV, regs</td>
+<td>register dump</td>
+<td>Through the emulator / raw.</td>
+</tr>
+<tr>
+<td>maxYMiser (<code>maxymiser/convert.ts</code>, <code>format.ts</code>)</td>
+<td><code>Song</code></td>
+<td>Unrolls the song&#39;s walk, bakes instruments to sequences, maps effects; digi and timer instruments.</td>
+</tr>
+<tr>
+<td>Arkos (<code>arkos/aks.ts</code>)</td>
+<td><code>Song</code></td>
+<td>Bakes instruments per tick via <code>export/bake.ts</code>; XML in a zip.</td>
+</tr>
+<tr>
+<td>Furnace (<code>furnace/fur.ts</code>)</td>
+<td><code>Song</code></td>
+<td>Bakes instruments into macros via <code>bake.ts</code>; per-note instrument copies for fractional tuning and vibrato.</td>
+</tr>
+</tbody></table>
+<p><code>bake.ts</code> renders an instrument tick by tick with the editor&#39;s own logic (<code>bakeInstrument</code> → <code>Baked</code> ticks of volume, pitch, noise, tone, envelope), so Arkos and Furnace instruments are exactly what the editor plays.</p>
+</section>
+<section class="sec" id="architecture-68000"><h2>The 68000 engine<a class="anchor" href="#architecture-68000" aria-label="link">#</a></h2><p><code>src/player68k/player.s</code> (the SNDH player), <code>drumeng.s</code> (digidrum + timer-effect engine) and <code>gamedrum.s</code> (the same engine for the C game kit) are assembled with <code>m68k-linux-gnu-as</code> and committed as binary blobs (<code>player.bin</code>, <code>gamedrum.bin</code>) wrapped by <code>blob.ts</code>; <code>npm run build:player</code> rebuilds them. The player reads the packed stream, writes the PSG once per 50 Hz tick, and on a drum or effect event starts an MFP interrupt handler.</p>
+</section>
+<section class="sec" id="architecture-build"><h2>Build and delivery<a class="anchor" href="#architecture-build" aria-label="link">#</a></h2><ul>
+<li><code>npm run build</code> runs <code>tsc --noEmit</code> then <code>vite build</code>, producing a static folder in <code>dist/</code>.</li>
+<li><code>base: &#39;./&#39;</code> makes every URL relative, so the folder works from any sub-path (a Nekoweb folder URL, <code>…/index.html</code>) and from <code>file://</code>.</li>
+<li>The script is emitted as a classic IIFE with <code>defer</code> (browsers refuse module scripts and <code>crossorigin</code> requests on <code>file://</code>), the demo module is inlined as a data URL, and the documentation is a single self-contained HTML file copied from <code>public/docs/</code>.</li>
+</ul>
+</section>
+<section class="sec" id="architecture-verification"><h2>Verification strategy<a class="anchor" href="#architecture-verification" aria-label="link">#</a></h2><p>The design relies on independent oracles rather than listening alone:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Oracle</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Frame converter</td>
+<td><code>tools/reference/</code> — an independent Python implementation; the register dump of the demo song must match frame for frame (<code>tests/convert.test.ts</code>).</td>
+</tr>
+<tr>
+<td>SNDH player + drum/effect engine</td>
+<td>psgplay&#39;s Musashi 68000 core runs the exported SNDH; YM register writes are compared with <code>.regs</code> (<code>tools/verify/sndh_check.py</code>).</td>
+</tr>
+<tr>
+<td>Game kit</td>
+<td>The generated C is compiled for the 68000, wrapped in an SNDH and run in psgplay (<code>tools/verify/gamekit_check.sh</code>).</td>
+</tr>
+<tr>
+<td>68000 interpreter</td>
+<td>ALU and mixed test programs compared with Musashi (<code>tools/verify/m68ktest</code>).</td>
+</tr>
+<tr>
+<td>maxYMiser export / import</td>
+<td>gwEm&#39;s real replayer run on the export (<code>scripts/maxymiser-check.ts</code>).</td>
+</tr>
+<tr>
+<td>Arkos export / import</td>
+<td>The independent Rust <code>ym2149-arkos-replayer</code> (not part of the repository).</td>
+</tr>
+<tr>
+<td>Furnace export</td>
+<td>A real, headless Furnace with <code>-vgmout</code> (<code>scripts/furnace-check.ts</code>).</td>
+</tr>
+<tr>
+<td>Perceptual</td>
+<td>Chroma similarity against libopenmpt renders ≈ 0.95.</td>
+</tr>
+</tbody></table>
+<p><code>npm test</code> runs the unit and parity tests (about 210). Tests that need external binaries (gcc for the C replayer, psgplay, Furnace, the maxYMiser replayer) are skipped or run by the scripts above.</p>
+</section>
+</section>
+<section class="chapter" id="specs"><h1>Technical specifications<a class="anchor" href="#specs" aria-label="link">#</a></h1>
+<div class="intro"><p>All multi-byte values are <strong>big-endian</strong> unless a format says otherwise (<code>.ymt</code> and <code>.aks</code>/<code>.fur</code> follow their own conventions).</p>
+</div>
+<section class="sec" id="specs-time"><h2>Time base and registers<a class="anchor" href="#specs-time" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PSG clock</td>
+<td>2 000 000 Hz (Atari ST)</td>
+</tr>
+<tr>
+<td>Frame rate</td>
+<td>50 Hz (one frame = 20 ms = 40 000 PSG clocks)</td>
+</tr>
+<tr>
+<td>Tone frequency</td>
+<td><code>2 000 000 / (16 × period)</code>, period 1–4095</td>
+</tr>
+<tr>
+<td>Envelope frequency</td>
+<td><code>2 000 000 / (256 × period)</code>, period 1–65535</td>
+</tr>
+<tr>
+<td>Tick (editor)</td>
+<td><code>2.5 / BPM</code> seconds; speed = ticks per row</td>
+</tr>
+<tr>
+<td>Maximum render length</td>
+<td>60 000 frames = 20 minutes</td>
+</tr>
+<tr>
+<td>Volume steps</td>
+<td>16 (R8–R10 bits 0–3); the tracker volume column (0–64) maps to the nearest step of the chip&#39;s amplitude table</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="specs-regs"><h2>Register dump (`.regs`, internal)<a class="anchor" href="#specs-regs" aria-label="link">#</a></h2><p>14 bytes per frame, R0…R13, no header. Two conventions of this tool inside the dump:</p>
+<ul>
+<li><strong>R13 = <code>0xFF</code></strong> means <em>do not write R13 this frame</em>. A write of the same shape retriggers the envelope, so only frames that really restart the envelope write it. When no voice ever uses the envelope (volume bit 4), R13 is never written.</li>
+<li><strong>Bit 5 of R8–R10</strong> is the <em>sync-square</em> flag (the chip ignores that bit). It is stripped in YM files and maxYMiser; the SNDH player and the game-kit replayer act on it.</li>
+</ul>
+</section>
+<section class="sec" id="specs-stream"><h2>Packed stream (SNDH and game kit)<a class="anchor" href="#specs-stream" aria-label="link">#</a></h2><p>Delta-coded; per frame:</p>
+<pre><code>A  = bit 7 &quot;B follows&quot; | mask of R0..R6 that changed (bits 0-6)
+B  = bit 7 &quot;event bytes follow&quot; | mask of R7..R13 that changed (bits 0-6)     [only if A bit 7]
+events (only if B bit 7):
+   timer effect (at most one per frame), top two bits 00:
+       X = kind&lt;&lt;4 | voice&lt;&lt;2 | cont       kind 0 = stop; 1 = SID, 2 = sinus, 3 = sync
+       kinds 1..3 are followed by: prescaler code, data register
+       cont = 1: a drum byte follows
+   digidrum trigger, top two bits != 00:
+       T = (voice+1)&lt;&lt;6 | drum index        drum 63 = stop
+then one data byte per set mask bit, in register order
+</code></pre>
+<ul>
+<li>The loop frame always starts with a <strong>full refresh</strong>, so a loop point is self-contained.</li>
+<li>Streams without drums or effects never set bit 7 of B, so older players can read them.</li>
+<li>The packer returns <code>data</code> and <code>loopOffset</code> (the byte offset of the loop frame).</li>
+</ul>
+</section>
+<section class="sec" id="specs-sndh"><h2>SNDH file<a class="anchor" href="#specs-sndh" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Offset</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0, 4, 8</td>
+<td>Three <code>bra.w</code> entries: init, exit, play (SNDH convention)</td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>SNDH</code> magic, then tags: <code>TITL</code>, <code>COMM</code> (composer), <code>CONV</code>, <code>YEAR</code>, <code>##01</code> (one subtune), <code>TC50</code> (Timer C, 50 Hz), <code>TIME</code> (seconds, 16 bit), <code>HDNS</code> (end of tags)</td>
+</tr>
+<tr>
+<td>after the tags</td>
+<td>The 68000 player blob (1540 bytes, position independent, even aligned)</td>
+</tr>
+<tr>
+<td>player + 12</td>
+<td><code>.w</code> number of frames</td>
+</tr>
+<tr>
+<td>player + 14</td>
+<td><code>.w</code> frames in the loop (<code>nframes − loopFrame</code>)</td>
+</tr>
+<tr>
+<td>player + 16</td>
+<td><code>.l</code> byte offset of the loop frame in the stream</td>
+</tr>
+<tr>
+<td>player + 20</td>
+<td><code>.l</code> offset of the digidrum table, only when the song has drums</td>
+</tr>
+<tr>
+<td>after the player</td>
+<td>The packed stream, then (word aligned) the digidrum table</td>
+</tr>
+</tbody></table>
+<p>Text is Latin-1 (other characters become <code>?</code>). The player calls Timer C at 50 Hz, writes the PSG, and starts an MFP interrupt handler for drum or effect events. Digidrum and timer-effect engines are included in every SNDH (they are part of the blob).</p>
+</section>
+<section class="sec" id="specs-ym"><h2>YM5! and YM6! files<a class="anchor" href="#specs-ym" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Field</th>
+<th><code>YM5!</code></th>
+<th><code>YM6!</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Magic</td>
+<td><code>YM5!LeOnArD!</code></td>
+<td><code>YM6!LeOnArD!</code></td>
+</tr>
+<tr>
+<td>Frames (u32)</td>
+<td>number of frames</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Attributes (u32)</td>
+<td>1 (interleaved)</td>
+<td>1 + 4 (interleaved + 4-bit drum samples)</td>
+</tr>
+<tr>
+<td>Drum count (u16)</td>
+<td>0</td>
+<td>number of drums (≤ 32)</td>
+</tr>
+<tr>
+<td>Clock (u32)</td>
+<td>2 000 000</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Frame rate (u16)</td>
+<td>50</td>
+<td>50</td>
+</tr>
+<tr>
+<td>Loop frame (u32)</td>
+<td>frame index</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Extra (u16)</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Drum samples</td>
+<td>–</td>
+<td>per drum: <code>.l</code> length, then one byte (0–15) per sample</td>
+</tr>
+<tr>
+<td>Strings</td>
+<td>title, author, comment (NUL terminated, Latin-1)</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Data</td>
+<td>16 register columns of <code>nframes</code> bytes (interleaved: all R0, then all R1 …)</td>
+<td>same</td>
+</tr>
+<tr>
+<td>End marker</td>
+<td><code>End!</code></td>
+<td><code>End!</code></td>
+</tr>
+</tbody></table>
+<p>YM6 digidrum trigger (ST-Sound convention): <code>R1</code> high nibble = <code>0x40 | (voice+1)&lt;&lt;4</code>, <code>R6</code> bits 5–7 = MFP prescaler, <code>R14</code> = MFP data register, <code>R(8+voice)</code> = drum number. ST-Sound effects last one frame, so <strong>timer effects</strong> are repeated every frame they run: <code>R1</code>/<code>R3</code> high nibble = <code>(voice+1)&lt;&lt;4 | type</code> (<code>0x00</code> SID, <code>0x80</code> sinus-SID, <code>0xC0</code> sync-buzzer), prescaler in <code>R6</code>/<code>R8</code> bits 5–7, data register in <code>R14</code>/<code>R15</code>; a frame with both a drum and an effect uses slot 1 for the drum and slot 2 for the effect. The rate stored is the musical rate (the sinus effect&#39;s interrupt runs 32× faster in the engine). <code>R13</code> carries the envelope shape for sync-buzzer frames.</p>
+<p>YM6 limits: 32 drums, no <em>stop</em> code (approximated), drums on different voices may overlap in ST-Sound (approximated).</p>
+<p>Importers accept YM2!, YM3!, YM3b!, YM5!, YM6!, also LHA-packed.</p>
+</section>
+<section class="sec" id="specs-drums"><h2>Digidrum table and engine<a class="anchor" href="#specs-drums" aria-label="link">#</a></h2><p>Table read by the 68000 engine (<code>drumtable.ts</code>): <code>.w</code> count, then per drum <code>.l</code> PCM offset, <code>.w</code> length, <code>.b</code> MFP prescaler code, <code>.b</code> MFP data register; then the PCM bytes (one byte per sample, 0–15 = chip volume step).</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MFP clock</td>
+<td>2 457 600 Hz</td>
+</tr>
+<tr>
+<td>Prescaler dividers</td>
+<td>code 1…7 = 4, 10, 16, 50, 64, 100, 200 (code 0 = stopped)</td>
+</tr>
+<tr>
+<td>Data register</td>
+<td>1–255</td>
+</tr>
+<tr>
+<td>Rate</td>
+<td><code>2 457 600 / (divider × data)</code>; the nearest achievable rate is used (8 kHz → 7 989 Hz)</td>
+</tr>
+<tr>
+<td>Timer</td>
+<td>Timer D, vector <code>$110</code>, IPL 6</td>
+</tr>
+<tr>
+<td>Voice</td>
+<td>the voice named in the trigger; tone and noise off while playing</td>
+</tr>
+<tr>
+<td>Concurrency</td>
+<td>one drum at a time; a trigger cuts the previous drum</td>
+</tr>
+<tr>
+<td>Max rate in the editor</td>
+<td>24 000 Hz; converter drum rates 4–16 kHz</td>
+</tr>
+<tr>
+<td>Max size</td>
+<td>63 drums per instrument, 16 000 bytes each</td>
+</tr>
+<tr>
+<td><code>.ymt</code> storage</td>
+<td>4-bit packed, low nibble first</td>
+</tr>
+</tbody></table>
+<p>Samples are 4-bit values written to the volume register, so amplitude follows the chip&#39;s non-linear DAC levels (the waveform view in the drum editor draws exactly that).</p>
+</section>
+<section class="sec" id="specs-fx"><h2>Timer-effect engine<a class="anchor" href="#specs-fx" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Timer</td>
+<td>Timer A, vector <code>$134</code>, IPL 6</td>
+</tr>
+<tr>
+<td>Parameter</td>
+<td><code>xy</code>: pitch step <code>x</code>, octave <code>y</code>; rate <code>20 × 2^(y + x/16)</code> Hz; <code>00</code> = off</td>
+</tr>
+<tr>
+<td>Range</td>
+<td>48.2 Hz (<code>2 457 600 / (200 × 255)</code>) to 20 kHz; clamped, with a warning</td>
+</tr>
+<tr>
+<td>SID voice (Q)</td>
+<td>each tick toggles the volume register between the voice&#39;s level (full level on an envelope voice) and 0</td>
+</tr>
+<tr>
+<td>Sinus-SID (S)</td>
+<td>64-step table (32-step rectified sine, then 32 silent steps); level <code>(sin32[t] × vol × 17 + 128) &gt;&gt; 8</code>; interrupt rate 32× the musical rate, so the musical rate is limited to about 625 Hz</td>
+</tr>
+<tr>
+<td>Sync-buzzer (U)</td>
+<td>each tick rewrites R13 with the current shape (restarting the envelope)</td>
+</tr>
+<tr>
+<td>Concurrency</td>
+<td>one effect at a time; the first keeps running</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="specs-gamekit"><h2>Game kit<a class="anchor" href="#specs-gamekit" aria-label="link">#</a></h2><p><code>&lt;name&gt;.h</code>: <code>&lt;N&gt;_FRAMES</code>, <code>&lt;N&gt;_LOOP_FRAME</code>, <code>&lt;N&gt;_LOOP_OFFSET</code>, <code>static const unsigned char &lt;n&gt;_data[]</code> (the packed stream), and with drums <code>&lt;N&gt;_DRUMS</code> and <code>static const unsigned short &lt;n&gt;_drums[]</code> (the table, word aligned).</p>
+<p><code>ymplay.h</code> (single header, plain C, 68000 target):</p>
+<table>
+<thead>
+<tr>
+<th>Call</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ymplay_start(&lt;n&gt;_data, &lt;N&gt;_FRAMES, &lt;N&gt;_LOOP_FRAME, &lt;N&gt;_LOOP_OFFSET)</code></td>
+<td>Once, before the first step: points the replayer at the stream and clears the registers.</td>
+</tr>
+<tr>
+<td><code>ymplay_step()</code></td>
+<td>Advance one 50 Hz frame; fills <code>ymplay_reg[0..13]</code>. At the end it jumps back to the loop frame by itself.</td>
+</tr>
+<tr>
+<td><code>ymplay_write()</code></td>
+<td>Write <code>ymplay_reg</code> to the PSG (supervisor mode). With drums/effects: also keeps the register shadow, leaves the volume register of the voice that plays a drum or effect alone, and starts/stops them.</td>
+</tr>
+<tr>
+<td><code>ymplay_reg[14]</code></td>
+<td>The registers of the current frame, for games that write the PSG themselves (so sound effects can steal a voice by overriding registers first).</td>
+</tr>
+<tr>
+<td><code>ymdrum_init(&lt;n&gt;_drums)</code></td>
+<td>Once, supervisor mode: takes over Timer D (and Timer A for effects). Use <code>ymdrum_init(0)</code> when only effects are present.</td>
+</tr>
+<tr>
+<td><code>ymdrum_exit()</code></td>
+<td>Restores the timers and the voice volume.</td>
+</tr>
+<tr>
+<td><code>ymdrum_busy()</code>, <code>ymfx_voice()</code>, <code>ymplay_trig</code>, <code>ymplay_fxev</code></td>
+<td>For hand-written PSG access; see the comment at the top of <code>ymplay.h</code>.</td>
+</tr>
+</tbody></table>
+<p>The 68000 engine is embedded as <code>unsigned short ymdrum_code[]</code> (1188 bytes, position independent, needs RAM). Timer D and Timer A must not be used by anything else while the music plays.</p>
+</section>
+<section class="sec" id="specs-ymt"><h2>`.ymt` song file<a class="anchor" href="#specs-ymt" aria-label="link">#</a></h2><p>The YM Tracker&#39;s native format, read and written byte-compatibly (little-endian).</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Header</td>
+<td><code>YMT1</code>, version <code>u8</code> = 1, flags <code>u8</code> (bit 0 = gzip), header size <code>u16</code> = 8</td>
+</tr>
+<tr>
+<td>Payload (gzip when flagged)</td>
+<td>name (<code>u16</code> length + UTF-8), BPM <code>u16</code>, speed <code>u8</code>, step <code>u8</code>, restart <code>u16</code>, channel count <code>u8</code>, drum channel <code>i8</code> (−1 = none), order length / pattern count / instrument count (<code>u16</code> each), channel names (flag <code>u8</code>, then <code>str8</code> per channel), the order (<code>u8</code> each)</td>
+</tr>
+<tr>
+<td>Patterns</td>
+<td>per pattern: rows <code>u16</code>, packed size <code>u32</code>, then cells: one mask byte per cell (<code>0x80</code> = empty cell; else bit 7 set + bit 0 note, 1 instrument, 2 volume, 3 effect, 4 parameter, followed by those bytes)</td>
+</tr>
+<tr>
+<td>Instruments</td>
+<td>name, ADSR, hard-envelope fields, noise/tone, arp speed, vibrato, phase/duty/noise masks, volume envelope, release table, arpeggio macro (<code>i8</code>), pitch macro (<code>i16</code>), wavetable, digidrum bank (name, rate <code>u16</code>, length <code>u32</code>, 4-bit packed PCM)</td>
+</tr>
+<tr>
+<td>Extensions (this tool)</td>
+<td><code>XSEQ</code>: step tables (count, then per instrument index, loop-from <code>i16</code>, velocity flag, release, step count, steps as volume×100 <code>i16</code>, semitone×100 <code>i16</code>, noise <code>u8</code>, flags <code>u8</code>); <code>XAUT</code>: author; <code>XSYN</code>: instruments with sync-square. The YM Tracker stops reading after the instruments and ignores them.</td>
+</tr>
+</tbody></table>
+<p>Limits: 255 patterns, 255 instruments, 1–256 rows per pattern, up to 7 channels in the file (the editor uses 3 voices + the drum column).</p>
+</section>
+<section class="sec" id="specs-mapping"><h2>Mapping file (`.json`)<a class="anchor" href="#specs-mapping" aria-label="link">#</a></h2><pre><code class="language-json">{
+  &quot;format&quot;: &quot;mod-xm-to-ym-mapping&quot;,
+  &quot;version&quot;: 1,
+  &quot;module&quot;: { &quot;title&quot;: &quot;...&quot;, &quot;kind&quot;: &quot;xm&quot;, &quot;channels&quot;: 4, &quot;instruments&quot;: 4 },
+  &quot;opts&quot;:  { &quot;gainDb&quot;: 0, &quot;drumBonus&quot;: 3, &quot;sticky&quot;: 1.5, &quot;arpOrder&quot;: &quot;xy&quot;, &quot;arpFill&quot;: 0, &quot;arpMinVol&quot;: 3,
+             &quot;digi&quot;: false, &quot;digiRate&quot;: 8000, &quot;digiMaxMs&quot;: 500, &quot;middle&quot;: false, &quot;waveform&quot;: false },
+  &quot;prio&quot;:  { &quot;0&quot;: 8, &quot;2&quot;: -99 },
+  &quot;inst&quot;:  { &quot;1&quot;: { &quot;mode&quot;: &quot;tone&quot;, &quot;transpose&quot;: -12, &quot;wave&quot;: &quot;saw&quot; },
+             &quot;3&quot;: { &quot;mode&quot;: &quot;macro&quot;, &quot;macro&quot;: { &quot;loopFrom&quot;: 2, &quot;velocity&quot;: true,
+                    &quot;steps&quot;: [ { &quot;vol&quot;: 15, &quot;semi&quot;: 0, &quot;noise&quot;: 0, &quot;tone&quot;: true } ] } } },
+  &quot;names&quot;: { &quot;1&quot;: &quot;Bass lead&quot; }
+}
+</code></pre>
+<ul>
+<li><code>prio</code>: 0-based channel → value; <code>-99</code> = Off. Low −3, High +3, Lead +8 in the dialog; any number is valid.</li>
+<li><code>inst.mode</code>: <code>auto</code>, <code>mute</code>, <code>tone</code>, <code>kick</code>, <code>snare</code>, <code>hat</code>, <code>macro</code>, <code>digi</code>; <code>wave</code>: <code>tone</code>, <code>saw</code>, <code>sawup</code>, <code>smooth</code>.</li>
+<li><code>names</code>: instrument number (1–255) → name, at most 24 characters. Optional (files without it load fine).</li>
+<li>All values are validated and clamped on loading; unreadable entries are dropped with a warning.</li>
+</ul>
+</section>
+<section class="sec" id="specs-trackers"><h2>Exports to other trackers<a class="anchor" href="#specs-trackers" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Target</th>
+<th>File</th>
+<th>Timing</th>
+<th>Instruments</th>
+<th>Effects carried</th>
+<th>Not carried</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>maxYMiser</td>
+<td><code>.mys</code> + <code>.myv</code> (+ <code>.myi</code>)</td>
+<td>replay rate = BPM × 0.4 Hz (≥ 50), row = <em>speed</em> calls</td>
+<td>sequences of 31 steps, 32 slots, 8 samples × 32 KB</td>
+<td><code>0xy 1xx 2xx 3xx 4xy C F D B E6 X K</code>, digidrums, <code>Q S U</code></td>
+<td>volume slides, tremolo, global volume, retrigger/cut/delay, <code>L M P Y</code>, tempo changes, second chip</td>
+</tr>
+<tr>
+<td>Arkos Tracker 3</td>
+<td><code>.aks</code> (XML in a zip, format 3.0)</td>
+<td>2 MHz PSG, replay rate = BPM × 0.4 Hz, 1 subsong, 3 channels</td>
+<td>baked per tick; periodic macros unrolled to common period; buzzer as software+hardware link</td>
+<td>notes, volume/<code>C</code>, <code>0xy 1xx 2xx 3xx 4xy F D</code></td>
+<td>digidrums, <code>Q S U</code>, sync-square, tremolo, volume slides, BPM changes, <code>B</code></td>
+</tr>
+<tr>
+<td>Furnace</td>
+<td><code>.fur</code> (format 228)</td>
+<td>tick rate BPM × 0.4 Hz, AY-3-8910 flagged YM2149 at 2 MHz, non-linear pitch</td>
+<td>macros (volume, wave, duty, arp, pitch, ex shape/period); per-note copies for fractional tuning and vibrato</td>
+<td>notes, vol, <code>0xy 1xx 2xx 3xx 4xy ED EC K F D B</code></td>
+<td>digidrums, <code>Q S U</code>, sync-square, tremolo, volume slides, global volume, <code>X Y M P L R T</code>, <code>E1 E2 E6 E9 EA EB</code></td>
+</tr>
+</tbody></table>
+<p>Details, tolerances and the known differences (first release tick, arpeggio-speed drift on odd row lengths, slide phasing) are listed in the README and as warnings in each export. The tools were checked as described in <a href="#architecture-verification">Architecture → Verification</a>.</p>
+</section>
+<section class="sec" id="specs-limits"><h2>Limits at a glance<a class="anchor" href="#specs-limits" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Voices</td>
+<td>3 (+ the drum column, which plays on voice C)</td>
+</tr>
+<tr>
+<td>Notes</td>
+<td>C-1…B-8 (1–96); <code>===</code> = key off</td>
+</tr>
+<tr>
+<td>BPM / speed</td>
+<td>32–255 / 1–31</td>
+</tr>
+<tr>
+<td>Pattern rows / patterns / instruments</td>
+<td>1–256 / 255 / 255</td>
+</tr>
+<tr>
+<td>Table lengths in instruments</td>
+<td>256 entries (arpeggio, pitch, volume tables); step tables up to 255 steps</td>
+</tr>
+<tr>
+<td>Instrument name</td>
+<td>22 characters in the editor; 24 for source-instrument names in the converter</td>
+</tr>
+<tr>
+<td>Digidrums</td>
+<td>63 per instrument, 16 000 bytes each; YM6: 32 in total</td>
+</tr>
+<tr>
+<td>Timer effects</td>
+<td>48–20 000 Hz (sinus ≤ about 625 Hz); one drum and one effect at a time</td>
+</tr>
+<tr>
+<td>Undo</td>
+<td>200 steps</td>
+</tr>
+<tr>
+<td>maxYMiser</td>
+<td>32 instrument slots, 8 samples of 32 KB, sequences of 31 steps</td>
+</tr>
+<tr>
+<td>Arkos</td>
+<td>notes C-1…B-8, one PSG</td>
+</tr>
+<tr>
+<td>Furnace</td>
+<td>one chip, 3 channels; a vibrato cycle over 254 ticks is cut</td>
+</tr>
+<tr>
+<td>Render length</td>
+<td>20 minutes</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="specs-scenarios"><h2>Scenarios<a class="anchor" href="#specs-scenarios" aria-label="link">#</a></h2><p>What each way of using the tool produces:</p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Path</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A. Quick SNDH</strong></td>
+<td>Load MOD/XM → Converter → <em>SNDH</em></td>
+<td>Dump from the frame converter; 1540-byte player + stream (typically 150–400 bytes per second of music for dense songs, ≈ 166 B/s for the demo).</td>
+</tr>
+<tr>
+<td><strong>B. Priorities tuned</strong></td>
+<td>Load → <em>Manual import…</em> / priority buttons → export</td>
+<td>Same pipeline; channels with <em>Off</em> are never replayed; priorities change only the allocation.</td>
+</tr>
+<tr>
+<td><strong>C. With digidrums</strong></td>
+<td><em>Percussion as digidrums</em> or per-instrument <em>digidrum</em> role → export</td>
+<td>Dump + <code>DrumTrack</code>. SNDH/game kit carry the table (<code>drumtable.ts</code>) and the Timer D engine; YM becomes YM6; WAV renders the samples.</td>
+</tr>
+<tr>
+<td><strong>D. Edit as AY patterns</strong></td>
+<td><em>Edit as AY patterns →</em></td>
+<td><code>moduleToSong</code>: pattern song with step-table instruments, drum column if the module has percussion, names and priorities applied; renderer produces the same dump.</td>
+</tr>
+<tr>
+<td><strong>E. Hand-written song</strong></td>
+<td>New → editor</td>
+<td>Renderer only; all effects including <code>Q S U Z</code> available.</td>
+</tr>
+<tr>
+<td><strong>F. Import SNDH / YM</strong></td>
+<td>Load <code>.sndh</code> / <code>.ym</code></td>
+<td>No conversion: the dump is the music (SNDH is emulated); drums and effects are classified from MFP writes; exports re-pack the dump.</td>
+</tr>
+<tr>
+<td><strong>G. Round trip to other trackers</strong></td>
+<td>Editor → maxYMiser / Arkos / Furnace</td>
+<td>Song-level export with instrument baking; maxYMiser and Arkos can be loaded back.</td>
+</tr>
+<tr>
+<td><strong>H. Game integration</strong></td>
+<td>Converter or editor → <em>Game kit (.zip)</em></td>
+<td>Header + replayer; the game calls <code>ymplay_step()</code> / <code>ymplay_write()</code> every 50 Hz tick.</td>
+</tr>
+<tr>
+<td><strong>I. Offline / file://</strong></td>
+<td>Open <code>index.html</code> from disk</td>
+<td>Everything works except the <em>Original</em> A/B side (needs http(s)).</td>
+</tr>
+</tbody></table>
+</section>
+</section>
+<section class="chapter" id="troubleshooting"><h1>Troubleshooting<a class="anchor" href="#troubleshooting" aria-label="link">#</a></h1>
+<div class="intro"></div>
+<section class="sec" id="troubleshooting-load"><h2>Loading and playback<a class="anchor" href="#troubleshooting-load" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Cause and fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A · Original</strong> is greyed out</td>
+<td>The original side uses libopenmpt in an AudioWorklet, which browsers refuse when the page is opened from disk (<code>file://</code>). Serve the folder over http(s) (any static host, <code>python3 -m http.server</code>, or the published site). Everything else works from disk.</td>
+</tr>
+<tr>
+<td>No sound at all</td>
+<td>Browsers start audio only after a click. Press <strong>▶ Play</strong> (or Space) once; check the tab is not muted.</td>
+</tr>
+<tr>
+<td>The preview takes seconds to update</td>
+<td>The conversion runs in your browser: a quarter of a second after the last change, then 1–3 s for a long song. The status text shows <em>Converting…</em> / <em>Rendering…</em>. Changing a priority while playing is fine; the new version replaces the old one.</td>
+</tr>
+<tr>
+<td>&quot;not a MOD or XM file&quot;</td>
+<td>The contents were not recognised. Packed or Impulse Tracker / S3M files are not supported. Check the file is not a renamed archive.</td>
+</tr>
+<tr>
+<td>A <code>.sndh</code> says <em>did not return</em></td>
+<td>The tune&#39;s init or play routine waits for hardware that is not emulated (for example a busy-wait on a timer data register). Try another subtune or a shorter <em>Seconds</em> value.</td>
+</tr>
+<tr>
+<td>An <code>.ym</code> has the wrong length or no loop</td>
+<td>YM files carry their own loop frame; if none is stored the tune plays once. For SNDH the loop is detected; <em>Seconds</em> overrides the length.</td>
+</tr>
+<tr>
+<td>The demo does not start</td>
+<td>Press <strong>Demo: Omar&#39;s Bazaar</strong> after the page has fully loaded; the demo is embedded in the page, so no network is needed.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="troubleshooting-sound"><h2>The conversion sounds wrong<a class="anchor" href="#troubleshooting-sound" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>What to try</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>The melody keeps disappearing</td>
+<td>Give its channel <strong>Lead</strong> (manual import) or press <strong>+</strong> a few times; check <em>Dropped</em> in <em>Source channels</em>. Switch on <strong>Arp fill</strong> so lost chord notes survive as arpeggios.</td>
+</tr>
+<tr>
+<td>Notes jump between voices, clicks</td>
+<td>Raise <strong>Voice stickiness</strong>.</td>
+</tr>
+<tr>
+<td>Drums swallow the melody</td>
+<td>Lower <strong>Drum priority</strong>; or lower the drum channel&#39;s priority.</td>
+</tr>
+<tr>
+<td>Drums are missing</td>
+<td>Check the drum instrument is not set to <em>mute</em> and the drum channel is not <em>Off</em>. With digidrums, make sure <em>Percussion as digidrums</em> or the <em>digidrum (sample)</em> role is set.</td>
+</tr>
+<tr>
+<td>Drums sound thin</td>
+<td>Use digidrums (a higher <strong>Drum rate</strong>, 10–12 kHz) or set the instrument role to <em>kick / snare / hat</em> to use the better-fitting synthetic drum.</td>
+</tr>
+<tr>
+<td>Bass is too quiet or too high</td>
+<td><strong>Level</strong> up; <strong>Tr.</strong> of the bass instrument −12; or <em>Bass + drums on the middle voice</em>.</td>
+</tr>
+<tr>
+<td>A tonal instrument sounds like noise or at the wrong pitch</td>
+<td>Set its AY role to <em>tone (written note)</em> and/or correct <strong>Tr.</strong> The measured pitch (<strong>C-4</strong>) comes from the sample; very short or noisy samples measure badly.</td>
+</tr>
+<tr>
+<td>The buzzer bass never appears</td>
+<td>The buzzer is used only for loud notes (level ≥ 12) at low pitch (envelope period ≥ 32, up to about 240 Hz for a saw), one voice at a time. Raise <strong>Level</strong>, or force <em>saw buzzer</em> on that instrument.</td>
+</tr>
+<tr>
+<td>Everything sounds a bit &quot;dull&quot; or &quot;buzzy&quot;</td>
+<td>That is the chip: 3 voices, square waves, 16 volume steps. Use the editor to write a more idiomatic version.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="troubleshooting-editor"><h2>Pattern editor<a class="anchor" href="#troubleshooting-editor" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Cause and fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Typing notes does nothing</td>
+<td>Edit mode is off. Press <strong>Space</strong> (when stopped) or <strong>○ Edit</strong>. Note keys always audition.</td>
+</tr>
+<tr>
+<td>A digidrum does not play</td>
+<td>The instrument in that cell has no drum of that number (the status line and export warnings say so), or another drum is still playing. Open <strong>Drums…</strong> and check the bank.</td>
+</tr>
+<tr>
+<td><code>Z</code> or the drum channel plays nothing after load</td>
+<td>The song is from an export that cannot carry digidrums (Arkos, Furnace).</td>
+</tr>
+<tr>
+<td>The effect <code>Q</code>/<code>S</code>/<code>U</code> seems to do nothing</td>
+<td>It needs a sounding note on that voice, and a rate inside 48 Hz–20 kHz. A new note without the effect ends it. Only one timer effect runs at a time.</td>
+</tr>
+<tr>
+<td>Slides sound different on different notes</td>
+<td><code>1xx</code>/<code>2xx</code> are in period units, so the same value is a larger musical interval on higher notes.</td>
+</tr>
+<tr>
+<td>A buzzer instrument disturbs another voice</td>
+<td>The envelope generator is shared: only one buzzer can sound at a time, and its shape and period are those written last.</td>
+</tr>
+<tr>
+<td>The <code>.ymt</code> opens in the YM Tracker with default instruments</td>
+<td>The YM Tracker ignores step tables (this tool&#39;s extension). Classic instruments are kept.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="troubleshooting-export"><h2>Export<a class="anchor" href="#troubleshooting-export" aria-label="link">#</a></h2><table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Cause and fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Warnings under the export buttons</td>
+<td>Each lists an effect or feature the format cannot carry; the file is still written. See the matrices in <a href="#concepts-matrix">Concepts</a> and <a href="#effects-matrix">Effects</a>.</td>
+</tr>
+<tr>
+<td>Digidrums or timer effects missing in a <code>.ym</code></td>
+<td>Players that only know <code>YM5!</code> ignore them. The tool writes <code>YM6!</code> when they are present; use an ST-Sound-compatible player.</td>
+</tr>
+<tr>
+<td>Sync-square has no effect in the <code>.ym</code></td>
+<td>It exists only in SNDH, the game kit and the WAV preview; the YM format has no place for it.</td>
+</tr>
+<tr>
+<td>maxYMiser does not find the voices</td>
+<td>Load the <code>.mys</code> <strong>and</strong> the <code>.myv</code> voice bank (they are in the same zip).</td>
+</tr>
+<tr>
+<td>Arkos reports an unsupported version</td>
+<td>The tool reads and writes Arkos Tracker <strong>3</strong> files (formatVersion 3.0). Re-save an Arkos Tracker 2 song in Arkos Tracker 3 first.</td>
+</tr>
+<tr>
+<td>Furnace refuses the file</td>
+<td>Furnace 0.6.8 or newer is needed (format 228).</td>
+</tr>
+<tr>
+<td>The SNDH is silent in a player</td>
+<td>Players that do not honour the <code>TC50</code> tag play at their default rate. The file declares Timer C 50 Hz; use a standard SNDH player (on a real ST or in an emulator, or a PC player that supports SNDH).</td>
+</tr>
+<tr>
+<td>The game kit crashes</td>
+<td>The functions must be called in supervisor mode; with digidrums or effects call <code>ymdrum_init(...)</code> first, <code>ymdrum_exit()</code> at the end, and keep Timer A and D free.</td>
+</tr>
+</tbody></table>
+</section>
+<section class="sec" id="troubleshooting-privacy"><h2>Files and privacy<a class="anchor" href="#troubleshooting-privacy" aria-label="link">#</a></h2><ul>
+<li>Nothing is uploaded. All conversion happens in the browser; the page makes no requests except loading itself (and, over http, the vendored libopenmpt files).</li>
+<li>Settings are not stored between sessions (except the documentation&#39;s light/dark choice). Use <strong>Save mapping</strong> and <strong>Save .ymt</strong> to keep your work.</li>
+<li>There is no auto-save: closing the page discards the pattern editor song. The editor asks before replacing a song that has unsaved changes.</li>
+</ul>
+</section>
+<section class="sec" id="troubleshooting-help"><h2>Getting help<a class="anchor" href="#troubleshooting-help" aria-label="link">#</a></h2><p>Include the file type, what you did and the <em>Conversion report</em> (or the warnings) when you report a problem. The source and issue tracker are at <a href="https://github.com/georgeflower/mod-xm-to-ym-sndh-tool">https://github.com/georgeflower/mod-xm-to-ym-sndh-tool</a>.</p>
+</section>
+</section>
+<p id="none" class="none hidden">Nothing found.</p>
+</main>
+</div>
+<footer>MOD/XM → YM2149 · SNDH · game stream — version 0.3.0. Runs entirely in your browser; this page is a single file and works offline.</footer>
+<script>
+(function () {
+  var q = document.getElementById('q'), secs = [].slice.call(document.querySelectorAll('section.sec, section.chapter > .intro')), none = document.getElementById('none');
+  var links = [].slice.call(document.querySelectorAll('nav.toc a'));
+  function clear(el) { [].slice.call(el.querySelectorAll('mark')).forEach(function (m) { m.replaceWith(document.createTextNode(m.textContent)); }); el.normalize(); }
+  function mark(el, term) {
+    var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), n, hits = [];
+    while ((n = w.nextNode())) { if (n.parentNode.closest('pre,code,script') ) continue; if (n.nodeValue.toLowerCase().indexOf(term) >= 0) hits.push(n); }
+    hits.slice(0, 40).forEach(function (t) {
+      var i = t.nodeValue.toLowerCase().indexOf(term), r = t.splitText(i), after = r.splitText(term.length), m = document.createElement('mark');
+      m.textContent = r.nodeValue; r.parentNode.replaceChild(m, r);
+    });
+  }
+  function run() {
+    var term = q.value.trim().toLowerCase(), shown = 0;
+    secs.forEach(function (s) {
+      clear(s);
+      if (!term) { s.classList.remove('hidden'); shown++; return; }
+      var hit = s.textContent.toLowerCase().indexOf(term) >= 0;
+      s.classList.toggle('hidden', !hit);
+      if (hit) { shown++; mark(s, term); }
+    });
+    [].slice.call(document.querySelectorAll('section.chapter > h1')).forEach(function (h) { h.classList.toggle('hidden', !!term && !h.parentNode.querySelector('section.sec:not(.hidden), .intro:not(.hidden)')); });
+    none.classList.toggle('hidden', shown > 0);
+  }
+  q.addEventListener('input', run);
+  document.addEventListener('keydown', function (e) { if (e.key === '/' && document.activeElement !== q) { e.preventDefault(); q.focus(); } if (e.key === 'Escape') { q.value = ''; run(); q.blur(); } });
+  document.getElementById('menu').addEventListener('click', function () { document.body.classList.toggle('menu'); });
+  links.forEach(function (a) { a.addEventListener('click', function () { document.body.classList.remove('menu'); }); });
+  var t = document.getElementById('theme');
+  t.addEventListener('click', function () {
+    var r = document.documentElement, dark = r.getAttribute('data-theme') === 'dark' || (!r.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+    r.setAttribute('data-theme', dark ? 'light' : 'dark');
+    try { localStorage.setItem('xmod-docs-theme', dark ? 'light' : 'dark'); } catch (e) {}
+  });
+  try { var th = localStorage.getItem('xmod-docs-theme'); if (th) document.documentElement.setAttribute('data-theme', th); } catch (e) {}
+  // a hidden target (search active) is revealed by following a link to it
+  window.addEventListener('hashchange', function () { if (q.value) { q.value = ''; run(); var el = document.getElementById(location.hash.slice(1)); if (el) el.scrollIntoView(); } });
+  // highlight the chapter being read
+  if ('IntersectionObserver' in window) {
+    var map = {}; links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting && map[e.target.id]) { links.forEach(function (a) { a.classList.remove('on'); }); map[e.target.id].classList.add('on'); } }); }, { rootMargin: '-60px 0px -75% 0px' });
+    [].slice.call(document.querySelectorAll('section.chapter, section.sec')).forEach(function (s) { io.observe(s); });
+  }
+})();
+</script>
+</body>
+</html>

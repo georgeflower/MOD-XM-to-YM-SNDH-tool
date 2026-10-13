@@ -1,15 +1,16 @@
 {
   "name": "mod-xm-to-ym-sndh-tool",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Browser tool: MOD/XM -> Atari ST YM2149 register dump, YM, SNDH and game streams",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run docs && tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "build:player": "sh src/player68k/build.sh"
+    "build:player": "sh src/player68k/build.sh",
+    "docs": "tsx scripts/build-docs.ts"
   },
   "dependencies": {
     "react": "^19.3.0",
@@ -20,6 +21,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "marked": "^18.1.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",

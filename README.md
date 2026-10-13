@@ -3,7 +3,8 @@
 A browser tool that turns **ProTracker `.MOD`** and **FastTracker II `.XM`** modules into music for the
 **Atari ST's YM2149** (one chip: 3 tone voices + noise, 50 Hz). Everything runs client-side — static files, no server.
 
-**Status:** load → auto-convert → A/B listen → export, plus an FT2-style AY pattern editor.
+**Status:** load → auto-convert → A/B listen → export, plus an FT2-style AY pattern editor.  
+**Version 0.3.** Documentation: open the **Help** link in the app header (`docs/index.html` in the built site — one self-contained page with a manual, how-to recipes, effects reference, tooltip list, architecture and technical specifications), or read the Markdown sources in [`docs/`](docs/).
 
 ## What you get today
 
@@ -256,11 +257,11 @@ YM2149 with the 2 MHz Atari ST clock, three channels, tick rate = BPM × 0.4 Hz,
 
 1. Open the page, **Load MOD / XM / SNDH / YM…** (or drop a file anywhere) — or press **Demo** (Omar's Bazaar).
 2. **Tab** flips between the original (libopenmpt) and the YM version, **Space** plays/stops.
-3. Tweak *Level / Drum priority / Voice stickiness / Arpeggio order*, per-instrument **AY role** (kick/snare/hat) and
+3. Tweak *Level / Drum priority / Voice stickiness / Arpeggio order*, per-instrument **AY role** (kick/snare/hat), instrument **names** (type over them) and
    per-channel **priority**; the preview re-renders automatically.
 4. **Manual import…** opens a channel list for modules with more than three channels: each channel shows its activity over the song, pitch and main instruments, and gets a
-   priority (Off / Low / Normal / High / Lead — give the melody *Lead*). **▶ Solo** plays one channel alone on the chip, **▶ Full import** plays the result with your priorities
-   (keep changing them while it plays), **Suggest** makes a first guess. The priorities apply to the exports and to *Edit as AY patterns*.
+   priority (Off / Low / Normal / High / Lead — give the melody *Lead*). **▶ Solo** plays one channel alone on the chip, **▶ Full preview** plays the result with your priorities
+   (keep changing them while it plays), **Suggest** makes a first guess. Click a channel's activity graph to listen to that channel from that point of the song, and rename an instrument right in the list. The priorities and names apply to the exports and to *Edit as AY patterns*.
 5. *Edit as AY patterns* adds the drum channel (digidrum samples) by itself when the module has percussion; set an instrument's AY role to kick / snare / hat to keep a synthetic drum instead.
 6. Export.
 
@@ -270,6 +271,7 @@ YM2149 with the 2 MHz Atari ST clock, three channels, tick rate = BPM × 0.4 Hz,
 npm install
 npm run dev          # http://localhost:5173
 npm test             # parity + export tests (needs gcc for the C replayer test)
+npm run docs         # regenerate the Help page (docs/*.md -> public/docs/index.html; also part of `npm run build`)
 npm run build        # static site in dist/ (relative paths: works from any sub-folder, e.g. Nekoweb)
 npm run build:player # re-assemble src/player68k/player.s + gamedrum.s (needs m68k-linux-gnu-as + objcopy + nm)
 npx tsx scripts/export-cli.ts song.mod out/   # same exporters from the command line
@@ -296,6 +298,8 @@ src/maxymiser   maxYMiser .MYS/.MYV/.MYI codec and the song -> maxYMiser convert
 src/arkos       song -> Arkos Tracker 3 (.aks)      src/furnace   song -> Furnace (.fur)      src/export/bake.ts  instrument baking shared by both
 src/tracker     pattern song model, renderer (tick player), module -> patterns, editor store, .ymt IO
 src/ui          React UI (FT2-flavoured skin), converter tab, pattern editor tab, A/B audio
+docs            documentation sources (Markdown; docs/06-tooltips.md is generated from the UI by scripts/build-docs.ts)
+public/docs     the generated Help page
 public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of the A/B switch
 ```
 
