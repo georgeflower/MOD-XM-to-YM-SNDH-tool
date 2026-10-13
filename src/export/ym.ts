@@ -1,5 +1,5 @@
 // YM5! writer (uncompressed, interleaved) - loads in ST-Sound, Atari-oriented players.
-import { NREGS } from './stream';
+import { NREGS, usesEnvelope } from './stream';
 
 export const YM_CLOCK = 2_000_000;
 
@@ -23,12 +23,13 @@ export function writeYm5(
   for (const c of 'YM5!LeOnArD!') head.push(c.charCodeAt(0));
   push32(nframes); push32(1); push16(0); push32(YM_CLOCK); push16(fps); push32(loopFrame); push16(0);
   head.push(...latin1(title), ...latin1(author), ...latin1(comment));
+  const env = usesEnvelope(regs, nframes);
   const body = new Uint8Array(nframes * 16);
   for (let r = 0; r < 16; r++) {
     for (let f = 0; f < nframes; f++) {
       let v = 0;
       if (r < NREGS) v = regs[f * NREGS + r];
-      if (r === 13) v = 0xff; // no envelope restart
+      if (r === 13 && !env) v = 0xff; // envelope unused: never restart it (0xFF = no write)
       body[r * nframes + f] = v;
     }
   }

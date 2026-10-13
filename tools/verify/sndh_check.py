@@ -29,10 +29,13 @@ img = None; bad = 0; first = None; frames = max(at) + 1 if loop is not None else
 for f in range(frames):
     if f in at: img = at[f]
     g = f if f < n else loop + (f - n) % (n - loop)
-    if bytes(img[:14]) != ref[g * 14:g * 14 + 14]:
+    want = ref[g * 14:g * 14 + 14]
+    got = bytes(img[:14])
+    if want[13] == 0xFF: got = got[:13]; want = want[:13]          # 0xFF = R13 not written this frame
+    if got != want:
         bad += 1
         if first is None:
             first = f
-            print('first diff: got', bytes(img[:14]).hex(' '), '\n           exp', ref[f*14:f*14+14].hex(' '), '\n   prev exp', ref[(f-1)*14:f*14].hex(' '))
+            print('first diff: got', got.hex(' '), '\n           exp', ref[f*14:f*14+14].hex(' '), '\n   prev exp', ref[(f-1)*14:f*14].hex(' '))
 print(f'{sndh}: {frames} frames compared against {regsf}, {bad} differ' + (f' (first at frame {first})' if first is not None else ''))
 sys.exit(1 if bad else 0)

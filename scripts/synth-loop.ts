@@ -10,7 +10,9 @@ for (let f = 0; f < n; f++) {
     const hold = f > 0 && (seed >> 8) % 3 === 0;           // keep some registers unchanged (delta coding)
     regs[f * 14 + k] = hold ? regs[(f - 1) * 14 + k] : (seed >> 4) & (k === 7 ? 0xff : k === 13 ? 0 : 0xf);
   }
-  regs[f * 14 + 7] |= 0xc0; regs[f * 14 + 13] = 0;
+  regs[f * 14 + 7] |= 0xc0;
+  if (f % 7 === 0) regs[f * 14 + 8] |= 16;                       // envelope in use
+  regs[f * 14 + 13] = f % 3 === 0 ? 8 + (f % 8) : 0xff;          // 0xff = no write (YM convention)
 }
 const dir = process.argv[2];
 writeFileSync(`${dir}/synth.regs`, regs);

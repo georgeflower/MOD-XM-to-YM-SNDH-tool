@@ -13,7 +13,9 @@ describe('exporters', () => {
   it('stream round-trips bit-exact', () => {
     const { data } = packStream(res.regs, res.nframes, res.loopFrame);
     const back = unpackStream(data, res.nframes);
-    expect(Buffer.from(back).equals(Buffer.from(res.regs))).toBe(true);
+    let bad = 0;                                       // R13 = 0xFF ("no write") when the envelope is unused
+    for (let f = 0; f < res.nframes; f++) for (let k = 0; k < 13; k++) if (back[f * 14 + k] !== res.regs[f * 14 + k]) bad++;
+    expect(bad).toBe(0);
   });
   it('stream matches the python packer size', () => {
     const { data } = packStream(res.regs, res.nframes, res.loopFrame);
@@ -53,10 +55,12 @@ int main(void){ int f; ymplay_start(song_data, SONG_FRAMES, SONG_LOOP_FRAME, SON
   for (f = 0; f < SONG_FRAMES + 50; f++) { ymplay_step(); fwrite(ymplay_reg, 1, 14, stdout); } return 0; }`);
     execFileSync('gcc', ['-O1', '-o', join(dir, 't'), join(dir, 't.c')]);
     const out = execFileSync(join(dir, 't'), { maxBuffer: 1 << 28 });
-    expect(Buffer.from(res.regs).equals(out.subarray(0, res.nframes * 14))).toBe(true);
+    let bad = 0;
+    for (let f = 0; f < res.nframes; f++) for (let k = 0; k < 13; k++) if (out[f * 14 + k] !== res.regs[f * 14 + k]) bad++;
+    expect(bad).toBe(0);
     // wrap-around: after the end we are back at the loop frame
     const lf = res.loopFrame;
-    expect(out.subarray(res.nframes * 14, (res.nframes + 5) * 14).equals(Buffer.from(res.regs.subarray(lf * 14, (lf + 5) * 14)))).toBe(true);
+    for (let f = 0; f < 5; f++) for (let k = 0; k < 13; k++) expect(out[(res.nframes + f) * 14 + k]).toBe(res.regs[(lf + f) * 14 + k]);
   });
   it('SNDH header is well formed', () => {
     const s = writeSndh(res.regs, res.nframes, res.loopFrame, { title: 'T', author: 'A' });
