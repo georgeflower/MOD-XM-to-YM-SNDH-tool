@@ -14,6 +14,7 @@ A browser tool that turns **ProTracker `.MOD`** and **FastTracker II `.XM`** mod
 | **Game kit** (`.zip`) | `<name>.h` (packed stream as a C array, + digidrum table) + `ymplay.h` (small replayer; with digidrums / timer effects also the 68000 engine). The game owns the PSG, so sound effects can steal a voice. |
 | **maxYMiser** (`.mys` + `.myv`, `.myi`) | The song as native files for gwEm's [maxYMiser](https://preromanbritain.com/maxymiser/) tracker (song + voice bank, or one instrument), so a tune can be continued there — digidrums and `Q` `S` `U` timer effects included. The same files load back into the editor (*Load maxYMiser…*). See below. |
 | **Arkos Tracker 3** (`.aks`) | The song as an Arkos Tracker 3 file: the editor's envelopes, arpeggios, pitch macros, step tables and buzzer instruments are baked into Arkos instruments, notes, volume, arpeggio, slide and speed go into the patterns. See below. |
+| **Furnace** (`.fur`) | The song as a Furnace Tracker file on an AY-3-8910 / YM2149 chip (2 MHz): instruments become Furnace macros, notes, volume, effects, speed and pattern flow go into the patterns. See below. |
 | Raw regs / WAV / report | 14 bytes per frame; YM emulator preview; conversion log. |
 
 How the conversion works: the module is replayed tick-accurately (all XM/MOD effects, envelopes, auto-vibrato,
@@ -215,6 +216,26 @@ a pattern break shortens it, the repeat position is the restart position, the re
   period units inside a row; converted modules agree on volume and, within the rounded semitone, on pitch. The official Arkos Tracker 3 could not be run here, so open the file
   there and tell me if it complains.
 
+## Furnace export
+
+*Export → Furnace (.fur)* writes a [Furnace](https://github.com/tildearrow/furnace) module (format 228, readable by every Furnace from 0.6.8 on): one subsong, one AY-3-8910 chip flagged as
+YM2149 with the 2 MHz Atari ST clock, three channels, tick rate = BPM × 0.4 Hz, one instrument per editor instrument.
+
+* **Instruments become macros.** The volume macro carries the envelope (a release tail is the macro's release part, played by the note-release command), the wave macro tone / noise / envelope
+  bits, the duty macro the noise period; arpeggio, pitch and built-in vibrato are baked into the arpeggio and pitch macros (the song is flagged *non-linear pitch*, so pitch macro and slides
+  are in YM period units like in the editor). Buzzers write the envelope shape (`ex2`), restart it with every note (phase-reset macro) and use Furnace's auto-envelope (`ex3` / `alg`) for the
+  note-following envelope period; a fixed envelope period is written as such.
+* **Fractional semitones** (the converter's step tables are tuned in fractions of a semitone) need the note: Furnace's pitch macro is in period units, so such an instrument is written once
+  per note it plays, each copy carrying that note's period correction (copies within one period unit are shared).
+* **Effects that carry over:** notes and note-off (release when the instrument has a tail), volume column / `Cxx`, `0xy` arpeggio (with the instrument's arpeggio speed), `1xx` `2xx` slides,
+  `3xx` tone portamento, `4xy` vibrato, `EDx` note delay, `ECx` note cut, `Kxx`, `Fxx` speed and BPM, `Dxx`, `Bxx`; shorter patterns end with a jump, the restart position is a jump at the end.
+* **Differences** (listed as warnings): a buzzer's envelope follows arpeggios / pitch of its note (the editor keeps it on the written note, which the acid-bass presets rely on); vibrato
+  starts in the opposite direction and two ticks earlier; the first tick of a release shows the held level (Furnace re-reads it) before the tail follows; sync-square, `Q S U` timer effects,
+  digidrums (`Z`, the drum channel), tremolo, volume slides, global volume, `X Y M P L R T`, `E1x` `E2x` `E6x` `E9x` `EAx` `EBx` and channels beyond the third are not exported.
+* **Verified** by playing the export in a real (headless) Furnace and comparing every register frame with the editor's render (`scripts/furnace-check.ts <furnace> <module|ymt|synth>`, needs a
+  Furnace with the `-vgmout` option): ADSR, volume envelopes and tables, arpeggios, slides, tone portamento, speed / BPM changes, pattern lengths, `Dxx`, `Bxx`, restart, noise, step tables,
+  one-shot tables, fractional tuning and all buzzer shapes are register-identical; the converted modules agree on pitch within 2 % and on level within 2 steps for 99 % of the sounding frames.
+
 ## Using it
 
 1. Open the page, **Load MOD / XM / SNDH / YM…** (or drop a file anywhere) — or press **Demo**.
@@ -240,6 +261,7 @@ npx tsx scripts/export-cli.ts song.mod out/   # same exporters from the command 
   **frame for frame** (`tools/reference/` holds the Python oracle).
 * `tools/verify/sndh_check.py` — runs an `.sndh` in [psgplay](https://github.com/frno7/psgplay)'s 68000 core and compares
   every YM register write against the `.regs` dump (`scripts/synth-loop.ts` builds a looping test song).
+* `scripts/furnace-check.ts` — plays the Furnace export in a real Furnace (`-vgmout`) and compares the AY registers with the editor's render.
 * `scripts/maxymiser-check.ts` + `tools/verify/maxymiser/` — plays the maxYMiser export through gwEm's real replayer (supply `MYM_REPL.BIN` yourself) and diffs the registers with the editor's render.
 * `tools/verify/gamekit_check.sh` — generates a game kit for a drum test song, compiles `ymplay.h` for the 68000, wraps it in an SNDH and runs it in psgplay.
 * Perceptual check: chroma similarity against libopenmpt renders ≈ 0.95 (XM) / 0.95 (MOD).
@@ -251,6 +273,7 @@ src/core        module loaders, tracker replayer, AY converter, digidrum samples
 src/export      stream packer, YM5/YM6, SNDH, game kit, C header + replayer, YM emulator (preview), WAV, ZIP
 src/player68k   68000 SNDH player + digidrum / timer-effect engine (player.s, drumeng.s, gamedrum.s → blob.ts)
 src/maxymiser   maxYMiser .MYS/.MYV/.MYI codec and the song -> maxYMiser converter
+src/arkos       song -> Arkos Tracker 3 (.aks)      src/furnace   song -> Furnace (.fur)      src/export/bake.ts  instrument baking shared by both
 src/tracker     pattern song model, renderer (tick player), module -> patterns, editor store, .ymt IO
 src/ui          React UI (FT2-flavoured skin), converter tab, pattern editor tab, A/B audio
 public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of the A/B switch
@@ -259,7 +282,6 @@ public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of th
 ## Roadmap
 
 * More than one timer effect or drum at a time (needs a second timer / mixing engine); timer-driven arpeggio and other handler effects that are not drums or Q/S/U
-* Furnace `.fur` export
 * maxYMiser: the STe DMA track (sampled sound), sequence-switching effects, more than one timer effect on the voices at once
 
 Note: SNDH files made here play in any SNDH player but cannot be opened *in* maxYMiser (it only loads its own songs) — use the maxYMiser export for that.

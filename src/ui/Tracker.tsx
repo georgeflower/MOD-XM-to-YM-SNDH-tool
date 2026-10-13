@@ -15,6 +15,7 @@ import { zip } from '../export/zip';
 import { songToMaxymiser, instrumentToMyi } from '../maxymiser/convert';
 import { maxymiserToSong, myiToInstrument } from '../maxymiser/import';
 import { songToAks, aksFile } from '../arkos/aks';
+import { songToFur, furName } from '../furnace/fur';
 import { download } from './download';
 import { NumField, TextField } from './fields';
 import { InstrumentEditor } from './InstrumentEditor';
@@ -314,6 +315,13 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
         if (a.warnings.length) onError(a.warnings.join('; '));
       } catch (e) { onError(String((e as Error).message ?? e)); }
     },
+    fur: () => {
+      try {
+        const f = songToFur(song, { title: meta.title, author: meta.author });
+        download(furName(base), f.bytes, 'application/octet-stream');
+        if (f.warnings.length) onError(f.warnings.join('; '));
+      } catch (e) { onError(String((e as Error).message ?? e)); }
+    },
     myi: () => {
       try {
         const inst = song.instruments[ed.instrument];
@@ -457,6 +465,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
           <button className="btn" onClick={exp.game}>Game kit (.zip)</button>
           <button className="btn" onClick={exp.mym} title="song + voice bank for gwEm's maxYMiser tracker">maxYMiser (.mys + .myv)</button>
           <button className="btn" onClick={exp.aks} title="song for Arkos Tracker 3 (envelopes, arpeggios, slides and speed baked into Arkos instruments and effects)">Arkos Tracker (.aks)</button>
+          <button className="btn" onClick={exp.fur} title="song for Furnace (AY-3-8910 / YM2149 chip: instruments become macros, effects and speed carry over)">Furnace (.fur)</button>
           <button className="btn" onClick={exp.myi} title="the selected instrument as a maxYMiser .myi">Instrument (.myi)</button>
           <button className="btn" onClick={exp.wav}>Preview (.wav)</button>
           <button className="btn" onClick={exp.regs}>Registers (.regs)</button>

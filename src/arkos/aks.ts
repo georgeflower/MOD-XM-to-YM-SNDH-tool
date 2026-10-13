@@ -15,7 +15,7 @@
 import {
   type Song, type Cell, type Instrument, NOTE_OFF, VOICES, channelsOf, EFFECT_LETTERS,
 } from '../tracker/types';
-import { LINEAR_TO_YM_VOL, VIB_TABLE } from '../tracker/render';
+import { bakeInstrument, clamp, logVol, type Tk } from '../export/bake';
 import { zip } from '../export/zip';
 
 export interface AksResult { xml: string; warnings: string[]; stats: { positions: number; patterns: number; tracks: number; instruments: number } }
@@ -26,29 +26,8 @@ interface ICell { volume: number; noise: number; link: Link; arpNote: number; ar
 interface AInst { name: string; cells: ICell[]; loopStart: number; end: number; looping: boolean; retrig: boolean }
 
 const MAX_CELLS = 255;
-const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
-const lcm = (a: number, b: number) => (a / gcd(a, b)) * b;
-const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 
 const esc = (s: string) => s.replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]!)).replace(/[^\x09\x0a\x0d\x20-￿]/g, '');
-
-/** ADSR level (0..15, fractional) per tick until sustain; the last value is held (same shape as the editor's) */
-function adsrLevels(a: { attack: number; decay: number; sustain: number }): number[] {
-  const out: number[] = [];
-  let phase: 'a' | 'd' | 's', level: number, tick = 0;
-  if (a.attack <= 0) { level = 15; phase = 'd'; if (a.decay <= 0) { level = a.sustain; phase = 's'; } } else { level = 0; phase = 'a'; }
-  out.push(level);
-  for (let guard = 0; guard < 600 && phase !== 's'; guard++) {
-    if (phase === 'a') { tick++; level = Math.min(15, (tick / a.attack) * 15); if (tick >= a.attack) { level = 15; phase = 'd'; tick = 0; } }
-    else if (a.decay <= 0) { level = a.sustain; phase = 's'; }
-    else { tick++; level = 15 - (15 - a.sustain) * Math.min(1, tick / a.decay); if (tick >= a.decay) { level = a.sustain; phase = 's'; } }
-    out.push(level);
-  }
-  return out;
-}
-
-/** the YM volume step the editor plays for an envelope level 0..15 at full track volume */
-const ymLevel = (env: number) => LINEAR_TO_YM_VOL[clamp(Math.round((clamp(env, 0, 15) / 15) * 64), 0, 64)];
 
 /** split a (possibly negative) semitone offset into Arkos' note-in-octave + octave */
 function splitSemi(n: number): { note: number; oct: number } {
@@ -57,8 +36,6 @@ function splitSemi(n: number): { note: number; oct: number } {
 }
 
 const emptyCell = (): ICell => ({ volume: 0, noise: 0, link: 'noSoftwareNoHardware', arpNote: 0, arpOct: 0, pitch: 0, ratio: 4, hwEnv: 8, secPeriod: 0, secNote: 0, secOct: 0, retrig: false });
-
-interface Tk { vol: number; noise: number; tone: boolean; semi: number; pitch: number }
 
 /** hardware part of a cell for an instrument that uses the envelope; returns false when the divisor cannot be expressed */
 function hardLink(inst: Instrument, tone: boolean, warn: (k: string, m: string) => void, label: string): Pick<ICell, 'link' | 'ratio' | 'hwEnv' | 'secPeriod' | 'secNote' | 'secOct'> {
@@ -78,58 +55,12 @@ function hardLink(inst: Instrument, tone: boolean, warn: (k: string, m: string) 
   return { link: 'hardwareOnly', ratio: 4, hwEnv: shape, secPeriod: 0, secNote: 0, secOct: 4 - k };
 }
 
-function compileInstrument(inst: Instrument, index: number, warn: (k: string, m: string) => void): AInst {
+function compileInstrument(inst: Instrument, index: number, warn: (k: string, m: string) => void, rowTicks: number): AInst {
   const label = `instrument ${index.toString(16).toUpperCase().padStart(2, '0')} "${inst.name}"`;
-  const ticks: Tk[] = [];
-  let loopStart = -1;                                             // -1: hold the last cell
-  let looping = true;
-  let bake: (t: number) => Tk;
-  let hard = inst.useHardEnv;
-
-  if (inst.seq) {
-    const sq = inst.seq, n = sq.steps.length || 1;
-    const steps = sq.steps.length ? sq.steps : [{ vol: 0, semi: 0, noise: 0, tone: true }];
-    let frac = false;
-    for (const s of steps) if (Math.abs(s.semi - Math.round(s.semi)) > 0.05) frac = true;
-    if (frac) warn('frac:' + label, `${label}: fractional semitone offsets are rounded (Arkos pitch is in period units)`);
-    for (let t = 0; t < Math.min(n, MAX_CELLS); t++) {
-      const s = steps[t];
-      ticks.push({ vol: clamp(Math.round(s.vol), 0, 15), noise: s.noise > 0 ? s.noise & 31 : 0, tone: s.tone, semi: Math.round(s.semi), pitch: 0 });
-    }
-    if (n > MAX_CELLS) warn('long:' + label, `${label}: the step table is cut to ${MAX_CELLS} cells`);
-    if (sq.loopFrom >= 0 && sq.loopFrom < ticks.length) { loopStart = sq.loopFrom; looping = true; } else looping = false;
-    if (sq.release > 0) warn('release:' + label, `${label}: release tails are cut (Arkos note-off silences at once)`);
-    bake = (t) => ticks[t];
-  } else {
-    const env = inst.adsr.useAdsr ? adsrLevels(inst.adsr) : (inst.volEnv.length ? inst.volEnv.slice() : [15]);
-    let L0 = env.length;
-    const z = inst.adsr.useAdsr ? -1 : env.findIndex((e) => e <= 0);
-    if (z >= 0) L0 = z + 1;
-    const arp = inst.arpMacro.length > 1 || (inst.arpMacro.length === 1 && inst.arpMacro[0] !== 0) ? inst.arpMacro : [0];
-    const pit = inst.pitchMacro.length > 1 || (inst.pitchMacro.length === 1 && inst.pitchMacro[0] !== 0) ? inst.pitchMacro : [0];
-    const vib = inst.vibratoDepth > 0 && inst.vibratoSpeed > 0;
-    const vibCycle = vib ? 64 / gcd(64, inst.vibratoSpeed) : 1;
-    let P = lcm(lcm(arp.length, pit.length), vibCycle);
-    if (inst.arpSpeed > 1 && arp.length > 1) warn('arpspeed:' + label, `${label}: arpeggio speed > 1 is played at speed 1`);
-    if (L0 + P > MAX_CELLS) { warn('cycle:' + label, `${label}: arpeggio / pitch / vibrato cycle is longer than an Arkos instrument; cut`); P = Math.max(1, MAX_CELLS - L0); }
-    const periodic = P > 1;
-    const total = periodic ? L0 + P : L0;
-    if (total > MAX_CELLS) warn('envlong:' + label, `${label}: the volume envelope is longer than ${MAX_CELLS} ticks; cut`);
-    const toneOn = hard ? inst.syncBuzz && inst.toneEnabled : inst.toneEnabled;
-    for (let t = 0; t < Math.min(total, MAX_CELLS); t++) {
-      const e = env[Math.min(t, env.length - 1)];
-      const past = inst.adsr.useAdsr ? false : z >= 0 && t >= L0;
-      let vol = past ? 0 : ymLevel(e);
-      if (hard) vol = vol > 0 ? 15 : 0;
-      const ti = Math.max(0, t - 1);                               // the renderer holds the macro position on the trigger tick
-      const off = (arp[ti % arp.length] ?? 0);
-      const offP = (pit[ti % pit.length] ?? 0) + (vib ? Math.round(VIB_TABLE[(ti * inst.vibratoSpeed) & 63] * inst.vibratoDepth / 128) : 0);
-      ticks.push({ vol, noise: inst.noiseEnabled ? Math.max(1, inst.noisePeriod & 31) : 0, tone: toneOn, semi: off, pitch: offP });
-    }
-    loopStart = periodic ? L0 : -1;
-    bake = (t) => ticks[t];
-    if (inst.volRelease.length || (inst.adsr.useAdsr && inst.adsr.release > 0)) warn('release:' + label, `${label}: release tails are cut (Arkos note-off silences at once)`);
-  }
+  const baked = bakeInstrument(inst, label, warn, MAX_CELLS, 'Arkos', 'period units', true, rowTicks);
+  const { ticks, loopStart, looping, hard } = baked;
+  if (baked.release.length) warn('release:' + label, `${label}: release tails are cut (Arkos note-off silences at once)`);
+  const bake = (t: number): Tk => ticks[t];
   if (inst.syncSquare) warn('syncsq:' + label, `${label}: sync-square is left out (Arkos has no equivalent)`);
 
   const cells: ICell[] = [];
@@ -166,7 +97,6 @@ function compileInstrument(inst: Instrument, index: number, warn: (k: string, m:
 interface ACell { index: number; note: number | null; instrument: number | null; effects: { name: string; value: number }[] }
 interface ChState { inst: number; last: number; vol15: number; arp: boolean; slide: boolean; vol64: number }
 
-const logVol = (v64: number) => (v64 <= 0 ? 0 : clamp(15 + Math.round(2 * Math.log2(v64 / 64)), 0, 15));
 const FX = (c: string) => EFFECT_LETTERS.indexOf(c) + 1;
 
 export function songToAks(song: Song, opts: AksOptions = {}): AksResult {
@@ -189,7 +119,7 @@ export function songToAks(song: Song, opts: AksOptions = {}): AksResult {
     if (!inst) continue;
     if (insts.length > 254) { warn('inst', 'more than 254 instruments: the extra ones are left out'); break; }
     instMap.set(i, insts.length);
-    insts.push(compileInstrument(inst, i, warn));
+    insts.push(compileInstrument(inst, i, warn, song.speed || 6));
   }
 
   // ---- tracks
