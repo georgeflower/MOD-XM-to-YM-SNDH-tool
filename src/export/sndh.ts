@@ -1,6 +1,8 @@
 // SNDH writer: header (bra.w x3 + tags) + position independent 68000 player + packed register stream.
 import { PLAYER_BLOB } from '../player68k/blob';
 import { packStream } from './stream';
+import { packDrumTable } from './drumtable';
+import { type DrumTrack, compactDrums, hasDrums } from '../core/drums';
 
 export interface SndhMeta {
   title: string;
@@ -20,9 +22,11 @@ function z(s: string): number[] {
 const ascii = (s: string) => Array.from(s).map((c) => c.charCodeAt(0));
 
 export function writeSndh(
-  regs: Uint8Array, nframes: number, loopFrame: number, meta: SndhMeta,
+  regs: Uint8Array, nframes: number, loopFrame: number, meta: SndhMeta, drumTrack?: DrumTrack | null,
 ): Uint8Array {
-  const { data, loopOffset } = packStream(regs, nframes, loopFrame);
+  const drums = hasDrums(drumTrack) ? compactDrums(drumTrack) : null;
+  const { data, loopOffset } = packStream(regs, nframes, loopFrame, drums);
+  const table = drums ? packDrumTable(drums.drums) : new Uint8Array(0);
   const seconds = meta.seconds ?? Math.max(1, Math.round(nframes / 50));
   const tags: number[] = [];
   const even = () => { if (tags.length & 1) tags.push(0); }; // tags start at offset 12 (even)
@@ -39,7 +43,8 @@ export function writeSndh(
   while ((12 + tags.length) & 1) tags.push(0); // keep the player even aligned
   const codeStart = 12 + tags.length; // the tags array includes the 'SNDH' magic at offset 12
   const blob = PLAYER_BLOB;
-  const total = codeStart + blob.length + data.length;
+  const dataEnd = blob.length + data.length + ((blob.length + data.length) & 1);   // the drum table starts word aligned
+  const total = codeStart + dataEnd + table.length;
   const out = new Uint8Array(total + (total & 1));
   const dv = new DataView(out.buffer);
   // header branches (bra.w displacement is relative to the displacement word)
@@ -54,5 +59,6 @@ export function writeSndh(
   pv.setUint16(14, nframes - loopFrame);
   pv.setUint32(16, loopOffset);
   out.set(data, codeStart + blob.length);
+  if (table.length) { pv.setUint32(20, dataEnd); out.set(table, codeStart + dataEnd); }
   return out;
 }

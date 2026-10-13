@@ -1,5 +1,6 @@
 // Small YM2149 emulator -> PCM, for in-browser preview. Tone / noise / mixer / volume / hardware envelope.
 import { NREGS } from './stream';
+import { type DrumTrack, mfpRate, trigVoice, trigDrum, TRIG_STOP } from '../core/drums';
 
 const CLK = 2_000_000;
 export const VOL = [0.0, 0.00465, 0.00772, 0.01095, 0.01625, 0.02359, 0.03317, 0.04658, 0.06655,
@@ -27,7 +28,7 @@ export function envLevel(shape: number, step: number): number {
   return ramped(up);
 }
 
-export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50, over = 4): Float32Array {
+export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50, over = 4, drums?: DrumTrack | null): Float32Array {
   const spf = Math.floor((sr * over) / fps);
   const tStep = CLK / 16 / (sr * over);
   const toneStep = 2 * tStep;
@@ -38,8 +39,18 @@ export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50
   const out = new Float32Array(nframes * outFrames);
   const acc = new Float64Array(spf);
   let envShape = 0, envStep = 0;          // envStep counts hardware-envelope steps (16 per ramp)
+  // digidrums: a voice's volume register is driven by the sample (tone and noise held "on") until it ends
+  const dr: ({ pcm: Uint8Array; pos: number; step: number } | null)[] = [null, null, null];
   for (let f = 0; f < nframes; f++) {
     const r = regs.subarray(f * NREGS, f * NREGS + NREGS);
+    const tg = drums ? drums.trig[f] ?? 0 : 0;
+    if (tg) {
+      const v = trigVoice(tg), idx = trigDrum(tg);
+      if (v >= 0 && v < 3) {
+        const d = idx === TRIG_STOP ? null : drums!.drums[idx];
+        dr[v] = d && d.pcm.length ? { pcm: d.pcm, pos: 0, step: mfpRate(d.rateHz).hz / (sr * over) } : null;
+      }
+    }
     if (r[13] !== 0xff) { envShape = r[13] & 15; envStep = 0; }
     const envPer = Math.max(1, r[11] | (r[12] << 8));
     const envRate = CLK / (16 * envPer) / (sr * over);       // envelope steps per oversampled sample
@@ -60,6 +71,12 @@ export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50
       const vol = useEnv ? 1 : VOL[r[8 + v] & 15];
       const start = ph[v];
       for (let n = 0; n < spf; n++) {
+        const cur = dr[v];
+        if (cur) {
+          const i = Math.floor(cur.pos);
+          if (i < cur.pcm.length) { acc[n] += VOL[cur.pcm[i] & 15]; cur.pos += cur.step; continue; }
+          dr[v] = null;                      // finished: the registers take over for the rest of the frame
+        }
         const pos = start + ((n + 1) * toneStep) / per;
         let sig = 1;
         if (toneOn) sig = Math.floor(pos) & 1;

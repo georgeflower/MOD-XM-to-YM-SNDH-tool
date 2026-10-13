@@ -6,12 +6,17 @@
  * Ticks run at the song tempo (2.5/BPM s); frames are sampled from them at 50 Hz, so a song with
  * BPM 125 is exactly one tick per frame (what Atari ST players do).
  *
- * Not rendered (reported as warnings): DigiDrum (Z), SID voice (Q), sinus-SID (S), sync-buzzer (U)
+ * DigiDrums (effect Zxx, or notes on the drum channel) come out as a DrumTrack next to the registers:
+ * one trigger code per frame, and the drum's voice is silenced in the registers while the sample plays.
+ * The ST has one drum timer, so a new drum cuts the one before it.
+ *
+ * Not rendered (reported as warnings): SID voice (Q), sinus-SID (S), sync-buzzer (U)
  * and channels >= 3 (second chip).
  */
 import {
   type Song, type Cell, type Instrument, NOTE_OFF, noteToFreq, channelsOf, drumChannelOf, VOICES, EFFECT_LETTERS,
 } from './types';
+import { type DrumSample, type DrumTrack, drumFrames, trigCode, TRIG_STOP, MAX_DRUMS } from '../core/drums';
 
 export const NREGS = 14;
 const FPS = 50;
@@ -142,16 +147,19 @@ export interface RenderResult {
   loopFrame: number;
   rows: RowMark[];
   warnings: string[];
+  /** digidrum samples and triggers, when the song plays any */
+  drums?: DrumTrack;
 }
 
 export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
-  const nCh = Math.min(VOICES, channelsOf(song));
   const drumCh = drumChannelOf(song);
+  const toneChannels = drumCh >= 0 ? channelsOf(song) - 1 : channelsOf(song);
+  const nCh = Math.min(VOICES, toneChannels);
   const chans: Chan[] = Array.from({ length: VOICES }, newChan);
   const warnings: string[] = [];
   const warned = new Set<string>();
   const warn = (k: string, msg: string) => { if (!warned.has(k)) { warned.add(k); warnings.push(msg); } };
-  if (channelsOf(song) > VOICES) warn('chips', `channels ${VOICES + 1}..${channelsOf(song)} (second chip / drum channel) are not rendered`);
+  if (toneChannels > VOICES) warn('chips', `channels ${VOICES + 1}..${toneChannels} (second chip) are not rendered`);
 
   let speed = Math.max(1, song.speed), bpm = Math.max(32, song.bpm);
   let orderPos = Math.max(0, Math.min(song.order.length - 1, opt.fromOrder ?? 0));
@@ -175,6 +183,25 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
 
   const isMuted = (c: number) => !!opt.mute?.[c];
 
+  // ---- digidrums: a trigger is "pending" until the frame it lands in is emitted
+  const drumTable: DrumSample[] = [];
+  const drumIdx = new Map<DrumSample, number>();
+  const trigOut: number[] = [];
+  interface DrumHit { voice: number; drum: DrumSample | null; owner: 'z' | 'chan' }
+  let pendingHit: DrumHit | null = null;
+  let live: { voice: number; owner: 'z' | 'chan'; endFrame: number } | null = null;
+  function hitDrum(voice: number, d: DrumSample, owner: 'z' | 'chan') {
+    if (!d.pcm.length) return;
+    if (!drumIdx.has(d)) {
+      if (drumTable.length >= MAX_DRUMS) { warn('drums63', `more than ${MAX_DRUMS} different digidrums: the extra ones are not played`); return; }
+      drumIdx.set(d, drumTable.length); drumTable.push(d);
+    }
+    pendingHit = { voice, drum: d, owner };
+  }
+  function stopDrum(voice: number) {
+    if (live?.voice === voice || pendingHit?.voice === voice) pendingHit = { voice, drum: null, owner: 'z' };
+  }
+
   function triggerCell(c: number, cell: Cell) {
     const ch = chans[c];
     const isTonePorta = cell.effect === 4 || cell.effect === 6;
@@ -186,6 +213,7 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
         if (!isTonePorta) { ch.envPos = 0; ch.released = false; ch.releasePos = 0; }
       }
     }
+    if (cell.note > 0 && cell.note !== NOTE_OFF && ((live?.voice === c && live.owner === 'z') || (pendingHit?.voice === c && pendingHit.owner === 'z'))) stopDrum(c);
     if (cell.note === NOTE_OFF) {
       release(ch);
       ch.retrig = 0; ch.retrigVolChange = 0; ch.noteCutTick = -1;
@@ -283,7 +311,12 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
       case FX_Q: if (p) warn('Q', 'Qxx (SID voice) is not rendered yet'); break;
       case FX_S: if (p) warn('S', 'Sxx (sinus-SID) is not rendered yet'); break;
       case FX_U: if (p) warn('U', 'Uxx (sync-buzzer) is not rendered yet'); break;
-      case FX_Z: if (p) warn('Z', 'Zxx (DigiDrum) is not rendered yet'); break;
+      case FX_Z: {
+        if (p === 0) { stopDrum(c); break; }
+        const d = ch.instrument?.digiDrums?.[p - 1];
+        if (d) hitDrum(c, d, 'z'); else warn(`Z${p}`, `Z${p.toString(16).toUpperCase().padStart(2, '0')}: instrument ${ch.instIdx.toString(16).toUpperCase().padStart(2, '0')} has no digidrum ${p}`);
+        break;
+      }
     }
   }
 
@@ -293,7 +326,6 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
     const rowCells = pat?.cells[row];
     if (!rowCells) return;
     for (let c = 0; c < nCh; c++) {
-      if (c === drumCh) continue;
       const cell = rowCells[c];
       const ch = chans[c];
       ch.delayedCell = null; ch.noteDelayTick = -1;
@@ -302,7 +334,18 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
       }
       triggerCell(c, cell);
     }
-    if (drumCh >= 0 && drumCh < VOICES) warn('drumch', 'the drum channel is not rendered yet');
+    if (drumCh >= 0 && rowCells[drumCh]) drumChannelCell(rowCells[drumCh]);
+  }
+
+  /** drum channel: a note picks digidrum (note-1) of the cell's instrument and plays it on voice C */
+  let drumInst = 1;
+  function drumChannelCell(cell: Cell) {
+    if (cell.instrument && song.instruments[cell.instrument]) drumInst = cell.instrument;
+    if (cell.note === NOTE_OFF) { stopDrum(VOICES - 1); return; }
+    if (cell.note <= 0 || isMuted(drumCh)) return;
+    const bank = song.instruments[drumInst]?.digiDrums ?? [];
+    if (!bank.length) { warn('nobank', `drum channel: instrument ${drumInst.toString(16).toUpperCase().padStart(2, '0')} has no digidrums`); return; }
+    hitDrum(VOICES - 1, bank[(cell.note - 1) % bank.length], 'chan');
   }
 
   /** the level a step-table instrument is at right now (before release scaling) */
@@ -493,6 +536,16 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
         const f = Uint8Array.from(regs);
         if (pendingShape >= 0 && f[13] === 0xff) f[13] = pendingShape;
         pendingShape = -1;
+        const fi = out.length / NREGS;
+        let tg = 0;
+        if (pendingHit) {
+          const h: DrumHit = pendingHit; pendingHit = null;
+          if (h.drum) { tg = trigCode(h.voice, drumIdx.get(h.drum)!); live = { voice: h.voice, owner: h.owner, endFrame: fi + drumFrames(h.drum) }; }
+          else if (live) { tg = trigCode(h.voice, TRIG_STOP); live = null; }
+        }
+        if (live && fi >= live.endFrame) live = null;
+        if (live) { f[8 + live.voice] = 0; f[7] |= (1 << live.voice) | (8 << live.voice); }   // the sample owns the voice
+        trigOut.push(tg);
         for (let k = 0; k < NREGS; k++) out.push(f[k]);
         emitted = true;
       }
@@ -521,5 +574,7 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
       if (orderPos < 0) orderPos = 0;
     }
   }
-  return { regs: Uint8Array.from(out), nframes: out.length / NREGS, loopFrame, rows, warnings };
+  const nframes = out.length / NREGS;
+  const drums = drumTable.length && trigOut.some((t) => t) ? { drums: drumTable, trig: Uint8Array.from(trigOut) } : undefined;
+  return { regs: Uint8Array.from(out), nframes, loopFrame, rows, warnings, drums };
 }

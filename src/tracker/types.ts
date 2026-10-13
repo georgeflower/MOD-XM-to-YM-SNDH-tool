@@ -8,6 +8,7 @@
  * macro editor edits — which the YM Tracker ignores.
  */
 import type { MacroStep } from '../core/convert';
+import type { DrumSample } from '../core/drums';
 
 export type Note = number;                 // 0 none, 1..96 (C-1..B-8), 97 key-off
 export const NOTE_NONE = 0;
@@ -48,7 +49,8 @@ export const isEmptyCell = (c: Cell) => !c.note && !c.instrument && !c.volume &&
 
 export interface ADSR { useAdsr: boolean; attack: number; decay: number; sustain: number; release: number }
 
-export interface DigiDrumSample { name: string; pcm: Uint8Array; rateHz: number }
+/** 4-bit digidrum (pcm bytes are YM volume steps 0..15) */
+export type DigiDrumSample = DrumSample;
 
 /** Step table instrument (this tool's extension). One step = one tick. */
 export interface StepSeq {

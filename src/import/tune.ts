@@ -1,3 +1,5 @@
+import type { DrumTrack } from '../core/drums';
+
 /** A register-dump tune (what .ym / .sndh files boil down to): 14 YM2149 registers per 50 Hz frame. */
 export interface AyTune {
   title: string;
@@ -7,6 +9,8 @@ export interface AyTune {
   regs: Uint8Array;
   nframes: number;
   loopFrame: number;
+  /** digidrum samples + triggers (YM5/YM6 files) */
+  drums?: DrumTrack;
   source: 'ym' | 'sndh';
   warnings: string[];
 }
