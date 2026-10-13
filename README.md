@@ -19,6 +19,17 @@ loop detection) into per-frame channel states; sample pitch is measured from the
 samples become kick/snare/hat macros (falling tone / noise bursts), and every 20 ms the 3 most important events win a
 voice (stickiness avoids voice jumping, one noise generator is shared, volumes map to the YM's ≈3 dB steps).
 
+## Instrument mapper and arpeggio fill
+
+* Per source instrument: **auto** (tone at the measured pitch, or a drum macro), **tone** (written note's pitch, volume
+  follows the sample), **kick / snare / hat**, **custom macro**, **mute**, plus a semitone transpose.
+* A **macro** is a per-tick (20 ms) table: volume 0–15, pitch offset in semitones (fractional → vibrato), noise period,
+  tone on/off, loop-from step, optional "follow note volume". Presets: pluck, organ, vibrato lead, bass thump, tom,
+  hat, snare, major/minor arpeggio.
+* **Arp fill**: a module has more channels than the YM has voices. With fill on, notes that would be dropped are folded
+  into a 2- or 3-note arpeggio on the voice with the closest pitch (alternating every frame). The strip under the roll
+  shows dropped notes (red) and arpeggio notes (cyan); the channel table lists the shares.
+
 ## Loading .sndh and .ym
 
 Besides modules the page loads **`.ym`** (YM2!/3!/3b/5!/6!, also LHA-packed) and **`.sndh`** (also ICE!-packed).
@@ -67,7 +78,7 @@ public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of th
 
 ## Roadmap
 
-* Instrument mapper (manual sample → waveform, per-tick sequences) and arpeggio generation
+* Mapper follow-ups: sample → waveform (square duty/buzzer envelope), saving a mapping with the project
 * FT2-style pattern editor for the AY data (from the *YM Tracker* project) with FT2 key layout
 * Digidrums (also usable from games)
 * Furnace `.fur`, Arkos Tracker `.aks`, Maxymiser `.MYS/.MYV/.MYI` export

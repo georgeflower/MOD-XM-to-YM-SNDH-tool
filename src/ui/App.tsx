@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadModule } from '../core/load';
 import type { Module } from '../core/types';
-import { convert, type ConvertResult, type DrumKind } from '../core/convert';
+import { convert, type ConvertResult, type InstMap, type InstMode, type Macro, type MacroStep } from '../core/convert';
+import { MACRO_PRESETS, cloneMacro } from '../core/macros';
 import { packStream } from '../export/stream';
 import { writeYm5 } from '../export/ym';
 import { writeSndh } from '../export/sndh';
@@ -20,8 +21,8 @@ import demoUrl from '../assets/back_in_town_again.mod?inline';
 
 const DEMO = 'back_in_town_again.mod';
 
-interface Opts { gainDb: number; drumBonus: number; sticky: number; arpOrder: 'xy' | 'yx' }
-const DEFAULT_OPTS: Opts = { gainDb: 0, drumBonus: 3, sticky: 1.5, arpOrder: 'xy' };
+interface Opts { gainDb: number; drumBonus: number; sticky: number; arpOrder: 'xy' | 'yx'; arpFill: number; arpMinVol: number }
+const DEFAULT_OPTS: Opts = { gainDb: 0, drumBonus: 3, sticky: 1.5, arpOrder: 'xy', arpFill: 0, arpMinVol: 3 };
 
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const slug = (s: string) => s.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'song';
@@ -48,7 +49,8 @@ export function App() {
   const [error, setError] = useState('');
   const [opts, setOpts] = useState<Opts>(DEFAULT_OPTS);
   const [prio, setPrio] = useState<Record<number, number>>({});
-  const [drumClass, setDrumClass] = useState<Record<number, DrumKind>>({});
+  const [instMap, setInstMap] = useState<Record<number, InstMap>>({});
+  const [macroSel, setMacroSel] = useState<number | null>(null);
   const [res, setRes] = useState<ConvertResult | null>(null);
   const [busy, setBusy] = useState('');
   const [source, setSource] = useState<Source>('ay');
@@ -64,7 +66,7 @@ export function App() {
   const loadBytes = useCallback((name: string, data: Uint8Array) => {
     try {
       setError(''); setFileName(name); setBytes(data);
-      setPrio({}); setDrumClass({}); setOpts(DEFAULT_OPTS); setSubtune(1); setSecOverride(0);
+      setPrio({}); setInstMap({}); setMacroSel(null); setOpts(DEFAULT_OPTS); setSubtune(1); setSecOverride(0);
       if (isSndh(data) || isYm(data)) {
         setMod(null); setRes(null);
         setBusy(isSndh(data) ? 'Running the SNDH in the 68000 emulator…' : 'Reading the YM file…');
@@ -113,7 +115,7 @@ export function App() {
     setBusy('Converting to YM2149 registers…');
     const h = setTimeout(() => {
       try {
-        const r = convert(mod, { gainDb: opts.gainDb, drumBonus: opts.drumBonus, sticky: opts.sticky, arpOrder: opts.arpOrder, prio, drumClass });
+        const r = convert(mod, { gainDb: opts.gainDb, drumBonus: opts.drumBonus, sticky: opts.sticky, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, prio, inst: instMap });
         setRes(r);
         setBusy('Rendering the YM2149 preview…');
         setTimeout(() => {
@@ -125,7 +127,7 @@ export function App() {
       }
     }, 250);
     return () => clearTimeout(h);
-  }, [mod, opts, prio, drumClass]);
+  }, [mod, opts, prio, instMap]);
 
   // ---- transport
   useEffect(() => {
@@ -154,6 +156,22 @@ export function App() {
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   });
+
+  // ---- instrument mapper helpers
+  const patchInst = (i: number, patch: Partial<InstMap>) =>
+    setInstMap((m) => {
+      const next: Record<number, InstMap> = { ...m, [i]: { ...(m[i] ?? { mode: 'auto' }), ...patch } };
+      if (next[i].mode === 'auto' && !next[i].transpose) delete next[i];
+      return next;
+    });
+  const setMode = (i: number, mode: InstMode) => {
+    patchInst(i, mode === 'macro' ? { mode, macro: instMap[i]?.macro ?? cloneMacro(MACRO_PRESETS['Pluck']) } : { mode });
+    if (mode === 'macro') setMacroSel(i); else if (macroSel === i) setMacroSel(null);
+  };
+  const editMacro = (i: number, f: (m: Macro) => Macro) => {
+    const cur = instMap[i]?.macro;
+    if (cur) patchInst(i, { macro: f(cloneMacro(cur)) });
+  };
 
   // ---- exports
   const out: { regs: Uint8Array; nframes: number; loopFrame: number } | null = mod ? res : tune;
@@ -283,7 +301,17 @@ export function App() {
                   <option value="yx">0 → y → x</option>
                 </select>
               </label>
-              <button className="btn small" onClick={() => { setOpts(DEFAULT_OPTS); setPrio({}); setDrumClass({}); }}>Reset to auto</button>
+              <label className="row" title="Notes that would be dropped (more channels than YM voices) share a voice and alternate every 20 ms, like a chiptune chord">
+                <span className="lbl">Arp fill</span>
+                <select value={opts.arpFill} onChange={(e) => setOpts({ ...opts, arpFill: +e.target.value })}>
+                  <option value={0}>off — drop the extra notes</option>
+                  <option value={2}>fold into 2-note arpeggios</option>
+                  <option value={3}>fold into 3-note arpeggios</option>
+                </select>
+              </label>
+              {opts.arpFill > 1 && <Slider label="Min. volume" value={opts.arpMinVol} min={1} max={12} step={1} onChange={(v) => setOpts({ ...opts, arpMinVol: v })}
+                hint="Dropped notes quieter than this AY volume are not worth an arpeggio slot" />}
+              <button className="btn small" onClick={() => { setOpts(DEFAULT_OPTS); setPrio({}); setInstMap({}); setMacroSel(null); }}>Reset to auto</button>
             </section>}
 
             <section className="panel">
@@ -317,52 +345,59 @@ export function App() {
               {busy && <span className="busy">{busy}</span>}
               {mod && !origOk && <span className="note">Original-module playback needs http(s) hosting (browsers block it for files opened from disk).</span>}
             </div>
-            {out && <AyRoll regs={out.regs} nframes={out.nframes} position={pos} />}
-            <div className="legend"><i style={{ background: '#ff5555' }} />voice A <i style={{ background: '#55dd55' }} />voice B <i style={{ background: '#5599ff' }} />voice C <i style={{ background: '#ffaa33' }} />noise · vertical = pitch, brightness = volume</div>
+            {out && <AyRoll regs={out.regs} nframes={out.nframes} position={pos} dropped={mod ? res?.dropPerFrame : undefined} arp={mod && opts.arpFill > 1 ? res?.arpPerFrame : undefined} />}
+            <div className="legend"><i style={{ background: '#ff5555' }} />voice A <i style={{ background: '#55dd55' }} />voice B <i style={{ background: '#5599ff' }} />voice C <i style={{ background: '#ffaa33' }} />noise · vertical = pitch, brightness = volume{mod && <> · bottom strip: <i style={{ background: '#ff4466' }} />notes dropped <i style={{ background: '#44ddee' }} />notes in an arpeggio</>}</div>
           </section>
 
           {mod && <div className="grid2">
             <section className="panel">
               <h2>Instruments → AY role</h2>
               <table>
-                <thead><tr><th>#</th><th>Name</th><th>Detected</th><th>C-4</th><th>AY role</th></tr></thead>
+                <thead><tr><th>#</th><th>Name</th><th>Detected</th><th>C-4</th><th>AY role</th><th title="semitones">Tr.</th></tr></thead>
                 <tbody>
-                  {instRows.map((r) => (
-                    <tr key={r.inst}>
-                      <td>{r.inst.toString(16).toUpperCase().padStart(2, '0')}</td>
-                      <td className="name">{r.name || '—'}</td>
-                      <td>{r.cls}</td>
-                      <td>{r.c4Hz ? `${r.c4Hz.toFixed(0)} Hz` : ''}</td>
-                      <td>
-                        <select value={drumClass[r.inst] ?? (r.drum ? `auto:${r.drum}` : 'auto')}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            const next = { ...drumClass };
-                            if (v.startsWith('auto')) delete next[r.inst]; else next[r.inst] = v as DrumKind;
-                            setDrumClass(next);
-                          }}>
-                          {r.drum ? <option value={`auto:${r.drum}`}>auto: {r.drum}</option> : <option value="auto">auto: tone</option>}
-                          <option value="kick">kick</option><option value="snare">snare</option><option value="hat">hat</option>
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
+                  {instRows.map((r) => {
+                    const cur = instMap[r.inst];
+                    const mode: InstMode = cur?.mode ?? 'auto';
+                    return (
+                      <tr key={r.inst} className={macroSel === r.inst ? 'sel' : ''}>
+                        <td>{r.inst.toString(16).toUpperCase().padStart(2, '0')}</td>
+                        <td className="name">{r.name || '—'}</td>
+                        <td>{r.cls}</td>
+                        <td>{r.c4Hz ? `${r.c4Hz.toFixed(0)} Hz` : ''}</td>
+                        <td>
+                          <select value={mode} onChange={(e) => setMode(r.inst, e.target.value as InstMode)}>
+                            <option value="auto">{r.drum ? `auto: ${r.drum}` : 'auto: tone'}</option>
+                            <option value="tone">tone (written note)</option>
+                            <option value="kick">kick</option><option value="snare">snare</option><option value="hat">hat</option>
+                            <option value="macro">custom macro…</option>
+                            <option value="mute">mute</option>
+                          </select>
+                          {mode === 'macro' && <button className="btn tiny" onClick={() => setMacroSel(macroSel === r.inst ? null : r.inst)}>edit</button>}
+                        </td>
+                        <td>
+                          <input type="number" className="txt num" min={-48} max={48} value={cur?.transpose ?? 0} disabled={mode === 'kick' || mode === 'snare' || mode === 'hat' || mode === 'mute'}
+                            onChange={(e) => patchInst(r.inst, { transpose: Math.max(-48, Math.min(48, +e.target.value || 0)) })} />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
-              <p className="note soft">Manual sample → waveform mapping, per-tick sequences and arpeggio generation arrive in the next milestone.</p>
+              <p className="note soft">Auto picks tone (pitch measured from the sample) or a drum macro. <b>tone</b> forces the written note's pitch with the sample's own volume curve; <b>custom macro</b> plays a per-tick sequence you edit below; <b>mute</b> leaves the instrument out.</p>
             </section>
 
             <section className="panel">
               <h2>Source channels → 3 voices</h2>
               <table>
-                <thead><tr><th>Ch</th><th>Played</th><th>Dropped</th><th>Priority</th></tr></thead>
+                <thead><tr><th>Ch</th><th>Played</th>{opts.arpFill > 1 && <th>In arp</th>}<th>Dropped</th><th>Priority</th></tr></thead>
                 <tbody>
                   {res && res.played.map((pl, ch) => {
-                    const dr = res.dropped[ch], tot = pl + dr;
+                    const dr = res.dropped[ch], fo = res.folded[ch], tot = pl + dr + fo;
                     return (
                       <tr key={ch}>
                         <td>{ch + 1}</td>
                         <td>{tot ? Math.round((pl / tot) * 100) : 0}%</td>
+                        {opts.arpFill > 1 && <td>{tot ? Math.round((fo / tot) * 100) : 0}%</td>}
                         <td className={dr / (tot || 1) > 0.1 ? 'warn' : ''}>{tot ? Math.round((dr / tot) * 100) : 0}%</td>
                         <td>
                           <button className="btn tiny" onClick={() => setPrio({ ...prio, [ch]: (prio[ch] ?? 0) - 1 })}>−</button>
@@ -377,6 +412,43 @@ export function App() {
               <p className="note soft">A module has more channels than the YM has voices; the converter picks the 3 most important events every 20 ms. Raise a channel's priority to protect it.</p>
             </section>
           </div>}
+
+          {mod && macroSel !== null && instMap[macroSel]?.macro && (() => {
+            const i = macroSel, mac = instMap[i].macro!;
+            const setStep = (k: number, patch: Partial<MacroStep>) => editMacro(i, (m) => { m.steps[k] = { ...m.steps[k], ...patch }; return m; });
+            return (
+              <section className="panel">
+                <h2>Macro editor — instrument {i.toString(16).toUpperCase().padStart(2, '0')} {instRows.find((r) => r.inst === i)?.name} <small>one step = 20 ms</small></h2>
+                <div className="macrobar">
+                  <label>Preset <select value="" onChange={(e) => e.target.value && patchInst(i, { macro: cloneMacro(MACRO_PRESETS[e.target.value]) })}>
+                    <option value="">load…</option>
+                    {Object.keys(MACRO_PRESETS).map((k) => <option key={k}>{k}</option>)}
+                  </select></label>
+                  <label title="Step to jump back to after the last step; −1 = play once, then silent">Loop from <input type="number" className="txt num" min={-1} max={mac.steps.length - 1} value={mac.loopFrom}
+                    onChange={(e) => editMacro(i, (m) => { m.loopFrom = Math.max(-1, Math.min(m.steps.length - 1, Math.trunc(+e.target.value))); return m; })} /></label>
+                  <label title="Scale by the note volume of the source module"><input type="checkbox" checked={mac.velocity} onChange={(e) => editMacro(i, (m) => { m.velocity = e.target.checked; return m; })} /> follow note volume</label>
+                  <button className="btn small" onClick={() => editMacro(i, (m) => { m.steps.push({ ...m.steps[m.steps.length - 1] ?? { vol: 15, semi: 0, noise: 0, tone: true } }); return m; })}>+ step</button>
+                  <button className="btn small" disabled={mac.steps.length <= 1} onClick={() => editMacro(i, (m) => { m.steps.pop(); m.loopFrom = Math.min(m.loopFrom, m.steps.length - 1); return m; })}>− step</button>
+                </div>
+                <div className="macrogrid">
+                  <table>
+                    <thead><tr><th>Step</th><th>Vol 0-15</th><th>Pitch (semitones)</th><th>Noise 0-31</th><th>Tone</th></tr></thead>
+                    <tbody>
+                      {mac.steps.map((stp, k) => (
+                        <tr key={k} className={mac.loopFrom === k ? 'loopmark' : ''}>
+                          <td>{k}{mac.loopFrom === k ? ' ↺' : ''}</td>
+                          <td><input type="number" className="txt num" min={0} max={15} value={stp.vol} onChange={(e) => setStep(k, { vol: Math.max(0, Math.min(15, Math.trunc(+e.target.value || 0))) })} /></td>
+                          <td><input type="number" className="txt num" min={-48} max={48} step={0.05} value={stp.semi} onChange={(e) => setStep(k, { semi: Math.max(-48, Math.min(48, +e.target.value || 0)) })} /></td>
+                          <td><input type="number" className="txt num" min={0} max={31} value={stp.noise} onChange={(e) => setStep(k, { noise: Math.max(0, Math.min(31, Math.trunc(+e.target.value || 0))) })} /></td>
+                          <td><input type="checkbox" checked={stp.tone} onChange={(e) => setStep(k, { tone: e.target.checked })} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            );
+          })()}
 
           {mod && <section className="panel">
             <h2>Conversion report</h2>

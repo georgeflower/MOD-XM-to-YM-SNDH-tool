@@ -24,6 +24,8 @@ export interface ChanState {
   /** sample position (frames) at the start of this tick */
   pos: number;
   note: number;
+  /** playback rate of the plain note (no vibrato / arpeggio / slides): rate / noteRate = pitch bend */
+  noteRate: number;
 }
 
 export interface ReplayResult {
@@ -142,7 +144,7 @@ export function replay(m: Module, opts: ReplayOptions = {}): ReplayResult {
     let v = c.vol / 64;
     v *= envValue(ins, c.envTick) / 64;
     v *= c.fade / 32768;
-    return { inst: c.inst, ksmp: c.ksmp, smp: c.smp, period: perEff, rate: rateOf(perEff), vol: v, age: c.age, pos: c.pos, note: c.note };
+    return { inst: c.inst, ksmp: c.ksmp, smp: c.smp, period: perEff, rate: rateOf(perEff), vol: v, age: c.age, pos: c.pos, note: c.note, noteRate: rateOf(notePeriod(c.note, c.smp)) };
   }
 
   main: while (ticks < maxTicks) {

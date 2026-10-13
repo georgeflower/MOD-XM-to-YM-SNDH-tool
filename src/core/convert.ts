@@ -13,11 +13,46 @@ export const NREGS = 14;
 
 export type DrumKind = 'kick' | 'hat' | 'snare';
 
+/** one 20 ms step of a hand-made AY instrument */
+export interface MacroStep {
+  /** AY volume 0..15 */
+  vol: number;
+  /** pitch offset in semitones (fractional allowed) added to the played note */
+  semi: number;
+  /** noise period 1..31, 0 = no noise */
+  noise: number;
+  /** tone on/off (off + noise = pure noise) */
+  tone: boolean;
+}
+export interface Macro {
+  steps: MacroStep[];
+  /** step to jump back to after the last one; -1 = one-shot (silent afterwards) */
+  loopFrom: number;
+  /** scale by the source note volume / envelope (3 dB per AY step) */
+  velocity: boolean;
+}
+/**
+ * How a source instrument is turned into AY sound.
+ *  auto   - detect (tonal sample -> tone at the measured pitch, otherwise drum macro)
+ *  mute   - leave the instrument out
+ *  tone   - force a tone at the written note's pitch, volume follows the sample's own envelope
+ *  kick/snare/hat - the built-in drum macros
+ *  macro  - the per-tick sequence in `macro`
+ */
+export type InstMode = 'auto' | 'mute' | 'tone' | DrumKind | 'macro';
+export interface InstMap { mode: InstMode; macro?: Macro; /** semitones */ transpose?: number }
+
 export interface ConvertOptions {
   /** extra allocation priority per 0-based source channel */
   prio?: Record<number, number>;
   /** force a drum macro for an instrument number */
   drumClass?: Record<number, DrumKind>;
+  /** manual instrument mapping (wins over drumClass) */
+  inst?: Record<number, InstMap>;
+  /** fold notes that lost a voice into a fast arpeggio on another voice: max notes per voice (0/1 = off) */
+  arpFill?: number;
+  /** minimum AY volume for a dropped note to be folded */
+  arpMinVol?: number;
   /** override the detected cycle length (samples) of an instrument's first sample */
   cycle?: Record<number, number>;
   drumBonus?: number;
@@ -55,7 +90,11 @@ interface Cand {
   lvl: number;
   inst: number;
   drum?: DrumKind;
+  /** macro notes: AY volume decided already (before gain) */
+  fixedVol?: number;
 }
+const A4_TO_C4 = 261.6255653;
+const noteHz = (note: number) => A4_TO_C4 * Math.pow(2, (note - 49) / 12);
 
 function drumMacro(kind: DrumKind, age: number, base: number): Omit<Cand, 'ch' | 'inst' | 'drum'> | null {
   if (kind === 'kick') {
@@ -82,6 +121,7 @@ export interface InstrumentReport {
   /** pitch of C-4 (XM) / PT C-2 for this instrument in Hz, tonal only */
   c4Hz?: number;
   drum?: DrumKind;
+  mode?: InstMode;
 }
 
 export interface ConvertResult {
@@ -94,6 +134,11 @@ export interface ConvertResult {
   /** per source channel: frames that got a voice / frames dropped for lack of voices */
   played: number[];
   dropped: number[];
+  /** per source channel: frames whose note was folded into an arpeggio */
+  folded: number[];
+  /** per frame: notes that got no voice at all / notes riding in an arpeggio */
+  dropPerFrame: Uint8Array;
+  arpPerFrame: Uint8Array;
   warnings: string[];
 }
 
@@ -143,7 +188,27 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
       const inf = info.get(`${st.inst}:${st.ksmp}`);
       if (!inf || inf.cls === 'empty') return;
       const s = st.smp;
-      if (inf.cls === 'tonal') {
+      const mp = options.inst?.[st.inst];
+      const mode: InstMode = mp?.mode ?? 'auto';
+      if (mode === 'mute') return;
+      const bend = st.rate / st.noteRate;
+      const trans = Math.pow(2, (mp?.transpose ?? 0) / 12);
+      if (mode === 'macro' && mp?.macro && mp.macro.steps.length) {
+        const mac = mp.macro, n = mac.steps.length;
+        let idx = st.age;
+        if (idx >= n) {
+          if (mac.loopFrom < 0 || mac.loopFrom >= n) return;
+          idx = mac.loopFrom + ((idx - mac.loopFrom) % (n - mac.loopFrom));
+        }
+        const stp = mac.steps[idx];
+        const hz = noteHz(st.note) * bend * trans * Math.pow(2, stp.semi / 12);
+        const fixedVol = stp.vol + (mac.velocity ? 2 * Math.log2(Math.max(st.vol, 1e-6)) : 0);
+        if (stp.noise && !stp.tone) lst.push({ ch: ci, kind: 'noise', per: null, np: stp.noise, lvl: 1, inst: st.inst, fixedVol });
+        else lst.push({ ch: ci, kind: 'tone', per: TONE_HZ / hz, np: stp.noise || null, lvl: 1, inst: st.inst, fixedVol });
+        return;
+      }
+      const forcedDrum: DrumKind | undefined = mode === 'kick' || mode === 'snare' || mode === 'hat' ? mode : undefined;
+      if (mode === 'tone' || (inf.cls === 'tonal' && !forcedDrum)) {
         if (ended(s, st.pos)) return;
         const n = Math.max(4, Math.trunc(st.rate * dt));
         const w = fold(s, st.pos, st.pos + n);
@@ -151,7 +216,7 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
         let sum = 0;
         for (let i = 0; i < w.length; i++) sum += w[i] * w[i];
         const rms = Math.sqrt(sum / w.length);
-        const hz = st.rate / inf.cycle!;
+        const hz = mode === 'tone' ? noteHz(st.note) * bend * trans : (st.rate / inf.cycle!) * trans;
         lst.push({ ch: ci, kind: 'tone', per: TONE_HZ / hz, np: null, lvl: rms * st.vol, inst: st.inst });
       } else {
         const key = `${st.inst}:${st.ksmp}`;
@@ -166,7 +231,7 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
           for (let k = 0; k < power.length; k++) { num += power[k] * ((k * rateC5) / size); den += power[k]; }
           const cen = num / Math.max(den, 1e-12);
           const durTicks = d.length / rateC5 / dt;
-          const over = options.drumClass?.[st.inst];
+          const over = forcedDrum ?? options.drumClass?.[st.inst];
           const kind: DrumKind = over ?? (inf.cls === 'kick' || cen < 400 ? 'kick' : durTicks <= 2.0 ? 'hat' : 'snare');
           let sq = 0;
           for (let i = 0; i < d.length; i++) sq += d[i] * d[i];
@@ -183,26 +248,32 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
   }
 
   // ---- allocation
+  const arpMax = Math.max(1, Math.trunc(options.arpFill ?? 0));
+  const arpMinVol = options.arpMinVol ?? 3;
   const tl: number[] = [];
-  for (const fr of cand) for (const c of fr) if (c.kind === 'tone' && !c.drum) tl.push(c.lvl);
+  for (const fr of cand) for (const c of fr) if (c.kind === 'tone' && !c.drum && c.fixedVol === undefined) tl.push(c.lvl);
   const ref = tl.length ? percentile(tl, o.refPercentile) : 1;
-  const ayVol = (lvl: number) => {
-    if (lvl <= 0) return 0;
-    const v = 15 + 2.0 * Math.log2(lvl / ref) + o.gainDb / 3.0103;
+  const ayVol = (c: Cand) => {
+    if (c.fixedVol !== undefined) return Math.max(0, Math.min(15, pyRound(c.fixedVol + o.gainDb / 3.0103)));
+    if (c.lvl <= 0) return 0;
+    const v = 15 + 2.0 * Math.log2(c.lvl / ref) + o.gainDb / 3.0103;
     return Math.max(0, Math.min(15, pyRound(v)));
   };
+  const usesNoise = (c: Cand) => c.kind === 'noise' || c.np != null;
   const NV = 3;
+  type Item = { v: number; c: Cand; arp?: { v: number; c: Cand }[] };
   const imp = new Map<number, number>();
-  for (const fr of cand) for (const c of fr) imp.set(c.ch, (imp.get(c.ch) ?? 0) + (c.drum ? 0 : ayVol(c.lvl)));
+  for (const fr of cand) for (const c of fr) imp.set(c.ch, (imp.get(c.ch) ?? 0) + (c.drum ? 0 : ayVol(c)));
   const rank = new Map<number, number>();
   for (const [ch, v] of imp) rank.set(ch, -v - 1000.0 * (prio[ch] ?? 0));
   let slots: (number | null)[] = [null, null, null];
-  const alloc: ({ v: number; c: Cand } | null)[][] = [];
-  const played = new Array(m.nch).fill(0), dropped = new Array(m.nch).fill(0);
-  for (const fr of cand) {
+  const alloc: (Item | null)[][] = [];
+  const played = new Array(m.nch).fill(0), dropped = new Array(m.nch).fill(0), folded = new Array(m.nch).fill(0);
+  const dropPerFrame = new Uint8Array(cand.length), arpPerFrame = new Uint8Array(cand.length);
+  cand.forEach((fr, f) => {
     const scored: { score: number; v: number; c: Cand }[] = [];
     for (const c of fr) {
-      const v = ayVol(c.lvl);
+      const v = ayVol(c);
       if (v <= 0) continue;
       let score = v + (prio[c.ch] ?? 0);
       if (c.drum) score += o.drumBonus;
@@ -210,19 +281,34 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
       scored.push({ score, v, c });
     }
     scored.sort((a, b) => b.score - a.score);
-    const chosen: { v: number; c: Cand }[] = [];
+    const chosen: Item[] = [];
+    const overflow: { v: number; c: Cand }[] = [];
     let noiseTaken = false;
     for (const { v, c } of scored) {
-      if (chosen.length === NV) { dropped[c.ch]++; continue; }
-      if (c.kind === 'noise') {
-        if (noiseTaken) { dropped[c.ch]++; continue; }
+      if (chosen.length === NV) { overflow.push({ v, c }); continue; }
+      if (usesNoise(c)) {
+        if (noiseTaken) { overflow.push({ v, c }); continue; }
         noiseTaken = true;
       }
       chosen.push({ v, c });
       played[c.ch]++;
     }
-    const nw: ({ v: number; c: Cand } | null)[] = [null, null, null];
-    const rest: { v: number; c: Cand }[] = [];
+    for (const ov of overflow) {
+      let host: Item | null = null;
+      if (arpMax > 1 && ov.c.kind === 'tone' && !ov.c.drum && ov.c.np == null && ov.v >= arpMinVol) {
+        let bd = Infinity;
+        for (const h of chosen) {
+          if (h.c.kind !== 'tone' || h.c.drum || h.c.np != null || h.c.ch === ov.c.ch) continue;
+          if (1 + (h.arp?.length ?? 0) >= arpMax) continue;
+          const d = Math.abs(Math.log2(h.c.per! / ov.c.per!));
+          if (d < bd) { bd = d; host = h; }
+        }
+      }
+      if (host) { (host.arp ??= []).push(ov); folded[ov.c.ch]++; arpPerFrame[f]++; }
+      else { dropped[ov.c.ch]++; dropPerFrame[f]++; }
+    }
+    const nw: (Item | null)[] = [null, null, null];
+    const rest: Item[] = [];
     for (const it of chosen) {
       const si = slots.indexOf(it.c.ch);
       if (si >= 0 && nw[si] === null) nw[si] = it; else rest.push(it);
@@ -234,7 +320,7 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
     }
     slots = nw.map((it) => (it ? it.c.ch : null));
     alloc.push(nw);
-  }
+  });
 
   // ---- registers
   const regs = new Uint8Array(nf * NREGS);
@@ -246,8 +332,9 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
     const vols = [0, 0, 0];
     const mixbits = [...prevMix];
     let npv = prevNp;
-    alloc[f].forEach((it, i) => {
-      if (!it) return;
+    alloc[f].forEach((it0, i) => {
+      if (!it0) return;
+      const it = it0.arp ? [it0, ...it0.arp][f % (1 + it0.arp.length)] : it0;
       const { v, c } = it;
       vols[i] = v;
       if (c.kind === 'tone') {
@@ -257,6 +344,7 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
         per = Math.max(1, Math.min(4095, pyRound(per)));
         prevPer[i] = per;
         mixbits[i] = 1;
+        if (c.np != null) { npv = c.np; mixbits[i] = 3; }
       } else {
         npv = c.np!;
         mixbits[i] = 2;
@@ -266,8 +354,8 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
     prevMix = mixbits;
     let mix = 0xc0;
     for (let i = 0; i < 3; i++) {
-      if (mixbits[i] !== 1) mix |= 1 << i;
-      if (mixbits[i] !== 2) mix |= 8 << i;
+      if (!(mixbits[i] & 1)) mix |= 1 << i;
+      if (!(mixbits[i] & 2)) mix |= 8 << i;
     }
     const b = f * NREGS;
     for (let i = 0; i < 3; i++) { regs[b + 2 * i] = prevPer[i] & 0xff; regs[b + 2 * i + 1] = prevPer[i] >> 8; }
@@ -276,12 +364,13 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
   }
 
   log(`loudness reference (tonal p${o.refPercentile}) = ${ref.toFixed(3)} -> AY volume 15`);
-  log('channel   voice-frames   dropped');
+  log(arpMax > 1 ? 'channel   voice-frames   in-arpeggio   dropped' : 'channel   voice-frames   dropped');
   for (let c = 0; c < m.nch; c++) {
-    if (played[c] + dropped[c] === 0) continue;
-    log(`  ch${String(c + 1).padStart(2, '0')}  ${String(played[c]).padStart(10)}  ${String(dropped[c]).padStart(8)}  ${((100 * dropped[c]) / Math.max(1, played[c] + dropped[c])).toFixed(1)}%`);
+    if (played[c] + dropped[c] + folded[c] === 0) continue;
+    const tot = played[c] + dropped[c] + folded[c];
+    log(`  ch${String(c + 1).padStart(2, '0')}  ${String(played[c]).padStart(10)}  ${arpMax > 1 ? String(folded[c]).padStart(11) + '  ' : ''}${String(dropped[c]).padStart(8)}  ${((100 * dropped[c]) / Math.max(1, tot)).toFixed(1)}%`);
   }
   if (octShift) log(`${octShift} events needed an octave shift (period > 4095)`);
 
-  return { regs, nframes: nf, loopFrame, report, instruments: instReports, played, dropped, warnings };
+  return { regs, nframes: nf, loopFrame, report, instruments: instReports, played, dropped, folded, dropPerFrame, arpPerFrame, warnings };
 }

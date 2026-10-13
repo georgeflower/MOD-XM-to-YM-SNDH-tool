@@ -78,3 +78,11 @@ td select { width: 100%; }
 
 .log { margin: 0; background: var(--well); color: var(--ink); padding: 8px; max-height: 260px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
 footer { color: var(--ink-dim); font-size: 11px; text-align: center; margin-top: 14px; }
+
+/* instrument mapper */
+.txt.num { width: 56px; text-align: right; }
+td .btn.tiny { margin-left: 4px; }
+tr.sel td { background: #1d2550; }
+tr.loopmark td { background: #14203a; }
+.macrobar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 6px; }
+.macrogrid { max-height: 320px; overflow: auto; }

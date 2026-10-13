@@ -4,16 +4,20 @@ const CH_COL = ['#ff5555', '#55dd55', '#5599ff'];
 
 /** piano-roll style overview of what the three AY voices do: pitch (log) vs time, brightness = volume,
  *  orange = noise, white playhead */
-export function AyRoll({ regs, nframes, position }: { regs: Uint8Array; nframes: number; position: number }) {
+export function AyRoll({ regs, nframes, position, dropped, arp }: {
+  regs: Uint8Array; nframes: number; position: number;
+  /** optional per-frame counts: notes that lost their voice (red) / notes sharing a voice in an arpeggio (cyan) */
+  dropped?: Uint8Array; arp?: Uint8Array;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   const bg = useRef<HTMLCanvasElement | null>(null);
-  const W = 960, H = 150;
+  const W = 960, H = 150, STRIP = dropped || arp ? 14 : 0, HT = H + STRIP;
 
   useEffect(() => {
     const c = document.createElement('canvas');
-    c.width = W; c.height = H;
+    c.width = W; c.height = HT;
     const g = c.getContext('2d')!;
-    g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#000'; g.fillRect(0, 0, W, HT);
     const lanes = 3, lh = H / lanes;
     for (let v = 0; v < lanes; v++) {
       g.fillStyle = '#12142a'; g.fillRect(0, v * lh + lh - 1, W, 1);
@@ -43,9 +47,19 @@ export function AyRoll({ regs, nframes, position }: { regs: Uint8Array; nframes:
       }
       g.globalAlpha = 1;
     }
+    if (STRIP) {
+      g.fillStyle = '#0b0d1c'; g.fillRect(0, H, W, STRIP);
+      for (let x = 0; x < W; x++) {
+        const f0 = Math.floor((x / W) * nframes), f1 = Math.min(nframes, Math.max(f0 + 1, Math.floor(((x + 1) / W) * nframes)));
+        let d = 0, a = 0;
+        for (let f = f0; f < f1; f++) { d = Math.max(d, dropped?.[f] ?? 0); a = Math.max(a, arp?.[f] ?? 0); }
+        if (d) { g.fillStyle = '#ff4466'; g.fillRect(x, H + 1, 1, 6); }
+        if (a) { g.fillStyle = '#44ddee'; g.fillRect(x, H + 7, 1, 6); }
+      }
+    }
     bg.current = c;
     draw();
-  }, [regs, nframes]);
+  }, [regs, nframes, dropped, arp]);
 
   function draw() {
     const cv = ref.current, b = bg.current;
@@ -53,9 +67,9 @@ export function AyRoll({ regs, nframes, position }: { regs: Uint8Array; nframes:
     const g = cv.getContext('2d')!;
     g.drawImage(b, 0, 0);
     g.fillStyle = '#fff';
-    g.fillRect(Math.floor(position * 50 / nframes * W), 0, 1, H);
+    g.fillRect(Math.floor(position * 50 / nframes * W), 0, 1, HT);
   }
   useEffect(draw, [position]);
 
-  return <canvas ref={ref} width={W} height={H} className="roll" />;
+  return <canvas ref={ref} width={W} height={HT} className="roll" />;
 }
