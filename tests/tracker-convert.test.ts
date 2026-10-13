@@ -52,7 +52,7 @@ describe('module -> pattern song', () => {
     expect(s.order.every((p) => p >= 0 && p < s.patterns.length)).toBe(true);
     expect(s.instruments.length).toBeGreaterThan(2);
     expect(s.instruments.length).toBeLessThanOrEqual(256);
-    for (const p of s.patterns) { expect(p.cells.length).toBe(p.rows); for (const row of p.cells) expect(row.length).toBe(3); }
+    for (const p of s.patterns) { expect(p.cells.length).toBe(p.rows); for (const row of p.cells) expect(row.length).toBe(s.channelCount); }
     for (const p of s.patterns) for (const row of p.cells) for (const c of row) {
       expect(c.note).toBeGreaterThanOrEqual(0); expect(c.note).toBeLessThanOrEqual(97);
       expect(c.instrument).toBeLessThan(s.instruments.length);

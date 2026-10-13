@@ -68,7 +68,18 @@ export interface ReplayOptions {
   /** arpeggio tick order: 'xy' = base, +x, +y ; 'yx' = base, +y, +x */
   arpOrder?: 'xy' | 'yx';
   maxTicks?: number;
+  /** channels (0-based) whose notes are left out of the frames (they still run, so the timing is unchanged) */
+  skip?: (ch: number) => boolean;
 }
+
+/** a channel with this priority (or lower) is left out of the import */
+export const PRIO_OFF = -99;
+/**
+ * which source channels the converters ignore: with `solo` only that channel is heard, otherwise every channel whose
+ * priority is PRIO_OFF is left out
+ */
+export const channelSkipper = (o: { prio?: Record<number, number>; solo?: number | null }) =>
+  (ch: number): boolean => (o.solo != null ? ch !== o.solo : (o.prio?.[ch] ?? 0) <= PRIO_OFF);
 
 export function replay(m: Module, opts: ReplayOptions = {}): ReplayResult {
   const arpSeq = (opts.arpOrder ?? 'xy') === 'xy' ? [0, 1, 2] : [0, 2, 1];
@@ -252,7 +263,7 @@ export function replay(m: Module, opts: ReplayOptions = {}): ReplayResult {
       }
       // ---- emit frames covering [tclock, tclock+dt)
       const snap: (ChanState | null)[] = [];
-      for (let ci = 0; ci < nch; ci++) snap.push(snapshot(ch[ci], tick));
+      for (let ci = 0; ci < nch; ci++) snap.push(opts.skip?.(ci) ? null : snapshot(ch[ci], tick));
       while (nextFrame / FPS < tclock + dt - 1e-9) {
         if (nextFrame / FPS >= tclock - 1e-9) frames.push(snap);
         nextFrame++;

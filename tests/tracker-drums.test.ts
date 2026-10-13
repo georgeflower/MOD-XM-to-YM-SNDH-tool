@@ -87,8 +87,13 @@ import { hasDrums } from '../src/core/drums';
 
 describe('module -> patterns with a digidrum channel', () => {
   const m = loadModule(new Uint8Array(readFileSync(new URL('../fixtures/OMARSBAZAAR.xm', import.meta.url))));
-  const plain = moduleToSong(m, {});
+  const plain = moduleToSong(m, { digiDrums: false });
   const r = moduleToSong(m, { digiDrums: true });
+  it('uses the drum channel by default when the module has percussion', () => {
+    const auto = moduleToSong(m, {});
+    expect(auto.song.channelCount).toBe(4);
+    expect(auto.song.drumChannel).toBe(3);
+  });
   it('adds a 4th column with drum notes and a bank instrument', () => {
     expect(plain.song.channelCount).toBe(3);
     expect(plain.song.drumChannel).toBe(-1);

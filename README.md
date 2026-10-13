@@ -258,7 +258,11 @@ YM2149 with the 2 MHz Atari ST clock, three channels, tick rate = BPM × 0.4 Hz,
 2. **Tab** flips between the original (libopenmpt) and the YM version, **Space** plays/stops.
 3. Tweak *Level / Drum priority / Voice stickiness / Arpeggio order*, per-instrument **AY role** (kick/snare/hat) and
    per-channel **priority**; the preview re-renders automatically.
-4. Export.
+4. **Manual import…** opens a channel list for modules with more than three channels: each channel shows its activity over the song, pitch and main instruments, and gets a
+   priority (Off / Low / Normal / High / Lead — give the melody *Lead*). **▶ Solo** plays one channel alone on the chip, **▶ Full import** plays the result with your priorities
+   (keep changing them while it plays), **Suggest** makes a first guess. The priorities apply to the exports and to *Edit as AY patterns*.
+5. *Edit as AY patterns* adds the drum channel (digidrum samples) by itself when the module has percussion; set an instrument's AY role to kick / snare / hat to keep a synthetic drum instead.
+6. Export.
 
 ## Develop
 

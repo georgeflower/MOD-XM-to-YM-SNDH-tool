@@ -14,7 +14,7 @@
  *    is exact and the song runs at 125 BPM = one tick per frame
  */
 import type { Module, Sample } from '../core/types';
-import { replay, FPS, type ChanState, type RowLog } from '../core/replay';
+import { replay, FPS, channelSkipper, type ChanState, type RowLog } from '../core/replay';
 import { analyseSample, fold, ended, type SampleInfo } from '../core/samples';
 import { DigiExtractor } from '../core/digi';
 import { drumFrames } from '../core/drums';
@@ -29,6 +29,8 @@ import { freqToYmPeriod } from './render';
 
 export interface SongConvertOptions {
   prio?: Record<number, number>;
+  /** play only this 0-based source channel */
+  solo?: number | null;
   inst?: Record<number, InstMap>;
   drumBonus?: number;
   sticky?: number;
@@ -40,7 +42,7 @@ export interface SongConvertOptions {
   arpMinVol?: number;
   /** merge identical patterns (default true) */
   dedupe?: boolean;
-  /** percussion-like instruments become digidrum samples on a fourth (drum) channel */
+  /** percussion-like instruments become digidrum samples on a fourth (drum) channel; default on: the drum channel appears when the module has percussion (false = synthetic drum macros) */
   digiDrums?: boolean;
   digiRate?: number;
   digiMaxMs?: number;
@@ -112,6 +114,7 @@ function effLetter(code: number): string {
 export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongConvertResult {
   const o = { drumBonus: 3, sticky: 3, gainDb: 0, refPercentile: 97, arpFill: 0, arpMinVol: 3, dedupe: true, ...options };
   const prio = options.prio ?? {};
+  const digiOn = options.digiDrums ?? true;
   const report: string[] = [];
   const warnings: string[] = [];
   const warnCount = new Map<string, number>();
@@ -135,7 +138,7 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
   });
 
   // ---------- replay
-  const rep = replay(m, { arpOrder: options.arpOrder });
+  const rep = replay(m, { arpOrder: options.arpOrder, skip: channelSkipper(options) });
   const frames = rep.frames;
   const rows = rep.rows.filter((r) => r.len > 0);
   if (!rows.length) throw new Error('module has no playable rows');
@@ -148,7 +151,7 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
     const mp = modeOf(st.inst);
     const mode = mp?.mode ?? 'auto';
     if (mode === 'digi') return true;
-    if (!options.digiDrums) return false;
+    if (!digiOn) return false;
     const inf = info.get(`${st.inst}:${st.ksmp}`);
     if (!inf || inf.cls === 'empty') return false;
     return !(mode === 'mute' || mode === 'macro' || mode === 'tone' || mode === 'kick' || mode === 'snare' || mode === 'hat') && inf.cls !== 'tonal';
@@ -159,7 +162,7 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
   const rowOfFrame = new Int32Array(frames.length).fill(-1);
   rows.forEach((r, ri) => { for (let k = 0; k < r.len; k++) if (r.frame + k < frames.length) rowOfFrame[r.frame + k] = ri; });
   const hitAt = new Map<number, { idx: number; cls: number; ch: number }>();
-  if (options.digiDrums || Object.values(options.inst ?? {}).some((x) => x.mode === 'digi')) {
+  if (digiOn || Object.values(options.inst ?? {}).some((x) => x.mode === 'digi')) {
     for (let f = 0; f < frames.length; f++) {
       frames[f].forEach((st, c) => {
         if (!st || st.age !== 0 || (f > 0 && frames[f - 1].includes(st)) || st.vol <= 0 || isMuted(st.inst) || !isDigi(st)) return;
@@ -743,7 +746,7 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
     const bytes = digi.list.reduce((n, d) => n + d.pcm.length, 0);
     report.push(`digidrums: ${digi.list.length} sample(s), ${bytes.toLocaleString()} bytes at ~${digi.rateHz} Hz, ${drumHitsWritten} hit(s) on the drum channel${drumHitsLost ? `, ${drumHitsLost} lost (two hits in one row)` : ''}${digi.skipped ? `, ${digi.skipped} skipped (more than 63 variants)` : ''}`);
     if (digi.skipped) warnings.push(`${digi.skipped} digidrum hit(s) skipped: more than 63 sample variants`);
-  } else if (options.digiDrums) report.push('digidrums: no percussion hits found');
+  } else if (digiOn) report.push('digidrums: no percussion hits found');
   if (timingSlips) report.push(`${timingSlips} tempo changes had to replace an effect`);
   for (const [k, n] of warnCount) warnings.push(`${k} x${n} not translated`);
   void FX;

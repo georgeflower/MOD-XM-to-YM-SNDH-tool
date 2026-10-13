@@ -124,7 +124,8 @@ tr.loopmark td { background: #14203a; }
 .plen { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: #10153a; }
 .btns + .plen { margin-top: 8px; }
 
-.tk-pat { width: max-content; max-width: 100%; }
+.tk-pat { width: max-content; max-width: 100%; min-width: 0; }   /* sized by the pattern grid only: the status line must not stretch it */
+.tk-pat h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .phead, .pr { display: grid; grid-template-columns: 4ch repeat(var(--nch, 3), 15ch); white-space: pre; }
 .phead { background: #14183a; color: var(--ink-dim); }
 .phead .rn { text-align: right; padding-right: 1ch; }
@@ -148,7 +149,7 @@ tr.loopmark td { background: #14203a; }
 .pc .i { color: #ffe08a; } .pc .v { color: #7be07b; } .pc .e { color: #ff9b6b; }
 .pc .at { background: var(--accent); color: #0a0d1e; }
 .pr.rec .pc .at { background: #ff4b4b; color: #fff; }
-.statusline { min-height: 20px; margin-top: 6px; padding: 0 6px; background: var(--well); color: var(--good); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.statusline { width: 0; min-width: 100%; box-sizing: border-box; min-height: 20px; height: 20px; line-height: 20px; margin-top: 6px; padding: 0 6px; background: var(--well); color: var(--good); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .warnlist { margin: 6px 0 0; padding-left: 18px; color: #3a1018; font-size: 12px; }
 .keyhelp summary { cursor: pointer; color: #10153a; }
@@ -183,3 +184,23 @@ tr.loopmark td { background: #14203a; }
 .dset { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 8px 0; }
 .dset small { color: var(--ink-dim); margin-left: 4px; }
 .dwave { width: 100%; max-width: 520px; height: 90px; border-radius: 4px; display: block; }
+
+/* manual import dialog */
+.imp { width: min(1040px, 96vw); max-height: 92vh; display: flex; flex-direction: column; }
+.imp .note { margin: 4px 0 8px; }
+.imp-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; }
+.imp-st { color: var(--ink-dim); margin-left: auto; }
+.imp-scroll { overflow: auto; background: var(--well); min-height: 120px; }
+.imp-t { width: 100%; border-collapse: collapse; color: var(--ink); }
+.imp-t th { position: sticky; top: 0; background: #14183a; color: var(--ink-dim); font-weight: normal; text-align: left; padding: 3px 8px; z-index: 1; }
+.imp-t td { padding: 3px 8px; border-top: 1px solid #1b2040; white-space: nowrap; }
+.imp-t td.insts { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.imp-t tr.offrow td { opacity: .45; }
+.imp-t tr.offrow td:nth-last-child(2), .imp-t tr.offrow td:last-child { opacity: 1; }
+.act { display: flex; align-items: flex-end; width: 192px; height: 22px; background: #0a0d20; }
+.act i { flex: 1; min-height: 0; background: var(--accent); }
+.seg { display: inline-flex; }
+.seg button { font: inherit; font-size: 12px; color: var(--ink); background: #2b3150; border: 0; border-right: 1px solid #11142a; padding: 1px 7px; cursor: pointer; }
+.seg button:hover { background: #3a4270; }
+.seg button.on { background: var(--accent); color: #0a0d1e; }
+.seg button:first-child.on { background: #ff6b6b; color: #fff; }

@@ -5,6 +5,7 @@
  */
 import type { InstMap, InstMode, Macro, MacroStep } from './convert';
 import type { WaveChoice } from './waveform';
+import { PRIO_OFF } from './replay';
 
 export interface Opts {
   gainDb: number; drumBonus: number; sticky: number; arpOrder: 'xy' | 'yx'; arpFill: number; arpMinVol: number;
@@ -65,7 +66,7 @@ export function parseMapping(text: string, mod?: MappingModuleInfo): ParsedMappi
     middle: o.middle === true, waveform: o.waveform === true,
   };
   const prio: Record<number, number> = {};
-  if (isObj(j.prio)) for (const [k, v] of Object.entries(j.prio)) { const c = Number(k); if (Number.isInteger(c) && c >= 0 && c < 64 && typeof v === 'number' && Number.isFinite(v)) prio[c] = Math.max(-10, Math.min(10, v)); }
+  if (isObj(j.prio)) for (const [k, v] of Object.entries(j.prio)) { const c = Number(k); if (Number.isInteger(c) && c >= 0 && c < 64 && typeof v === 'number' && Number.isFinite(v)) prio[c] = v <= PRIO_OFF ? PRIO_OFF : Math.max(-10, Math.min(10, v)); }
   const inst: Record<number, InstMap> = {};
   let dropped = 0;
   if (isObj(j.inst)) {

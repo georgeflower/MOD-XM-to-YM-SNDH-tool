@@ -3,7 +3,7 @@
  * AY event (tone period + level, or a drum macro), then picks the best 3 events per frame.
  */
 import type { Module, Sample } from './types';
-import { replay, FPS, type ChanState } from './replay';
+import { replay, FPS, channelSkipper, type ChanState } from './replay';
 import { analyseSample, fold, ended, type SampleInfo } from './samples';
 import { powerSpectrum } from './fft';
 import { DigiExtractor } from './digi';
@@ -53,8 +53,10 @@ export interface InstMap {
 }
 
 export interface ConvertOptions {
-  /** extra allocation priority per 0-based source channel */
+  /** extra allocation priority per 0-based source channel (PRIO_OFF = leave the channel out) */
   prio?: Record<number, number>;
+  /** play only this 0-based source channel (the per-track preview of the manual import) */
+  solo?: number | null;
   /** force a drum macro for an instrument number */
   drumClass?: Record<number, DrumKind>;
   /** manual instrument mapping (wins over drumClass) */
@@ -236,7 +238,7 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
   });
 
   // ---- replay
-  const rep = replay(m, { arpOrder: options.arpOrder });
+  const rep = replay(m, { arpOrder: options.arpOrder, skip: channelSkipper(options) });
   const nf = rep.frames.length;
   let loopFrame = rep.loopFrame;
   if (options.loopOrder !== undefined) loopFrame = rep.orderFrame.get(options.loopOrder) ?? 0;

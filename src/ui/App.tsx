@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadModule } from '../core/load';
 import type { Module } from '../core/types';
-import { convert, type ConvertResult, type InstMap, type InstMode, type Macro, type MacroStep } from '../core/convert';
+import { convert, type ConvertOptions, type ConvertResult, type InstMap, type InstMode, type Macro, type MacroStep } from '../core/convert';
 import { MACRO_PRESETS, cloneMacro } from '../core/macros';
 import { packStream } from '../export/stream';
 import { writeYm5, writeYm6 } from '../export/ym';
@@ -24,6 +24,7 @@ import { Tracker } from './Tracker';
 import { download } from './download';
 import { DEFAULT_OPTS, mappingToJson, parseMapping, type Opts } from '../core/mapping';
 import { AyRoll } from './AyRoll';
+import { ImportDialog } from './ImportDialog';
 import demoUrl from '../assets/OMARSBAZAAR.xm?inline';
 
 const DEMO = 'OMARSBAZAAR.xm';
@@ -60,6 +61,7 @@ export function App() {
   const [macroSel, setMacroSel] = useState<number | null>(null);
   const [res, setRes] = useState<ConvertResult | null>(null);
   const [busy, setBusy] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
   const [source, setSource] = useState<Source>('ay');
   const [playing, setPlaying] = useState(false);
   const origOk = location.protocol !== 'file:';
@@ -141,12 +143,13 @@ export function App() {
   };
 
   // ---- conversion (debounced; runs on the main thread, ~1-3 s for a long song)
+  const convOpts = useMemo<ConvertOptions>(() => ({ gainDb: opts.gainDb, drumBonus: opts.drumBonus, sticky: opts.sticky, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, waveform: opts.waveform, prio, inst: instMap }), [opts, prio, instMap]);
   useEffect(() => {
     if (!mod) return;
     setBusy('Converting to YM2149 registers…');
     const h = setTimeout(() => {
       try {
-        const r = convert(mod, { gainDb: opts.gainDb, drumBonus: opts.drumBonus, sticky: opts.sticky, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, waveform: opts.waveform, prio, inst: instMap });
+        const r = convert(mod, convOpts);
         setRes(r);
         setBusy('Rendering the YM2149 preview…');
         setTimeout(() => {
@@ -158,7 +161,7 @@ export function App() {
       }
     }, 250);
     return () => clearTimeout(h);
-  }, [mod, opts, prio, instMap]);
+  }, [mod, convOpts]);
 
   // ---- transport
   useEffect(() => {
@@ -173,6 +176,8 @@ export function App() {
     const p = preview();
     if (p.playing) { p.stop(); setPlaying(false); setPos(p.position()); } else { p.play(pos); setPlaying(true); }
   };
+  const playMain = (s: Source) => { const pv = preview(); pv.setSource(s); setSource(s); pv.stop(); void pv.play(pos); setPlaying(true); };
+  const stopMain = () => { const pv = previewRef.current; if (pv?.playing) { pv.stop(); setPos(pv.position()); } setPlaying(false); };
   const rewind = () => { preview().rewind(); setPos(0); setPlaying(false); };
   const pickSource = (s: Source) => { setSource(s); preview().setSource(s); };
 
@@ -226,7 +231,7 @@ export function App() {
     setBusy('Converting to AY patterns…');
     setTimeout(() => {
       try {
-        const r = moduleToSong(mod, { prio, inst: instMap, drumBonus: opts.drumBonus, sticky: opts.sticky, gainDb: opts.gainDb, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, waveform: opts.waveform });
+        const r = moduleToSong(mod, { prio, inst: instMap, drumBonus: opts.drumBonus, sticky: opts.sticky, gainDb: opts.gainDb, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: true, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, waveform: opts.waveform });
         e.loadSong(r.song, fileName);
         setSongReport([...r.report, ...r.warnings.map((w) => 'warning: ' + w)]);
         setTab('ed');
@@ -287,6 +292,12 @@ export function App() {
       </nav>
 
       {error && <div className="panel err">{error}</div>}
+
+      {importOpen && mod && (
+        <ImportDialog mod={mod} convOpts={convOpts} prio={prio} setPrio={setPrio} mainPlaying={playing} mainSource={source} hasOrig={origOk}
+          playMain={playMain} stopMain={stopMain} busy={busy} onClose={() => setImportOpen(false)}
+          onEdit={() => { setImportOpen(false); toPatterns(); }} />
+      )}
 
       {tab === 'ed' && (
         <>
@@ -414,6 +425,7 @@ export function App() {
               <button className="btn small" onClick={() => { setOpts(DEFAULT_OPTS); setPrio({}); setInstMap({}); setMacroSel(null); }}>Reset to auto</button>
               <button className="btn small" onClick={saveMapping} title="Save the instrument mapping, channel priorities and these options as a .json file">Save mapping</button>
               <label className="btn small" title="Load a mapping saved earlier (for this module or a similar one)">Load mapping…<input type="file" accept=".json,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadMapping(f); e.target.value = ''; }} /></label>
+              <button className="btn small primary" onClick={() => setImportOpen(true)} title="Choose which channels matter most, listen to each channel alone and to the full import">Manual import…</button>
               <button className="btn small primary" disabled={!!busy} onClick={toPatterns} title="Turn the module into an editable pattern song for one YM2149 (uses the options above)">Edit as AY patterns →</button>
             </section>}
 
@@ -525,7 +537,7 @@ export function App() {
                   })}
                 </tbody>
               </table>
-              <p className="note soft">A module has more channels than the YM has voices; the converter picks the 3 most important events every 20 ms. Raise a channel's priority to protect it.</p>
+              <p className="note soft">A module has more channels than the YM has voices; the converter picks the 3 most important events every 20 ms. Raise a channel's priority to protect it — or use <b>Manual import…</b> to set priorities while listening to each channel.</p>
             </section>
           </div>}
 
