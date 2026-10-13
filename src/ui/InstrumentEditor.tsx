@@ -3,6 +3,7 @@ import type { Editor } from '../tracker/editor';
 import type { Instrument, StepSeq } from '../tracker/types';
 import type { MacroStep } from '../core/convert';
 import { MACRO_PRESETS } from '../core/macros';
+import { INSTRUMENT_PRESETS, PRESET_GROUPS } from '../tracker/presets';
 import { NumField, TextField } from './fields';
 
 const SHAPES: [number, string][] = [
@@ -131,6 +132,16 @@ export function InstrumentEditor({ ed, idx, onClose }: { ed: Editor; idx: number
         <div>
           <Field label="Name"><TextField value={inst.name} maxLength={22} onCommit={(v) => up({ name: v })} /></Field>
           <Field label="Test"><button className="btn" onPointerDown={() => test(true)} onPointerUp={() => test(false)} onPointerLeave={() => test(false)}>Play C-5 (hold)</button></Field>
+          <Field label="Preset" hint="Replaces this instrument with a ready-made sound: chord ornaments, drums, acid bass. Undoable.">
+            <select value="" onChange={(e) => { const p = INSTRUMENT_PRESETS[+e.target.value]; if (p) ed.replaceInstrument(p.make(), idx); }}>
+              <option value="">choose…</option>
+              {PRESET_GROUPS.map((g) => (
+                <optgroup key={g} label={g}>
+                  {INSTRUMENT_PRESETS.map((p, i) => p.group === g ? <option key={i} value={i}>{p.name}</option> : null)}
+                </optgroup>
+              ))}
+            </select>
+          </Field>
           <Field label="Sound type" hint="A step table lets you draw the volume, pitch, noise and tone for every 50 Hz tick. The classic type is the YM Tracker's own ADSR / envelope instrument.">
             <label className="chk"><input type="radio" name={`kind${idx}`} checked={!seq} onChange={() => up({ seq: undefined })} /> classic (ADSR / envelope)</label>
             <label className="chk"><input type="radio" name={`kind${idx}`} checked={!!seq} onChange={() => up({ seq: seq ?? { steps: MACRO_PRESETS['Pluck'].steps.map((s) => ({ ...s })), loopFrom: -1, velocity: true, release: 3 } })} /> step table</label>
@@ -152,7 +163,7 @@ export function InstrumentEditor({ ed, idx, onClose }: { ed: Editor; idx: number
               <Field label="After key-off"><ListField value={inst.volRelease} lo={0} hi={15} onCommit={(v) => up({ volRelease: v })} /></Field>
             </>)}
           </>)}
-          {seq && <p className="note soft">The step table sets volume, pitch offset, noise and tone for every tick. The arpeggio / pitch tables, vibrato and hardware envelope settings still apply.</p>}
+          {seq && <p className="note soft">The step table sets volume, pitch offset, noise and tone for every tick. The arpeggio / pitch tables, vibrato and hardware envelope settings still apply. With the hard envelope on, the steps gate the buzzer (its level can't be scaled) and drive the tone and noise.</p>}
         </div>
         <div>
           <Field label="Arpeggio" hint="Semitone offsets stepped through while the note plays, e.g. 0 4 7">

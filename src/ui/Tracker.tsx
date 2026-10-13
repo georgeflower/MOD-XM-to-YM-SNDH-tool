@@ -61,7 +61,7 @@ const Row = memo(function Row({ r, cells, cur, col, editing, s1, s2, play, hl }:
   );
 });
 
-type Dialog = null | { kind: 'scale'; scope: Scope } | { kind: 'transpose' };
+type Dialog = null | { kind: 'scale'; scope: Scope } | { kind: 'transpose' } | { kind: 'echo' };
 
 export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; onError: (m: string) => void }) {
   const ver = useSyncExternalStore(ed.subscribe, ed.getVersion);
@@ -360,6 +360,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
           <label title="Instrument used for the notes you type">Instrument <button className="btn tiny" onClick={() => ed.selectInstrument(ed.instrument - 1)}>−</button><span className="val">{toHex2(ed.instrument)}</span><button className="btn tiny" onClick={() => ed.selectInstrument(ed.instrument + 1)}>+</button></label>
           <label className="chk" title="Adds a fourth column for digidrums: a note there plays that drum of the instrument on voice C"><input type="checkbox" checked={ed.hasDrumChannel} onChange={(e) => ed.setDrumChannel(e.target.checked)} /> Drum channel</label>
           <button className="btn" onClick={() => setDialog({ kind: 'transpose' })}>Transpose…</button>
+          <button className="btn" onClick={() => setDialog({ kind: 'echo' })} title="Copy notes a few rows later at a lower volume (the AY F-A echo)">Echo…</button>
           <button className="btn" onClick={() => setDialog({ kind: 'scale', scope: sel ? 'block' : 'pattern' })} title="Ctrl/Alt/Shift+V">Scale volume…</button>
           <span className="time">{ed.playing ? `${toHex2(ed.playOrder)}:${toHex2(ed.playRow)}` : `${secs ? Math.floor(secs / 60) + ':' + String(Math.floor(secs % 60)).padStart(2, '0') : '—'}`}</span>
         </div>
@@ -473,6 +474,8 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
       </details>
 
       {dialog?.kind === 'scale' && <ScaleDialog scope={dialog.scope} hasSel={!!sel} onClose={() => setDialog(null)} onApply={(sc, a, b) => { ed.scaleVolume(sc, a, b); setDialog(null); }} />}
+      {dialog?.kind === 'echo' && <EchoDialog hasSel={!!sel} onClose={() => setDialog(null)}
+        onApply={(sc, d, pct, rep) => { const n = ed.echo(sc, d, pct, rep); setDialog(null); setMsg(n ? `Wrote ${n} echo note${n === 1 ? '' : 's'}.` : 'No echoes written (no notes in range, or the rows after them are not empty).'); }} />}
       {dialog?.kind === 'transpose' && <TransposeDialog hasSel={!!sel} instrument={ed.instrument} onClose={() => setDialog(null)}
         onApply={(sc, n, filt) => { const changed = ed.transpose(sc, n, filt ? ed.instrument : null); setDialog(null); setMsg(changed ? `Transposed ${changed} note${changed === 1 ? '' : 's'}.` : 'Nothing to transpose (no notes in that range).'); }} />}
     </div>
@@ -502,6 +505,22 @@ function ScaleDialog({ scope: s0, hasSel, onClose, onApply }: { scope: Scope; ha
       <label className="row"><span className="lbl">Start %</span><input autoFocus className="txt" value={a} onChange={(e) => setA(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') go(); if (e.key === 'Escape') onClose(); }} /></label>
       <label className="row"><span className="lbl">End %</span><input className="txt" value={b} onChange={(e) => setB(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') go(); if (e.key === 'Escape') onClose(); }} /></label>
       <div className="btns"><button type="button" className="btn primary" onClick={go}>Apply</button><button type="button" className="btn" onClick={onClose}>Cancel</button></div>
+    </Modal>
+  );
+}
+
+function EchoDialog({ hasSel, onClose, onApply }: { hasSel: boolean; onClose: () => void; onApply: (s: 'block' | 'track' | 'pattern', delay: number, pct: number, repeats: number) => void }) {
+  const [scope, setScope] = useState<'block' | 'track' | 'pattern'>(hasSel ? 'block' : 'track');
+  const [delay, setDelay] = useState(2), [pct, setPct] = useState(60), [rep, setRep] = useState(1);
+  return (
+    <Modal title="Echo" onClose={onClose}>
+      <p className="note">Copies each note (same instrument) a few rows later at a lower volume. Only empty cells are filled.</p>
+      <label className="row"><span className="lbl">Range</span><select value={scope} onChange={(e) => setScope(e.target.value as 'block' | 'track' | 'pattern')}>
+        <option value="block" disabled={!hasSel}>selected block</option><option value="track">this track</option><option value="pattern">this pattern</option></select></label>
+      <label className="row"><span className="lbl">Delay (rows)</span><NumField value={delay} min={1} max={32} onCommit={setDelay} /></label>
+      <label className="row"><span className="lbl">Volume %</span><NumField value={pct} min={1} max={100} onCommit={setPct} /></label>
+      <label className="row"><span className="lbl">Repeats</span><NumField value={rep} min={1} max={8} onCommit={setRep} /></label>
+      <div className="btns"><button type="button" className="btn primary" onClick={() => onApply(scope, delay, pct, rep)}>Apply</button><button type="button" className="btn" onClick={onClose}>Cancel</button></div>
     </Modal>
   );
 }

@@ -7,7 +7,7 @@
  */
 import {
   type Song, type Cell, type Instrument, type Pattern,
-  emptyCell, emptyPattern, defaultInstrument, newSong, NOTE_OFF, noteToFreq, channelsOf, drumChannelOf, defaultChannelNames,
+  emptyCell, isEmptyCell, emptyPattern, defaultInstrument, newSong, NOTE_OFF, noteToFreq, channelsOf, drumChannelOf, defaultChannelNames,
 } from './types';
 import { renderSong, type RenderResult, type RowMark } from './render';
 import { renderYm } from '../export/ymemu';
@@ -377,6 +377,39 @@ export class Editor {
       return { ...c, note: n };
     });
     return changed;
+  }
+  /**
+   * Echo: copy every note `delay` rows later at `pct` % of its volume (the AY "F A" echo), `repeats` times
+   * with the volume falling each time. Only empty cells are filled; returns how many echoes were written.
+   */
+  echo(scope: Exclude<Scope, 'song'>, delay: number, pct: number, repeats: number): number {
+    delay = Math.max(1, Math.trunc(delay)); repeats = Math.max(1, Math.min(8, Math.trunc(repeats)));
+    const rows = this.rows;
+    let r1 = 0, r2 = rows - 1, c1 = 0, c2 = this.nch - 1;
+    if (scope === 'track') { c1 = c2 = this.channel; }
+    else if (scope === 'block') { if (this.sel) ({ r1, r2, c1, c2 } = this.sel); else c1 = c2 = this.channel; }
+    const pat = this.song.patterns[this.patIdx];
+    if (!pat) return 0;
+    const src: { r: number; c: number; cell: Cell }[] = [];
+    for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) {
+      const cell = pat.cells[r]?.[c];
+      if (cell && cell.note >= 1 && cell.note < NOTE_OFF) src.push({ r, c, cell });
+    }
+    let n = 0;
+    this.mutate(this.patIdx, (w) => {
+      for (const { r, c, cell } of src) {
+        const base = cell.volume >= 0x10 && cell.volume <= 0x50 ? cell.volume - 0x10 : 64;
+        for (let k = 1; k <= repeats; k++) {
+          const rr = r + delay * k;
+          if (rr >= rows) break;
+          const dst = w(rr)[c];
+          if (!isEmptyCell(dst)) break;
+          w(rr)[c] = { note: cell.note, instrument: cell.instrument, volume: 0x10 + Math.max(0, Math.min(64, Math.round(base * Math.pow(pct / 100, k)))), effect: 0, param: 0 };
+          n++;
+        }
+      }
+    });
+    return n;
   }
   /** FT2 volume scaling, linear ramp from startPct to endPct over the scope */
   scaleVolume(scope: Scope, startPct: number, endPct: number) {

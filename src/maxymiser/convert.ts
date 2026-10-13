@@ -160,6 +160,8 @@ function compileInstrument(inst: Instrument, opt: { rowTicks: number; step: numb
       const stepAt = (k: number) => { const t = k * step; return t < n ? sq.steps[t] : null; };
       const cnt = Math.min(MYM_SEQ_WORDS, Math.ceil(total / step));
       vol = []; mixV = []; noiseV = []; arp = [];
+      hard = inst.useHardEnv;                                                    // buzzer + step table (acid bass): the steps gate the buzzer and move the tone
+      const buzz = hard ? MIX_BUZZ : 0;
       // a constant tuning offset (fraction of a semitone) is applied per note; a varying one is rounded step by step
       const fr = sq.steps.map((x) => x.semi - Math.round(x.semi));
       const frs = fr.slice().sort((a, b) => a - b);
@@ -168,8 +170,8 @@ function compileInstrument(inst: Instrument, opt: { rowTicks: number; step: numb
       else if (fr.some((x) => Math.abs(x) >= 0.3)) warn('semifrac:' + label, `${label}: fractional semitone offsets in the step table are rounded`);
       for (let k = 0; k < cnt; k++) {
         const s = stepAt(k);
-        vol.push(s ? clamp(Math.round(s.vol), 0, 15) : 0);
-        mixV.push(s ? (s.tone ? MIX_TONE : 0) | (s.noise > 0 ? MIX_NOISE : 0) : MIX_TONE);
+        vol.push(s ? (hard ? (s.vol > 0 ? 15 : 0) : clamp(Math.round(s.vol), 0, 15)) : 0);
+        mixV.push((s ? (s.tone ? MIX_TONE : 0) | (s.noise > 0 ? MIX_NOISE : 0) : MIX_TONE) | buzz);
         noiseV.push(s && s.noise > 0 ? s.noise & 31 : 0);
         arp.push(s ? u16(Math.round(s.semi - detune)) : 0);
       }
@@ -235,22 +237,23 @@ function compileInstrument(inst: Instrument, opt: { rowTicks: number; step: numb
     if (inst.noiseEnabled) { mix |= MIX_NOISE; noiseV = [inst.noisePeriod & 31]; }
     if (!mix) mix = MIX_TONE;          // all off would silence the voice anyway; keep the sequence valid
     mixV = [mix];
-    if (hard) {
-      rec[INST.wave] = inst.hardEnvShape & 15; rec[INST.sync] = 1;
-      if (!inst.hardEnvAutoPeriod && inst.hardEnvPeriod) {
-        rec[INST.fixMask] = 2;
-        fix = { values: [u16(clamp(inst.hardEnvPeriod, 1, 65534))], length: 1, repeat: 0 };
-      } else if ((inst.hardEnvDivisor || 1) > 1) {
-        const k = Math.log2(inst.hardEnvDivisor);
-        if (Number.isInteger(k) && k <= 5) { rec[INST.detuneMask] = 2; rec[INST.detuneCoarse] = (-12 * k) & 255; }
-        else warn('envdiv:' + label, `${label}: hardware-envelope divisor ${inst.hardEnvDivisor} is not a power of two; exported as 1`);
-      }
+  }
+  if (hard) {
+    rec[INST.wave] = inst.hardEnvShape & 15; rec[INST.sync] = 1;
+    if (inst.seq) rec[INST.arpMask] = 4;      // the step table's pitch offsets move the tone only: the buzzer stays on the note
+    if (!inst.hardEnvAutoPeriod && inst.hardEnvPeriod) {
+      rec[INST.fixMask] = 2;
+      fix = { values: [u16(clamp(inst.hardEnvPeriod, 1, 65534))], length: 1, repeat: 0 };
+    } else if ((inst.hardEnvDivisor || 1) > 1) {
+      const k = Math.log2(inst.hardEnvDivisor);
+      if (Number.isInteger(k) && k <= 5) { rec[INST.detuneMask] = 2; rec[INST.detuneCoarse] = (-12 * k) & 255; }
+      else warn('envdiv:' + label, `${label}: hardware-envelope divisor ${inst.hardEnvDivisor} is not a power of two; exported as 1`);
     }
   }
   rec[INST.seqSpeed] = step;
   if (detune) rec[INST.detuneMask] = 6;
   const mixSeq: MymSeq = { values: mixV, length: mixV.length, repeat: mixV.length > 1 ? stepRepeat : 0 };
-  const mixBuzzVals = mixV.map((w) => (w & MIX_NOISE) | MIX_BUZZ | (inst.syncBuzz && inst.toneEnabled ? MIX_TONE : 0));
+  const mixBuzzVals = mixV.map((w) => inst.seq && hard ? w : (w & MIX_NOISE) | MIX_BUZZ | (inst.syncBuzz && inst.toneEnabled ? MIX_TONE : 0));
   return {
     name: nm, rec,
     vol: { values: vol, length: vol.length, repeat: clamp(volRepeat, 0, vol.length - 1) },

@@ -74,6 +74,13 @@ parameter), same effect letters, same `.ymt` song files in both directions.
 * **Instruments** are either the YM Tracker's classic ADSR / envelope / hardware-envelope kind, or a **step table**
   (this tool's extension): volume, pitch offset, noise and tone for every 20 ms tick, drawn with the mouse.
   The YM Tracker ignores the step tables, so such songs still load there with plain default instruments.
+* **Instrument presets** (picker at the top of the instrument editor): the chord ornaments AY composers use for a whole chord on one
+  voice (`0 3 7`, `0 4 7`, doubled `0 0 3 3 7 7`, with octave `0 3 7 12`, and a `19 0 0` blip at the start of a note), kick / snare / hats /
+  toms from noise bursts and fast pitch drops (including a hat with the F-A volume echo), and **acid bass**: the buzzer plays the note
+  while a square wave on the same voice sweeps down onto it from 40 semitones above (gwEm, *Torture Your YM*, Alive 9). They are plain
+  50 Hz register writes, so they need no timer and play on real hardware in every export; checked register-for-register against the real
+  maxYMiser replayer. A step table with the hard envelope on gates the buzzer (its level can't be scaled) and drives tone and noise.
+* **Echo…** copies each note a few rows later at a lower volume (delay, volume %, repeats), into empty cells only.
 * The editor plays through a register-level emulation of the chip (including the hardware envelope) and exports the same
   formats as the converter: **SNDH, YM, game kit, WAV, raw registers**.
 
