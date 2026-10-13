@@ -9,8 +9,8 @@ interface OrigPlayer {
   setPos(sec: number): void;
 }
 async function createOrigPlayer(ctx: AudioContext): Promise<OrigPlayer> {
-  const url = `${import.meta.env.BASE_URL}vendor/chiptune3/chiptune3.js`;
-  const mod = await import(/* @vite-ignore */ new URL(url, document.baseURI).href);
+  const url = new URL('vendor/chiptune3/chiptune3.js', document.baseURI).href;
+  const mod = await import(/* @vite-ignore */ url);
   return new mod.ChiptuneJsPlayer({ context: ctx, repeatCount: -1 });
 }
 
@@ -49,7 +49,7 @@ export class Preview {
   loadOriginal(bytes: Uint8Array) {
     this.stop();
     this.modBytes = bytes.slice().buffer;
-    if (!this.orig && !this.origLoading) {
+    if (!this.orig && !this.origLoading && location.protocol !== 'file:') {
       this.origLoading = true;
       createOrigPlayer(this.ctx).then((p) => {
         this.orig = p;

@@ -13,6 +13,7 @@ import { zip } from '../export/zip';
 import { Preview, type Source } from './audio';
 import { download } from './download';
 import { AyRoll } from './AyRoll';
+import demoUrl from '../assets/back_in_town_again.mod?inline';
 
 const DEMO = 'back_in_town_again.mod';
 
@@ -46,6 +47,7 @@ export function App() {
   const [busy, setBusy] = useState('');
   const [source, setSource] = useState<Source>('ay');
   const [playing, setPlaying] = useState(false);
+  const origOk = location.protocol !== 'file:';
   const [pos, setPos] = useState(0);
   const [author, setAuthor] = useState('');
   const previewRef = useRef<Preview | null>(null);
@@ -65,7 +67,7 @@ export function App() {
   }, []);
   const loadFile = async (f: File) => loadBytes(f.name, new Uint8Array(await f.arrayBuffer()));
   const loadDemo = async () => {
-    const r = await fetch(`${import.meta.env.BASE_URL}demo/${DEMO}`);
+    const r = await fetch(demoUrl); // embedded data: URL, works from file:// too
     loadBytes(DEMO, new Uint8Array(await r.arrayBuffer()));
   };
 
@@ -111,7 +113,7 @@ export function App() {
       const t = e.target as HTMLElement;
       if (t.tagName === 'INPUT' && (t as HTMLInputElement).type === 'text') return;
       if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
-      if (e.code === 'Tab' && !e.shiftKey && mod && t.tagName !== 'SELECT') { e.preventDefault(); pickSource(source === 'ay' ? 'orig' : 'ay'); }
+      if (e.code === 'Tab' && origOk && !e.shiftKey && mod && t.tagName !== 'SELECT') { e.preventDefault(); pickSource(source === 'ay' ? 'orig' : 'ay'); }
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
@@ -233,11 +235,13 @@ export function App() {
               <button className="btn" onClick={rewind} disabled={!res}>⏮</button>
               <button className="btn primary" onClick={togglePlay} disabled={!res || !!busy}>{playing ? '■ Stop' : '▶ Play'}</button>
               <div className="ab" role="group" aria-label="Source">
-                <button className={source === 'orig' ? 'on' : ''} onClick={() => pickSource('orig')}>A · Original</button>
+                <button className={source === 'orig' ? 'on' : ''} disabled={!origOk} onClick={() => pickSource('orig')}
+                  title={origOk ? '' : 'Needs the page to be served over http(s) — not available when index.html is opened from disk'}>A · Original</button>
                 <button className={source === 'ay' ? 'on' : ''} onClick={() => pickSource('ay')}>B · YM2149</button>
               </div>
               <span className="time">{fmtTime(pos)} / {fmtTime(seconds)}</span>
               {busy && <span className="busy">{busy}</span>}
+              {!origOk && <span className="note">Original-module playback needs http(s) hosting (browsers block it for files opened from disk).</span>}
             </div>
             {res && <AyRoll regs={res.regs} nframes={res.nframes} position={pos} />}
             <div className="legend"><i style={{ background: '#ff5555' }} />voice A <i style={{ background: '#55dd55' }} />voice B <i style={{ background: '#5599ff' }} />voice C <i style={{ background: '#ffaa33' }} />noise · vertical = pitch, brightness = volume</div>
