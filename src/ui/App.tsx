@@ -27,8 +27,8 @@ import demoUrl from '../assets/back_in_town_again.mod?inline';
 
 const DEMO = 'back_in_town_again.mod';
 
-interface Opts { gainDb: number; drumBonus: number; sticky: number; arpOrder: 'xy' | 'yx'; arpFill: number; arpMinVol: number; digi: boolean; digiRate: number; digiMaxMs: number }
-const DEFAULT_OPTS: Opts = { gainDb: 0, drumBonus: 3, sticky: 1.5, arpOrder: 'xy', arpFill: 0, arpMinVol: 3, digi: false, digiRate: 8000, digiMaxMs: 500 };
+interface Opts { gainDb: number; drumBonus: number; sticky: number; arpOrder: 'xy' | 'yx'; arpFill: number; arpMinVol: number; digi: boolean; digiRate: number; digiMaxMs: number; middle: boolean }
+const DEFAULT_OPTS: Opts = { gainDb: 0, drumBonus: 3, sticky: 1.5, arpOrder: 'xy', arpFill: 0, arpMinVol: 3, digi: false, digiRate: 8000, digiMaxMs: 500, middle: false };
 
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const slug = (s: string) => s.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'song';
@@ -145,7 +145,7 @@ export function App() {
     setBusy('Converting to YM2149 registers…');
     const h = setTimeout(() => {
       try {
-        const r = convert(mod, { gainDb: opts.gainDb, drumBonus: opts.drumBonus, sticky: opts.sticky, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, prio, inst: instMap });
+        const r = convert(mod, { gainDb: opts.gainDb, drumBonus: opts.drumBonus, sticky: opts.sticky, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, prio, inst: instMap });
         setRes(r);
         setBusy('Rendering the YM2149 preview…');
         setTimeout(() => {
@@ -213,7 +213,7 @@ export function App() {
     setBusy('Converting to AY patterns…');
     setTimeout(() => {
       try {
-        const r = moduleToSong(mod, { prio, inst: instMap, drumBonus: opts.drumBonus, sticky: opts.sticky, gainDb: opts.gainDb, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs });
+        const r = moduleToSong(mod, { prio, inst: instMap, drumBonus: opts.drumBonus, sticky: opts.sticky, gainDb: opts.gainDb, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle });
         e.loadSong(r.song, fileName);
         setSongReport([...r.report, ...r.warnings.map((w) => 'warning: ' + w)]);
         setTab('ed');
@@ -362,6 +362,9 @@ export function App() {
                 hint="How strongly kicks/snares/hats win a voice against melody notes" />
               <Slider label="Voice stickiness" value={opts.sticky} min={0} max={4} step={0.25} onChange={(v) => setOpts({ ...opts, sticky: v })}
                 hint="Higher = a note stays on the same YM voice (less jumping, fewer clicks)" />
+              <label className="chk" title="How AY composers lay out the three voices: bass and the synthetic drums on the middle voice (B), melody and arpeggios on A and C, so the voices sit in different frequency ranges. Digidrums stay on voice C.">
+                <input type="checkbox" checked={opts.middle} onChange={(e) => setOpts({ ...opts, middle: e.target.checked })} /> Bass + drums on the middle voice
+              </label>
               <label className="row" title="Order in which an arpeggio cycles its notes">
                 <span className="lbl">Arpeggio</span>
                 <select value={opts.arpOrder} onChange={(e) => setOpts({ ...opts, arpOrder: e.target.value as 'xy' | 'yx' })}>

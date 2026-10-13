@@ -30,6 +30,10 @@ voice (stickiness avoids voice jumping, one noise generator is shared, volumes m
 * **Arp fill**: a module has more channels than the YM has voices. With fill on, notes that would be dropped are folded
   into a 2- or 3-note arpeggio on the voice with the closest pitch (alternating every frame). The strip under the roll
   shows dropped notes (red) and arpeggio notes (cyan); the channel table lists the shares.
+* **Bass + drums on the middle voice** (option, off by default): the layout AY composers use. A source channel whose notes sit
+  below 200 Hz (median) is the bass; it and the synthetic drums prefer voice B, melody and arpeggios voices A and C, so the three
+  voices live in different frequency ranges. A melody note on B makes room when a bass or drum needs it and an outer voice is
+  free. Digidrums stay on voice C. Works in the frame converter and in the pattern-editor conversion.
 
 ## Loading .sndh and .ym
 

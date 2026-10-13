@@ -43,6 +43,10 @@ export interface SongConvertOptions {
   digiDrums?: boolean;
   digiRate?: number;
   digiMaxMs?: number;
+  /** bass and synthetic drums on the middle voice, melody on A and C (digidrums stay on C) */
+  middleLayout?: boolean;
+  /** notes below this frequency count as bass for the middle layout, Hz (default 200) */
+  bassHz?: number;
 }
 
 export interface SongConvertResult {
@@ -461,6 +465,22 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
   const arpMax = Math.max(2, Math.trunc(o.arpFill));
   let arpRows = 0, noteOffs = 0, steals = 0;
 
+  // middle layout: a source channel whose pitched notes sit below bassHz (median) is the bass
+  const bassCh = new Set<number>();
+  if (o.middleLayout) {
+    const lim = o.bassHz ?? 200;
+    for (let c = 0; c < nch; c++) {
+      const hz: number[] = [];
+      for (let ri = 0; ri < nRows; ri++) {
+        const ci = chInfo(rows[ri], c);
+        const st = ci.trig?.st ?? ci.stLast;
+        if (ci.active && !ci.drum && !ci.noise && st) hz.push((c4Hz.get(st.inst) ?? 261.6255653) * Math.pow(2, (st.note - 49) / 12));
+      }
+      hz.sort((a, b) => a - b);
+      if (hz.length && hz[hz.length >> 1] < lim) bassCh.add(c);
+    }
+  }
+
   for (let ri = 0; ri < nRows; ri++) {
     const rl = rows[ri];
     const cells = flat[ri];
@@ -494,10 +514,17 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
     voices.forEach((v, i) => { if (v.owner !== null && chosen.includes(v.owner) && allowed.includes(i)) ownerVoice.set(v.owner, i); });
     const used = new Set<number>(ownerVoice.values());
     const needVoice = chosen.filter((c) => !ownerVoice.has(c));
-    needVoice.sort((a, b) => Number(!!infos[a].drum) - Number(!!infos[b].drum) || (prio[b] ?? 0) - (prio[a] ?? 0));
+    // middle layout: 0 = drum / noise, 1 = bass channel, 2 = melody; the first two prefer voice B, melody voices A and C
+    const roleOf = (c: number) => (infos[c].drum || infos[c].noise ? 0 : bassCh.has(c) ? 1 : 2);
+    if (o.middleLayout && chosen.length < allowed.length && needVoice.some((c) => roleOf(c) <= 1)) {
+      // a melody note sitting on B makes room for a bass / drum that needs it, when an outer voice is free
+      for (const [oc, vi] of ownerVoice) if (vi === 1 && roleOf(oc) === 2) { ownerVoice.delete(oc); used.delete(1); needVoice.push(oc); break; }
+    }
+    if (o.middleLayout) needVoice.sort((a, b) => roleOf(a) - roleOf(b) || (prio[b] ?? 0) - (prio[a] ?? 0));
+    else needVoice.sort((a, b) => Number(!!infos[a].drum) - Number(!!infos[b].drum) || (prio[b] ?? 0) - (prio[a] ?? 0));
     for (const c of needVoice) {
-      const order = (infos[c].drum || infos[c].noise ? [2, 1, 0] : [0, 1, 2]).filter((i) => allowed.includes(i));
-      const pick = order.find((i) => !used.has(i) && voices[i].owner === null) ?? order.find((i) => !used.has(i));
+      const order = (o.middleLayout ? [[1, 0, 2], [1, 0, 2], [0, 2, 1]][roleOf(c)] : infos[c].drum || infos[c].noise ? [2, 1, 0] : [0, 1, 2]).filter((i) => allowed.includes(i));
+      const pick = (o.middleLayout ? undefined : order.find((i) => !used.has(i) && voices[i].owner === null)) ?? order.find((i) => !used.has(i));
       if (pick === undefined) continue;                      // cannot happen (<= 3 chosen)
       if (voices[pick].owner !== null && prevActive[voices[pick].owner!]) steals++;
       ownerVoice.set(c, pick); used.add(pick);

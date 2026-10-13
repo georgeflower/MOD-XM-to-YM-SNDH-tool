@@ -71,6 +71,13 @@ export interface ConvertOptions {
   refPercentile?: number;
   arpOrder?: 'xy' | 'yx';
   loopOrder?: number;
+  /**
+   * AY-composer voice layout: bass and the synthetic drums on the middle voice (B), melody and arpeggios on the outer
+   * voices (A, C), so the three voices sit in different frequency ranges. Digidrums stay on voice C.
+   */
+  middleLayout?: boolean;
+  /** notes below this frequency count as bass for the middle layout, Hz (default 200) */
+  bassHz?: number;
 }
 
 const DEFAULTS = { drumBonus: 3.0, drumGain: 1.0, gainDb: 0.0, sticky: 1.5, refPercentile: 97.0 };
@@ -318,6 +325,16 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
   for (const fr of cand) for (const c of fr) imp.set(c.ch, (imp.get(c.ch) ?? 0) + (c.drum ? 0 : ayVol(c)));
   const rank = new Map<number, number>();
   for (const [ch, v] of imp) rank.set(ch, -v - 1000.0 * (prio[ch] ?? 0));
+  // voice layout: 0 = drum / noise, 1 = bass, 2 = melody; each prefers its own voices
+  const middle = !!options.middleLayout;
+  const bassPer = 125000 / Math.max(20, options.bassHz ?? 200);
+  // a channel is a bass channel when its pitched notes sit below bassHz on median (stable over the song)
+  const perOf = new Map<number, number[]>();
+  for (const fr of cand) for (const c of fr) if (c.kind === 'tone' && !c.drum && c.np == null && c.per != null) { const l = perOf.get(c.ch) ?? []; l.push(c.per); perOf.set(c.ch, l); }
+  const bassCh = new Set<number>();
+  for (const [ch, l] of perOf) { l.sort((a, b) => a - b); if (l[l.length >> 1] > bassPer) bassCh.add(ch); }
+  const role = (c: Cand) => (c.drum || c.kind === 'noise' || c.np != null ? 0 : bassCh.has(c.ch) ? 1 : 2);
+  const ROLE_ORDER: number[][] = [[1, 0, 2], [1, 0, 2], [0, 2, 1]];
   let slots: (number | null)[] = [null, null, null];
   const alloc: (Item | null)[][] = [];
   const played = new Array(m.nch).fill(0), dropped = new Array(m.nch).fill(0), folded = new Array(m.nch).fill(0);
@@ -362,13 +379,17 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
     const nw: (Item | null)[] = [null, null, null];
     const rest: Item[] = [];
     const freeSlots = busy[f] ? [0, 1] : [0, 1, 2];
+    // middle layout: a melody note sitting on B makes room for a bass / drum that needs it, when an outer voice is free
+    const needMid = middle && chosen.length < freeSlots.length && chosen.some((it) => role(it.c) <= 1 && !slots.includes(it.c.ch));
     for (const it of chosen) {
       const si = slots.indexOf(it.c.ch);
-      if (si >= 0 && freeSlots.includes(si) && nw[si] === null) nw[si] = it; else rest.push(it);
+      if (si >= 0 && freeSlots.includes(si) && nw[si] === null && !(needMid && si === 1 && role(it.c) === 2)) nw[si] = it; else rest.push(it);
     }
-    rest.sort((a, b) => (Number(!!a.c.drum) - Number(!!b.c.drum)) || ((rank.get(a.c.ch) ?? 0) - (rank.get(b.c.ch) ?? 0)));
+    rest.sort((a, b) => middle
+      ? (role(a.c) - role(b.c)) || ((rank.get(a.c.ch) ?? 0) - (rank.get(b.c.ch) ?? 0))
+      : (Number(!!a.c.drum) - Number(!!b.c.drum)) || ((rank.get(a.c.ch) ?? 0) - (rank.get(b.c.ch) ?? 0)));
     for (const it of rest) {
-      const order = (it.c.drum ? [2, 1, 0] : [0, 1, 2]).filter((i) => freeSlots.includes(i));
+      const order = (middle ? ROLE_ORDER[role(it.c)] : it.c.drum ? [2, 1, 0] : [0, 1, 2]).filter((i) => freeSlots.includes(i));
       for (const i of order) if (nw[i] === null) { nw[i] = it; break; }
     }
     slots = nw.map((it) => (it ? it.c.ch : null));
