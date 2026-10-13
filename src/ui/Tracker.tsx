@@ -14,6 +14,7 @@ import { encodeWav } from '../export/wav';
 import { zip } from '../export/zip';
 import { songToMaxymiser, instrumentToMyi } from '../maxymiser/convert';
 import { maxymiserToSong, myiToInstrument } from '../maxymiser/import';
+import { songToAks, aksFile } from '../arkos/aks';
 import { download } from './download';
 import { NumField, TextField } from './fields';
 import { InstrumentEditor } from './InstrumentEditor';
@@ -306,6 +307,13 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
         if (m.warnings.length) onError(m.warnings.join('; '));
       } catch (e) { onError(String((e as Error).message ?? e)); }
     },
+    aks: () => {
+      try {
+        const a = songToAks(song, { title: meta.title, author: meta.author });
+        download(`${base}.aks`, aksFile(a.xml, base), 'application/zip');
+        if (a.warnings.length) onError(a.warnings.join('; '));
+      } catch (e) { onError(String((e as Error).message ?? e)); }
+    },
     myi: () => {
       try {
         const inst = song.instruments[ed.instrument];
@@ -448,6 +456,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
           <button className="btn" onClick={exp.ym}>YM (.ym)</button>
           <button className="btn" onClick={exp.game}>Game kit (.zip)</button>
           <button className="btn" onClick={exp.mym} title="song + voice bank for gwEm's maxYMiser tracker">maxYMiser (.mys + .myv)</button>
+          <button className="btn" onClick={exp.aks} title="song for Arkos Tracker 3 (envelopes, arpeggios, slides and speed baked into Arkos instruments and effects)">Arkos Tracker (.aks)</button>
           <button className="btn" onClick={exp.myi} title="the selected instrument as a maxYMiser .myi">Instrument (.myi)</button>
           <button className="btn" onClick={exp.wav}>Preview (.wav)</button>
           <button className="btn" onClick={exp.regs}>Registers (.regs)</button>

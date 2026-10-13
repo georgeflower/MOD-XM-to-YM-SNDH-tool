@@ -13,6 +13,7 @@ A browser tool that turns **ProTracker `.MOD`** and **FastTracker II `.XM`** mod
 | **YM** (`.ym`) | `YM5!` uncompressed register dump; `YM6!` with digidrums / timer effects when the song has any (loads in ST-Sound and friends). |
 | **Game kit** (`.zip`) | `<name>.h` (packed stream as a C array, + digidrum table) + `ymplay.h` (small replayer; with digidrums / timer effects also the 68000 engine). The game owns the PSG, so sound effects can steal a voice. |
 | **maxYMiser** (`.mys` + `.myv`, `.myi`) | The song as native files for gwEm's [maxYMiser](https://preromanbritain.com/maxymiser/) tracker (song + voice bank, or one instrument), so a tune can be continued there — digidrums and `Q` `S` `U` timer effects included. The same files load back into the editor (*Load maxYMiser…*). See below. |
+| **Arkos Tracker 3** (`.aks`) | The song as an Arkos Tracker 3 file: the editor's envelopes, arpeggios, pitch macros, step tables and buzzer instruments are baked into Arkos instruments, notes, volume, arpeggio, slide and speed go into the patterns. See below. |
 | Raw regs / WAV / report | 14 bytes per frame; YM emulator preview; conversion log. |
 
 How the conversion works: the module is replayed tick-accurately (all XM/MOD effects, envelopes, auto-vibrato,
@@ -187,6 +188,23 @@ a pattern break shortens it, the repeat position is the restart position, the re
 * Checked against the real replayer register by register (`scripts/maxymiser-check.ts <MYM_REPL.BIN> song.mys`): gwEm's own example songs and songs exported from here
   play identically except for slides (the replayer also slides on the first tick) and fractional tuning.
 
+## Arkos Tracker export
+
+*Export → Arkos Tracker (.aks)* writes an Arkos Tracker 3 song (the XML inside a zip, the way AT3 saves it): one subsong, the YM clock (2 MHz), replay rate = BPM × 0.4 Hz
+(125 BPM = 50 Hz), three channels, one Arkos instrument per editor instrument.
+
+* **Instruments are baked per tick.** ADSR / volume envelope, arpeggio and pitch macros, built-in vibrato and the step tables (drum, acid, chord-ornament presets) become the
+  instrument's cells; periodic macros are unrolled to their common period and looped. Buzzer instruments use a software + hardware link (envelope period from the note, tone
+  free to sweep), buzzer-only ones a hardware link; shapes 0-7 are played as 9 / 15 (Arkos has 8-15 only).
+* **Effects that carry over:** notes (note-off = a silent instrument), volume column / `Cxx` (as Arkos' 16 levels), `0xy` arpeggio, `1xx` `2xx` slides, `3xx` glide (to a note without
+  instrument), `Fxx` speed (speed track), `Dxx` (shorter pattern).
+* **Approximations** (listed as warnings): slides and glides run evenly over the row instead of only on the ticks after the first, fractional semitone offsets are rounded, release tails are cut
+  (Arkos note-off is silent at once), sync-square and `Q S U` / `Z` timer effects and digidrums are left out, `4xy` vibrato, tremolo, volume slides, BPM changes, `Bxx` are not exported.
+* **Verified** by loading the exported file in an independent Arkos replayer (the Rust `ym2149-arkos-replayer`, not part of this repository) and comparing every frame with the editor's
+  render: ADSR, volume, arpeggio macros, speed changes, note-off, the drum, hat, tom and acid-bass presets and the sync-bass step table are register-identical; slides differ by a few
+  period units inside a row; converted modules agree on volume and, within the rounded semitone, on pitch. The official Arkos Tracker 3 could not be run here, so open the file
+  there and tell me if it complains.
+
 ## Using it
 
 1. Open the page, **Load MOD / XM / SNDH / YM…** (or drop a file anywhere) — or press **Demo**.
@@ -232,7 +250,7 @@ public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of th
 
 * Mapper follow-ups: sample → waveform (square duty/buzzer envelope), saving a mapping with the project
 * More than one timer effect or drum at a time (needs a second timer / mixing engine); timer-driven arpeggio and other handler effects that are not drums or Q/S/U
-* Furnace `.fur`, Arkos Tracker `.aks` export
+* Furnace `.fur` export
 * maxYMiser: the STe DMA track (sampled sound), sequence-switching effects, more than one timer effect on the voices at once
 
 Note: SNDH files made here play in any SNDH player but cannot be opened *in* maxYMiser (it only loads its own songs) — use the maxYMiser export for that.
