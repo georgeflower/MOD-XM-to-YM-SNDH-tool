@@ -841,6 +841,10 @@ footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top
 <td>Length to run the emulator for; 0 = use the file&#39;s <code>TIME</code> tag.</td>
 </tr>
 <tr>
+<td><strong>STe samples</strong></td>
+<td>(SNDH that plays samples through the STe DMA sound chip.) On: every sample hit becomes a 4-bit digidrum on voice C at the same frame, and voice C is silent while it plays. Off: the samples are left out. The checkbox shows how many hits were found.</td>
+</tr>
+<tr>
 <td><strong>Composer</strong></td>
 <td>Written to the exports (and to the song, if you open it as patterns).</td>
 </tr>
@@ -1477,13 +1481,14 @@ lower row:   S   D       G   H   J       L
 <li><strong>Tuning.</strong> Tunes that were converted from samples are often slightly off A = 440 Hz. The tune&#39;s overall offset is added to every step, so semitone values such as <code>-0.2</code> or <code>2.8</code> are normal in imported instruments. Pitches are snapped to clean values when the difference is under 0.4 % (about 7 cents).</li>
 <li><strong>Digidrums</strong> of a YM5/YM6 file or an SNDH become a bank on a <strong>Drum</strong> channel (note = drum number). A drum that played on voice A or B is moved to voice C, which is where the drum channel plays; the report counts them.</li>
 <li><strong>Timer effects</strong> (SID voice, sinus-SID, sync-buzzer) become <code>Q</code>, <code>S</code> and <code>U</code> on the voice&#39;s note, repeated after every new note on that voice.</li>
+<li><strong>STe DMA sound.</strong> An STe tune can play 8-bit samples through the DMA sound chip next to the YM2149 (maxYMiser&#39;s DMA track does). The YM has no such channel and a register dump cannot carry it, so the emulator logs each sample start and the sample becomes a 4-bit digidrum hit at the same frame, on voice C, which is silent while the sample plays. The <em>Loaded tune</em> panel shows an <strong>STe samples</strong> checkbox for such tunes: untick it to leave the samples out and keep voice C as the tune plays it. The sound is the sample at 4-bit resolution and at most 12.5 kHz, so it is coarser than the STe&#39;s, and the bass or lead on voice C is cut while a sample plays.</li>
 <li><strong>Loop.</strong> The tune&#39;s loop frame becomes the order position the song restarts at.</li>
 <li><strong>Too many sounds.</strong> There are 255 instrument slots. If a tune has more distinct sounds, the most similar ones are merged and the report says how many and how large the difference is. A note that plays the wrong instrument sounds slightly different (a volume step or a fraction of a semitone), not wrong.</li>
 <li><strong>Check by ear.</strong> The editor plays the same registers as the original to within a few percent of the frames (a few frames differ at merged instruments and where the tune does something the editor&#39;s voice model cannot, such as changing the buzzer period during a note).</li>
 </ul>
 </section>
 <section class="sec" id="howto-load-sndh"><h2>Load SNDH and YM files<a class="anchor" href="#howto-load-sndh" aria-label="link">#</a></h2><ul>
-<li><strong>SNDH</strong> (<code>.sndh</code>, <code>.snd</code>, also ICE!-packed): the file is <em>run</em> in a built-in 68000 emulator and the chip writes are captured at 50 Hz. Use <strong>Subtune</strong> to pick one, <strong>Seconds</strong> to set the length (0 = use the TIME tag). Tunes whose player never returns or waits for hardware that is not emulated report <em>did not return</em>.</li>
+<li><strong>SNDH</strong> (<code>.sndh</code>, <code>.snd</code>, also ICE!-packed): the file is <em>run</em> in a built-in 68000 emulator and the chip writes are captured at 50 Hz. Use <strong>Subtune</strong> to pick one, <strong>Seconds</strong> to set the length (0 = use the TIME tag). The emulated machine is an STe (cookie jar with <code>_MCH</code>, <code>_SND</code>, GEMDOS memory allocation, microwire handshake), so players that check for an STe before they start the DMA sound chip do start it; see <em>STe DMA sound</em> below. Tunes whose player never returns or waits for other hardware that is not emulated report <em>did not return</em> and the address where they got stuck.</li>
 <li><strong>YM</strong> (<code>.ym</code>: YM2!, YM3!, YM3b!, YM5!, YM6!, LHA-packed): read as the register dump it is. YM5/YM6 digidrums and YM6 timer effects are imported with their samples.</li>
 <li>You get the piano roll, the YM preview and the exports SNDH / YM5 / game kit / WAV / regs, and <strong>Edit as AY patterns →</strong> to turn the tune into patterns (<a href="#howto-edit-tune">Edit an existing SNDH or YM tune</a>). SNDH timer-interrupt effects are recognised and classified (digidrum, Q, S, U); one drum and one effect at a time, so overlapping ones keep the first and the import says how many it dropped.</li>
 </ul>
@@ -2058,6 +2063,10 @@ npx tsx scripts/import-cli.ts tune.sndh out.regs     # run an SNDH / read a YM i
 <tr>
 <td>Seconds</td>
 <td>0 = use the length from the file&#39;s TIME tag</td>
+</tr>
+<tr>
+<td>STe samples</td>
+<td>This tune plays 8-bit samples through the STe DMA sound chip, which a YM2149 register dump cannot carry. On: each sample becomes a 4-bit digidrum hit on voice C at the same frames (voice C is silent while it plays). Off: the samples are left out.</td>
 </tr>
 <tr>
 <td>Edit as AY patterns →</td>
@@ -2915,6 +2924,7 @@ scripts         command-line tools and checks; tools/ holds the external oracles
 </ul>
 </section>
 <section class="sec" id="architecture-sndh-import"><h2>SNDH import<a class="anchor" href="#architecture-sndh-import" aria-label="link">#</a></h2><p><code>src/import/sndh.ts</code> runs the tune in a built-in Motorola 68000 interpreter (<code>m68k.ts</code>, 4 MB RAM, I/O page at <code>$FF8000</code>): it loads the file (ICE!-depacked if needed) at a base address, calls the init routine for the chosen subtune, then calls the play routine at the tune&#39;s own rate (VBL or Timer A–D) and records the YM registers once per frame. The MFP model (<code>mfp.ts</code>) runs timer interrupts in virtual time; every YM write made inside an interrupt is logged with a timestamp, and <code>sndhfx.ts</code> classifies the log into digidrums and timer effects (see the table in <a href="#howto-load-sndh">How-to: load SNDH</a>). The interpreter was checked against the Musashi core in psgplay.</p>
+<p>The emulated machine is an STe. <code>sndh.ts</code> puts a cookie jar at <code>$5A0</code> (<code>_CPU</code>, <code>_VDO</code>, <code>_MCH</code> = STe, <code>_SND</code> = YM + 8-bit DMA), answers the GEMDOS <code>Malloc</code> / <code>Mxalloc</code> / <code>Mfree</code> traps from a heap above the file (a player that allocates a sample buffer would otherwise copy over low memory), and lets the STe microwire registers (<code>$FF8922</code> / <code>$FF8924</code>) finish their transfer after a few polls. Every write that starts or stops the DMA sound (<code>$FF8901</code>) is logged with the frame, the frame base and end addresses and the mode byte. <code>dma.ts</code> reads those samples out of memory (signed 8-bit, mono or stereo mixed down, 6.3 / 12.5 / 25 / 50 kHz), converts each distinct one to a 4-bit digidrum with <code>prepareDrum</code> (at most 12.5 kHz and 16 000 bytes), adds it to the tune&#39;s drum track as a hit on voice C and silences voice C while it plays. <code>parseSndh(…, { dma: false })</code> leaves them out.</p>
 </section>
 <section class="sec" id="architecture-fromregs"><h2>Register dump to patterns<a class="anchor" href="#architecture-fromregs" aria-label="link">#</a></h2><p><code>src/tracker/fromRegs.ts</code> (<code>regsToSong</code>) is the inverse of the renderer for <code>.sndh</code> / <code>.ym</code> input. It never invents structure that is not in the dump; every note records what the chip did, so re-rendering the song reproduces the dump.</p>
 <ol>
@@ -3457,6 +3467,10 @@ then one data byte per set mask bit, in register order
 <td>63 per instrument, 16 000 bytes each; YM6: 32 in total</td>
 </tr>
 <tr>
+<td>STe DMA samples (SNDH)</td>
+<td>become digidrums on voice C: mono or stereo (mixed down) 8-bit, played back at most 12.5 kHz and 16 000 bytes, shared with the 63 digidrum slots; no looped DMA, no volume or pan changes</td>
+</tr>
+<tr>
 <td>Timer effects</td>
 <td>48–20 000 Hz (sinus ≤ about 625 Hz); one drum and one effect at a time</td>
 </tr>
@@ -3658,6 +3672,10 @@ then one data byte per set mask bit, in register order
 <tr>
 <td><em>distinct sounds do not fit in 255 instruments</em></td>
 <td>The most similar ones were merged. If the difference matters, import fewer subtunes or shorter sections, or fix the affected notes by hand.</td>
+</tr>
+<tr>
+<td>An SNDH from maxYMiser or another STe player sounds different from the original</td>
+<td>It plays samples through the STe DMA sound chip, which a YM register dump cannot hold. The importer turns the sample hits into digidrums on voice C (coarser, and voice C is silent while a sample plays), see the <strong>STe samples</strong> checkbox. A tune that checks for hardware the emulator does not model may still skip its DMA part; the warning <em>init routine did not return … stuck at offset $…</em> names where.</td>
 </tr>
 <tr>
 <td>A drum plays on the wrong voice</td>

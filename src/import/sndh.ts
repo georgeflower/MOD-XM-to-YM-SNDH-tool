@@ -9,6 +9,7 @@ import { extractTimerEffects } from './sndhfx';
 import { iceDepack, isIce } from './ice';
 import type { AyTune } from './tune';
 import type { DrumTrack } from '../core/drums';
+import { dmaToDrums, dmaReport, type DmaResult } from './dma';
 import type { FxTrack } from '../core/fx';
 
 const BASE = 0x10000;
@@ -26,6 +27,8 @@ export interface SndhInfo {
   rateHz: number;            // call rate of the play routine
   timer: 'vbl' | 'A' | 'B' | 'C' | 'D';
   flags: string;
+  /** STe DMA sound: distinct samples and hits found while running the tune */
+  dmaSamples?: number; dmaHits?: number;
 }
 
 export function isSndh(d: Uint8Array): boolean {
@@ -77,8 +80,21 @@ export function parseSndhHeader(d: Uint8Array): SndhInfo {
   return info;
 }
 
+/** one write to the STe DMA sound control register ($FF8901) */
+export interface DmaEvent {
+  frame: number;
+  play: boolean;
+  /** frame base / end addresses as programmed, sample mode byte ($FF8921: bits 0-1 rate, bit 7 mono) */
+  start: number; end: number; mode: number;
+  loop: boolean;
+}
+const MAX_DMA_EVENTS = 20_000;
+
 class YmBus implements Bus {
   regs = new Uint8Array(16);
+  /** frame the play routine is running for (to date the DMA events) */
+  frame = 0;
+  dma: DmaEvent[] = [];
   sel = 0;
   envWritten = false;
   io = new Uint8Array(0x8000);          // plain backing store for the rest of the I/O page
@@ -91,7 +107,10 @@ class YmBus implements Bus {
   clock: () => number = () => 0;
   logT: number[] = []; logR: number[] = []; logV: number[] = [];
   logFull = false;
+  /** STe microwire: after a data write the mask register reads "shifting" for a few polls, then the original mask again */
+  mwBusy = 0;
   ioRead(addr: number, size: number): number {
+    if (addr === 0xff8924 && size === 1 && this.mwBusy > 0) { this.mwBusy--; return 0; }
     let v = 0;
     for (let i = 0; i <= (size === 2 ? 3 : size === 1 ? 1 : 0); i++) v = (v * 256) + this.rb(addr + i);
     return v;
@@ -125,13 +144,61 @@ class YmBus implements Bus {
     if (a >= 0xfffa19 && a <= 0xfffa25 && v !== 0) this.mfpTimerTouched = true; // timer control/data regs
     if (a >= 0xfffa00 && a < 0xfffa40) { this.mfp.write(a, v); return; }
     this.io[a - 0xff8000] = v;
+    if (a === 0xff8922 || a === 0xff8923) this.mwBusy = 3;
+    if (a === 0xff8901 && this.dma.length < MAX_DMA_EVENTS) {
+      const g = (o: number) => this.io[o - 0xff8000];
+      this.dma.push({
+        frame: this.frame, play: (v & 1) !== 0, loop: (v & 2) !== 0,
+        start: (g(0xff8903) << 16) | (g(0xff8905) << 8) | g(0xff8907),
+        end: (g(0xff890f) << 16) | (g(0xff8911) << 8) | g(0xff8913),
+        mode: g(0xff8921),
+      });
+    }
   }
+}
+
+/**
+ * A cookie jar at $5A0 that says "STe": SNDH players look for _MCH / _SND before they start the DMA sound chip
+ * (maxYMiser's does, and plays its sample track only on an STe). _MCH 1.0 = STe, _SND 3 = YM2149 + 8-bit DMA.
+ */
+const JAR = 0x600;
+function installCookies(cpu: M68k) {
+  const cookies: [string, number][] = [['_CPU', 0], ['_VDO', 0x00010000], ['_MCH', 0x00010000], ['_SND', 3], ['_FRB', 0]];
+  let p = JAR;
+  for (const [id, v] of cookies) {
+    for (let i = 0; i < 4; i++) cpu.mem[p + i] = id.charCodeAt(i);
+    cpu.wr32(p + 4, v); p += 8;
+  }
+  cpu.wr32(p, 0); cpu.wr32(p + 4, cookies.length + 1);
+  cpu.wr32(0x5a0, JAR);
+}
+
+/**
+ * GEMDOS memory calls (TRAP #1): Malloc $48, Mxalloc $44, Mfree $49. Players such as maxYMiser's allocate a buffer for
+ * their samples at init; without an answer d0 keeps the subtune number and the player copies over low memory.
+ */
+const HEAP_START = 0x320000, HEAP_END = 0x3d0000;
+function installGemdos(cpu: M68k) {
+  let heap = HEAP_START;
+  cpu.onTrap = (n) => {
+    if (n !== 1) return;
+    const sp = cpu.a[7] >>> 0, fn = cpu.rd16(sp);
+    if (fn === 0x48 || fn === 0x44) {
+      const size = cpu.rd32(sp + 2) | 0;
+      if (size === -1) { cpu.d[0] = HEAP_END - heap; return; }
+      const sz = (Math.max(0, size) + 3) & ~3;
+      if (size < 0 || heap + sz > HEAP_END) { cpu.d[0] = 0; return; }
+      cpu.d[0] = heap; heap += sz;
+    } else if (fn === 0x49) cpu.d[0] = 0;
+  };
 }
 
 export interface SndhOptions {
   subtune?: number;          // 1-based
   seconds?: number;          // override the rendered length
   maxInstructions?: number;
+  /** turn STe DMA samples into digidrum hits (default true); false leaves them out */
+  dma?: boolean;
   /** collect every YM data write made by the play routine, in order (tests) */
   trace?: { r: number; v: number; i: number }[];
 }
@@ -161,9 +228,11 @@ export function parseSndh(file: Uint8Array, opt: SndhOptions = {}): AyTune & { i
   };
 
   bus.regs[7] = 0xff;
+  installCookies(cpu);
+  installGemdos(cpu);
   if (info.timer !== 'vbl') bus.mfp.disabled['ABCD'.indexOf(info.timer)] = true;   // the host's own timer, not the tune's
   try {
-    if (!call(0, sub, 5_000_000)) warnings.push('init routine did not return (waiting for hardware?)');
+    if (!call(0, sub, 5_000_000)) warnings.push(`init routine did not return (waiting for hardware? stuck at offset $${(cpu.pc - BASE).toString(16)})`);
   } catch (e) { throw new Error(`SNDH init crashed: ${(e as Error).message}`); }
 
   const dur = opt.seconds ?? (info.durations[sub - 1] || 0);
@@ -214,6 +283,7 @@ export function parseSndh(file: Uint8Array, opt: SndhOptions = {}): AyTune & { i
       acc += perFrame;
       let calls = Math.floor(acc + 1e-9); acc -= calls;
       bus.envWritten = false;
+      bus.frame = f;
       bus.mfp.now = f * MFP_FRAME;
       let envShape = 0xff;
       while (calls-- > 0) {
@@ -249,9 +319,28 @@ export function parseSndh(file: Uint8Array, opt: SndhOptions = {}): AyTune & { i
   } else if (bus.mfpTimerTouched) {
     warnings.push('this tune programs MFP timers, but no timer interrupt reached a handler that writes the YM');
   }
+  let dmaRes: DmaResult | undefined;
+  const dmaStarts = bus.dma.filter((e) => e.play).length;
+  if (dmaStarts) {
+    if (opt.dma !== false) {
+      dmaRes = dmaToDrums(bus.dma, cpu.mem, out, got, drums);
+      if (dmaRes.track) drums = dmaRes.track;
+      warnings.push(...dmaRes.warnings);
+    }
+  }
   const { nframes: n2, loopFrame } = detectLoop(out, got, drums?.trig, fx);
   out = out.slice(0, n2 * 14);
   if (drums) drums = { drums: drums.drums, trig: drums.trig.slice(0, n2) };
+  if (dmaStarts && !dmaRes?.track) {
+    info.dmaHits = bus.dma.filter((e) => e.play && e.frame < n2).length;
+    if (opt.dma === false) warnings.push(`STe DMA sound: ${info.dmaHits} sample start(s) left out`);
+  }
+  if (dmaRes?.track && drums) {
+    warnings.push(dmaReport(dmaRes, drums, n2));
+    const used = new Set<number>(); let hits = 0;
+    drums.trig.forEach((t) => { const i = t & 63; if (t && i !== 63 && i >= dmaRes!.first) { hits++; used.add(i); } });
+    info.dmaSamples = used.size; info.dmaHits = hits;
+  }
   if (fx) fx = fx.slice(0, n2);
   return {
     title: info.title, author: info.author, comment: [info.converter, info.ripper].filter(Boolean).join(' / '),

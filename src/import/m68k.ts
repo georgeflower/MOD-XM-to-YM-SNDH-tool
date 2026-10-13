@@ -19,6 +19,8 @@ export class M68k {
   sr_hi = 0x2000;          // system byte (always supervisor)
   usp = 0;
   mem = new Uint8Array(RAM_SIZE);
+  /** called for TRAP #n (the stack still holds the call's arguments) */
+  onTrap: ((n: number) => void) | null = null;
   stopped = false;
   instructions = 0;
   // effective address scratch
@@ -281,7 +283,7 @@ export class M68k {
 
   private group4(op: number) {
     const mode = (op >> 3) & 7, reg = op & 7;
-    if (op >= 0x4e40 && op <= 0x4e4f) return; // TRAP: ignored
+    if (op >= 0x4e40 && op <= 0x4e4f) { this.onTrap?.(op & 15); return; } // TRAP: only what the host hooks (GEMDOS memory calls), else ignored
     switch (op) {
       case 0x4afc: throw new Error('ILLEGAL instruction');
       case 0x4e70: return;                       // RESET

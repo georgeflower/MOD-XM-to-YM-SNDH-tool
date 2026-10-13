@@ -56,6 +56,7 @@ export function App() {
   const [tune, setTune] = useState<(AyTune & { info?: SndhInfo }) | null>(null);
   const [subtune, setSubtune] = useState(1);
   const [secOverride, setSecOverride] = useState(0);   // SNDH: 0 = use the TIME tag
+  const [dmaOn, setDmaOn] = useState(true);              // SNDH: play STe DMA samples as digidrums
   const [error, setError] = useState('');
   const [opts, setOpts] = useState<Opts>(DEFAULT_OPTS);
   const [prio, setPrio] = useState<Record<number, number>>({});
@@ -104,7 +105,7 @@ export function App() {
         return;
       }
       setError(''); setFileName(name); setBytes(data);
-      setPrio({}); setInstMap({}); setMacroSel(null); setOpts(DEFAULT_OPTS); setSubtune(1); setSecOverride(0);
+      setPrio({}); setInstMap({}); setMacroSel(null); setOpts(DEFAULT_OPTS); setSubtune(1); setSecOverride(0); setDmaOn(true);
       if (isSndh(data) || isYm(data)) {
         setMod(null); setRes(null);
         setBusy(isSndh(data) ? 'Running the SNDH in the 68000 emulator…' : 'Reading the YM file…');
@@ -130,12 +131,12 @@ export function App() {
     }
   }, []);
   /** re-run an SNDH with another subtune / length */
-  const rerunSndh = (sub: number, secs: number) => {
+  const rerunSndh = (sub: number, secs: number, dma = dmaOn) => {
     if (!bytes) return;
     setBusy('Running the SNDH in the 68000 emulator…');
     setTimeout(() => {
       try {
-        const t = parseSndh(bytes, { subtune: sub, seconds: secs || undefined });
+        const t = parseSndh(bytes, { subtune: sub, seconds: secs || undefined, dma });
         setTune(t); preview().setAy(renderYm(t.regs, t.nframes, 44100, 50, 4, t.drums, t.fx)); setPos(0);
       } catch (e) { setError(String((e as Error).message ?? e)); }
       setBusy('');
@@ -380,6 +381,13 @@ export function App() {
                       onChange={(e) => setSecOverride(Math.max(0, Math.min(1200, +e.target.value || 0)))}
                       onBlur={() => rerunSndh(subtune, secOverride)}
                       onKeyDown={(e) => { if (e.key === 'Enter') rerunSndh(subtune, secOverride); }} />
+                  </label>
+                )}
+                {tune.info && !!tune.info.dmaHits && (
+                  <label className="row" title="This tune plays 8-bit samples through the STe DMA sound chip, which a YM2149 register dump cannot carry. On: each sample becomes a 4-bit digidrum hit on voice C at the same frames (voice C is silent while it plays). Off: the samples are left out.">
+                    <span className="lbl">STe samples</span>
+                    <input type="checkbox" checked={dmaOn} onChange={(e) => { setDmaOn(e.target.checked); rerunSndh(subtune, secOverride, e.target.checked); }} />
+                    <span className="note soft"> play the {tune.info.dmaHits} DMA sample hit{tune.info.dmaHits === 1 ? '' : 's'} as digidrums</span>
                   </label>
                 )}
                 <label className="row"><span className="lbl">Composer</span>

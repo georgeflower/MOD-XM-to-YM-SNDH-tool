@@ -186,6 +186,7 @@ Details, tolerances and the known differences (first release tick, arpeggio-spee
 | Table lengths in instruments | 256 entries (arpeggio, pitch, volume tables); step tables up to 255 steps |
 | Instrument name | 22 characters in the editor; 24 for source-instrument names in the converter |
 | Digidrums | 63 per instrument, 16 000 bytes each; YM6: 32 in total |
+| STe DMA samples (SNDH) | become digidrums on voice C: mono or stereo (mixed down) 8-bit, played back at most 12.5 kHz and 16 000 bytes, shared with the 63 digidrum slots; no looped DMA, no volume or pan changes |
 | Timer effects | 48–20 000 Hz (sinus ≤ about 625 Hz); one drum and one effect at a time |
 | Undo | 200 steps |
 | maxYMiser | 32 instrument slots, 8 samples of 32 KB, sequences of 31 steps |

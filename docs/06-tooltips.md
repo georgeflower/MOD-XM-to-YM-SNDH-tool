@@ -14,6 +14,7 @@ Hover over any control for a tooltip. This chapter lists every one of them (gene
 | AY pattern editor | Edit a song as patterns for one YM2149 (FastTracker 2 style) |
 | Subtune | Which subtune of the SNDH file to run |
 | Seconds | 0 = use the length from the file's TIME tag |
+| STe samples | This tune plays 8-bit samples through the STe DMA sound chip, which a YM2149 register dump cannot carry. On: each sample becomes a 4-bit digidrum hit on voice C at the same frames (voice C is silent while it plays). Off: the samples are left out. |
 | Edit as AY patterns → | Turn this register dump into an editable pattern song: the tempo and notes are found, every sound becomes a step-table instrument, digidrums and Q/S/U effects come along |
 | Level | Overall loudness mapped onto the 16 YM volume steps |
 | Drum priority | How strongly kicks/snares/hats win a voice against melody notes |

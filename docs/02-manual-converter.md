@@ -146,6 +146,7 @@ Shown instead of *Module* when a `.sndh` or `.ym` is loaded.
 | Timer | (SNDH) VBL or Timer A–D and its rate; non-50 Hz tunes are resampled to 50 Hz. |
 | **Subtune** | (SNDH with several subtunes.) Choose which one to run. |
 | **Seconds** | Length to run the emulator for; 0 = use the file's `TIME` tag. |
+| **STe samples** | (SNDH that plays samples through the STe DMA sound chip.) On: every sample hit becomes a 4-bit digidrum on voice C at the same frame, and voice C is silent while it plays. Off: the samples are left out. The checkbox shows how many hits were found. |
 | **Composer** | Written to the exports (and to the song, if you open it as patterns). |
 | **Edit as AY patterns →** | Turns the tune into an editable pattern song in the AY pattern editor tab. The report of what was found (tempo, notes, instruments, drums, effects) opens above the song bar. For an SNDH the subtune and length currently shown are used. |
 
