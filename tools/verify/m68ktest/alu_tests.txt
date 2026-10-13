@@ -1,0 +1,250 @@
+0 add.b
+1 sub.b
+2 and.b
+3 or.b
+4 cmp.b
+5 eor.b
+6 addx.b
+7 subx.b
+8 neg.b
+9 negx.b
+10 not.b
+11 clr.b
+12 tst.b
+13 addq.b #1
+14 addq.b #3
+15 addq.b #8
+16 subq.b #1
+17 subq.b #3
+18 subq.b #8
+19 addi.b imm
+20 subi.b imm
+21 andi.b imm
+22 ori.b imm
+23 eori.b imm
+24 cmpi.b imm
+25 asl.b #1
+26 asl.b #2
+27 asl.b #8
+28 asl.b dn
+29 asr.b #1
+30 asr.b #2
+31 asr.b #8
+32 asr.b dn
+33 lsl.b #1
+34 lsl.b #2
+35 lsl.b #8
+36 lsl.b dn
+37 lsr.b #1
+38 lsr.b #2
+39 lsr.b #8
+40 lsr.b dn
+41 rol.b #1
+42 rol.b #2
+43 rol.b #8
+44 rol.b dn
+45 ror.b #1
+46 ror.b #2
+47 ror.b #8
+48 ror.b dn
+49 roxl.b #1
+50 roxl.b #2
+51 roxl.b #8
+52 roxl.b dn
+53 roxr.b #1
+54 roxr.b #2
+55 roxr.b #8
+56 roxr.b dn
+57 add.w
+58 sub.w
+59 and.w
+60 or.w
+61 cmp.w
+62 eor.w
+63 addx.w
+64 subx.w
+65 neg.w
+66 negx.w
+67 not.w
+68 clr.w
+69 tst.w
+70 addq.w #1
+71 addq.w #3
+72 addq.w #8
+73 subq.w #1
+74 subq.w #3
+75 subq.w #8
+76 addi.w imm
+77 subi.w imm
+78 andi.w imm
+79 ori.w imm
+80 eori.w imm
+81 cmpi.w imm
+82 asl.w #1
+83 asl.w #2
+84 asl.w #8
+85 asl.w dn
+86 asr.w #1
+87 asr.w #2
+88 asr.w #8
+89 asr.w dn
+90 lsl.w #1
+91 lsl.w #2
+92 lsl.w #8
+93 lsl.w dn
+94 lsr.w #1
+95 lsr.w #2
+96 lsr.w #8
+97 lsr.w dn
+98 rol.w #1
+99 rol.w #2
+100 rol.w #8
+101 rol.w dn
+102 ror.w #1
+103 ror.w #2
+104 ror.w #8
+105 ror.w dn
+106 roxl.w #1
+107 roxl.w #2
+108 roxl.w #8
+109 roxl.w dn
+110 roxr.w #1
+111 roxr.w #2
+112 roxr.w #8
+113 roxr.w dn
+114 add.l
+115 sub.l
+116 and.l
+117 or.l
+118 cmp.l
+119 eor.l
+120 addx.l
+121 subx.l
+122 neg.l
+123 negx.l
+124 not.l
+125 clr.l
+126 tst.l
+127 addq.l #1
+128 addq.l #3
+129 addq.l #8
+130 subq.l #1
+131 subq.l #3
+132 subq.l #8
+133 addi.l imm
+134 subi.l imm
+135 andi.l imm
+136 ori.l imm
+137 eori.l imm
+138 cmpi.l imm
+139 asl.l #1
+140 asl.l #2
+141 asl.l #8
+142 asl.l dn
+143 asr.l #1
+144 asr.l #2
+145 asr.l #8
+146 asr.l dn
+147 lsl.l #1
+148 lsl.l #2
+149 lsl.l #8
+150 lsl.l dn
+151 lsr.l #1
+152 lsr.l #2
+153 lsr.l #8
+154 lsr.l dn
+155 rol.l #1
+156 rol.l #2
+157 rol.l #8
+158 rol.l dn
+159 ror.l #1
+160 ror.l #2
+161 ror.l #8
+162 ror.l dn
+163 roxl.l #1
+164 roxl.l #2
+165 roxl.l #8
+166 roxl.l dn
+167 roxr.l #1
+168 roxr.l #2
+169 roxr.l #8
+170 roxr.l dn
+171 ext.w
+172 ext.l
+173 swap
+174 mulu.w
+175 muls.w
+176 divu.w
+177 divs.w
+178 btst dn,dn
+179 btst #n,dn
+180 bchg dn,dn
+181 bchg #n,dn
+182 bclr dn,dn
+183 bclr #n,dn
+184 bset dn,dn
+185 bset #n,dn
+186 abcd
+187 sbcd
+188 nbcd
+189 tas
+190 exg
+191 st
+192 dbt
+193 sf
+194 dbf
+195 shi
+196 dbhi
+197 sls
+198 dbls
+199 scc
+200 dbcc
+201 scs
+202 dbcs
+203 sne
+204 dbne
+205 seq
+206 dbeq
+207 svc
+208 dbvc
+209 svs
+210 dbvs
+211 spl
+212 dbpl
+213 smi
+214 dbmi
+215 sge
+216 dbge
+217 slt
+218 dblt
+219 sgt
+220 dbgt
+221 sle
+222 dble
+223 movea.w/adda
+224 suba.l/cmpa
+225 movep.w
+226 movep.l
+227 move.b d,d
+228 move.w d,d
+229 move.l d,d
+230 moveq
+231 mem add.w
+232 mem sub.l
+233 mem asl.w
+234 mem lsr.w
+235 mem roxl.w
+236 mem ror.w
+237 mem bset.b
+238 mem not.b/neg.w
+239 mem clr.l/tst
+240 predec/postinc
+241 movem w
+242 movem l pre/post
+243 idx
+244 link/unlk
+245 pea/lea
+246 jsr/rts
+247 ccr ops
+248 sp byte
+249 cmpm
