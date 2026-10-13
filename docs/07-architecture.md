@@ -54,7 +54,8 @@ src/arkos       song ↔ Arkos Tracker 3 (.aks)
 src/furnace     song → Furnace (.fur)
 src/import      SNDH import: 68000 emulator (m68k.ts), MFP timers (mfp.ts), timer-effect classifier (sndhfx.ts),
                 ICE / LHA depackers, YM reader, ZIP reader
-src/tracker     pattern-song model, renderer (render.ts), module → patterns (fromModule.ts), editor store (editor.ts),
+src/tracker     pattern-song model, renderer (render.ts), module → patterns (fromModule.ts), register dump → patterns
+                (fromRegs.ts), editor store (editor.ts),
                 .ymt reader/writer, presets, key map, status-line hints
 src/ui          React UI: App (converter), Tracker, ImportDialog, InstrumentEditor, DrumEditor, AyRoll, audio.ts
 public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of the A/B switch
@@ -95,6 +96,19 @@ scripts         command-line tools and checks; tools/ holds the external oracles
 ## SNDH import {#architecture-sndh-import}
 
 `src/import/sndh.ts` runs the tune in a built-in Motorola 68000 interpreter (`m68k.ts`, 4 MB RAM, I/O page at `$FF8000`): it loads the file (ICE!-depacked if needed) at a base address, calls the init routine for the chosen subtune, then calls the play routine at the tune's own rate (VBL or Timer A–D) and records the YM registers once per frame. The MFP model (`mfp.ts`) runs timer interrupts in virtual time; every YM write made inside an interrupt is logged with a timestamp, and `sndhfx.ts` classifies the log into digidrums and timer effects (see the table in [How-to: load SNDH](#howto-load-sndh)). The interpreter was checked against the Musashi core in psgplay.
+
+## Register dump to patterns {#architecture-fromregs}
+
+`src/tracker/fromRegs.ts` (`regsToSong`) is the inverse of the renderer for `.sndh` / `.ym` input. It never invents structure that is not in the dump; every note records what the chip did, so re-rendering the song reproduces the dump.
+
+1. **Per-frame voice state:** audible, volume, envelope flag, tone, noise, period, sync bit. A voice owned by a digidrum keeps its previous state while the sample plays.
+2. **Note starts:** a voice becoming audible after at least two silent frames (or after one with a pitch or level change), a volume jump of 4 or more, a switch to the envelope or an envelope shape rewrite, a pitch step to a new value that holds for three frames after the old one held for two (a single-frame excursion is an arpeggio, not a note), and the sync-square bit. Digidrum hits are added for the tempo search.
+3. **Tempo:** the largest frames-per-row S (2…16) for which at least 97 % (then 92 %, then 85 %) of the starts lie within a tolerance of one row grid (0 frames for S ≤ 3, 1 for S = 4…5, 2 for S ≥ 6), with the phase that fits most. No fit → S = 1. Frames before the first grid frame become a short first row.
+4. **Segments:** a note lasts from its start row to the next start of that voice. Frames are written as steps: level, pitch relative to the note in semitones (snapped to the tune's global tuning offset plus 1, ½, ¼, 0.1 or 0.01), noise period, tone flag, plain flag. A loudness shift is moved into the volume column (`velocity` instruments). A periodic tail (period ≤ 32 steps) becomes the loop; a loop that ends at a row boundary gets a `===` there.
+5. **Instruments:** segments are sorted by length; a segment reuses an existing instrument if that instrument reproduces all its frames (a prefix match, so a note cut short by the next one shares the long instrument). Buzzers get the envelope shape and either the automatic period with an integer divisor (when the observed period is within 1.5 % of a multiple) or a fixed period. More than 255 instruments are reduced by repeatedly merging the pair with the lowest cost, summed over all notes.
+6. **Side tracks:** drum triggers go to the drum column (note = drum number, `===` for a stop), timer effects to `Q` / `S` / `U` by the first frame of each row in which the effect runs. The loop frame becomes `restartPos`. Patterns are 64 rows; identical patterns are shared.
+
+Limits: 60 000 frames and 12 000 note starts (a dump that is not music, such as a sample played through the volume register, is cut there), 255 instruments, 255 patterns for `.ymt`.
 
 ## Exporters {#architecture-exporters}
 

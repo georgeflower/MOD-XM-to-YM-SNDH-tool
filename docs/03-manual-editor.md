@@ -14,7 +14,7 @@ The **AY pattern editor** tab is a FastTracker 2-style editor for **one YM2149**
 | **Export** | SNDH, YM, game kit, maxYMiser, Arkos, Furnace, instrument `.myi`, WAV, registers. A list of warnings appears under the buttons when something cannot be exported exactly. |
 | **Keyboard reference** | A collapsible list of all keys (also in [Tooltips and keys](#tooltips)). |
 
-When you arrive from the Converter, a collapsed *Converted from … — report* panel above the song bar lists what was done.
+When you arrive from the Converter, or load an SNDH/YM here, a collapsed *Import report* panel above the song bar lists what was done.
 
 ## Song bar {#manual-editor-bar}
 
@@ -22,6 +22,7 @@ When you arrive from the Converter, a collapsed *Converted from … — report* 
 |---|---|
 | **New** | Empty song (asks first if there are unsaved changes). |
 | **Load .ymt…** | Opens a YM Tracker song. |
+| **Load .sndh/.ym…** | Turns an SNDH (subtune 1) or YM register dump into editable patterns, as *Edit as AY patterns →* does on the Converter page. See [Edit an existing SNDH or YM tune](#howto-edit-tune). |
 | **Load maxYMiser…** | Opens a `.mys` (select its `.myv` voice bank at the same time) or a single `.myi` instrument. |
 | **Load Arkos…** | Opens an Arkos Tracker 3 `.aks` song (Arkos Tracker 2 files are rejected with a message). |
 | **Save .ymt** (Ctrl+S) | Saves the song as a gzip-compressed `.ymt`. |

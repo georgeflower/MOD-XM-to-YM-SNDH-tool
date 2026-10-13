@@ -192,6 +192,7 @@ Details, tolerances and the known differences (first release tick, arpeggio-spee
 | Arkos | notes C-1…B-8, one PSG |
 | Furnace | one chip, 3 channels; a vibrato cycle over 254 ticks is cut |
 | Render length | 20 minutes |
+| SNDH / YM → patterns | 60 000 frames, 12 000 note starts, 255 instruments (more are merged), tables up to 2 000 steps (the editor's own *add step* stops at 255) |
 
 ## Scenarios {#specs-scenarios}
 
@@ -205,6 +206,7 @@ What each way of using the tool produces:
 | **D. Edit as AY patterns** | *Edit as AY patterns →* | `moduleToSong`: pattern song with step-table instruments, drum column if the module has percussion, names and priorities applied; renderer produces the same dump. |
 | **E. Hand-written song** | New → editor | Renderer only; all effects including `Q S U Z` available. |
 | **F. Import SNDH / YM** | Load `.sndh` / `.ym` | No conversion: the dump is the music (SNDH is emulated); drums and effects are classified from MFP writes; exports re-pack the dump. |
+| **F2. Edit an SNDH / YM** | *Edit as AY patterns →* on a loaded tune | `regsToSong`: tempo and note starts are detected, every sound becomes a step-table instrument, drums go to the drum column and timer effects to `Q S U`; the renderer reproduces the dump to within a few percent of the frames. |
 | **G. Round trip to other trackers** | Editor → maxYMiser / Arkos / Furnace | Song-level export with instrument baking; maxYMiser and Arkos can be loaded back. |
 | **H. Game integration** | Converter or editor → *Game kit (.zip)* | Header + replayer; the game calls `ymplay_step()` / `ymplay_write()` every 50 Hz tick. |
 | **I. Offline / file://** | Open `index.html` from disk | Everything works except the *Original* A/B side (needs http(s)). |

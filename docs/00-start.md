@@ -11,7 +11,7 @@ Everything runs in your browser. There is no server and nothing is uploaded.
 | Tab | What it is for |
 |---|---|
 | **Converter** | Load a module, let the tool convert it automatically, listen to the original and the YM version side by side, tune the conversion (priorities, instrument roles, options) and export. |
-| **AY pattern editor** | Edit the song as patterns for the three YM voices, with your own instruments, digidrums and timer effects. Reached with *Edit as AY patterns →*, *New*, or by loading a `.ymt`, maxYMiser or Arkos file. |
+| **AY pattern editor** | Edit the song as patterns for the three YM voices, with your own instruments, digidrums and timer effects. Reached with *Edit as AY patterns →* (for a module, an `.sndh` or a `.ym`), *New*, or by loading a `.ymt`, `.sndh`, `.ym`, maxYMiser or Arkos file. |
 
 ## Ten-minute quick start
 
@@ -20,7 +20,7 @@ Everything runs in your browser. There is no server and nothing is uploaded.
 3. If the melody gets lost, open **Manual import…**, give the melody channel the priority **Lead**, press **▶ Full preview**, and listen. See [Manual import](#howto-manual-import).
 4. If a drum sounds thin, set the instrument's **AY role** to *digidrum (sample)* (or tick *Percussion as digidrums*).
 5. Choose an export: **SNDH** plays in any Atari ST player; **YM** plays in ST-Sound and similar players.
-6. To keep working on the song by hand, press **Edit as AY patterns →**.
+6. To keep working on the song by hand, press **Edit as AY patterns →**. This works for a loaded `.sndh` or `.ym` as well: the tune is turned back into notes and instruments (see [Edit an existing SNDH or YM tune](#howto-edit-tune)).
 
 ## What's new in 0.3
 

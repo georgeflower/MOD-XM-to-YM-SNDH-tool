@@ -81,6 +81,12 @@ parameter), same effect letters, same `.ymt` song files in both directions.
 * **Start** from scratch (*New*), load a `.ymt`, or press **Edit as AY patterns →** in the converter: the module is turned into
   patterns with row-level voice allocation, step-table instruments, arpeggios folded into `0xy`, `Fxx` speed changes for exact
   row timing and slides/vibrato translated by pitch ratio. The conversion report is kept above the editor.
+* **Edit an `.sndh` or `.ym`**: *Edit as AY patterns →* in the *Loaded tune* panel (or *Load .sndh/.ym…* in the editor) works the
+  notes out of the register dump again — the tempo (frames per row) and the note starts are detected, what each voice did becomes
+  a step-table instrument (volume, relative pitch, noise, tone, buzzer; loud and soft versions of a sound share one instrument),
+  digidrums go to the drum channel and SID / sinus-SID / sync-buzzer effects to `Q` `S` `U`. Re-rendering the song reproduces the
+  dump to within a few percent of the frames (`src/tracker/fromRegs.ts`, tests in `tests/from-regs.test.ts`). Arpeggios, vibrato
+  and slides end up inside the step tables, since a dump cannot tell them from notes.
 * **Keys** are the FT2 / YM Tracker ones. Notes `Z S X D C V G B H N J M , L .` and `Q 2 W 3 E R 5 T 6 Y 7 U I 9 O`, `F1–F8`
   octave, `Space` stop / toggle Edit, `Right Ctrl` play song, `Right Alt` play pattern, `Right Shift` record pattern,
   `Caps Lock` or `1` note off, `` ` `` / `§` cycles the Add step, `Shift+←/→` song position, `Ctrl+←/→` pattern number,
@@ -296,7 +302,7 @@ src/export      stream packer, YM5/YM6, SNDH, game kit, C header + replayer, YM 
 src/player68k   68000 SNDH player + digidrum / timer-effect engine (player.s, drumeng.s, gamedrum.s → blob.ts)
 src/maxymiser   maxYMiser .MYS/.MYV/.MYI codec and the song -> maxYMiser converter
 src/arkos       song -> Arkos Tracker 3 (.aks)      src/furnace   song -> Furnace (.fur)      src/export/bake.ts  instrument baking shared by both
-src/tracker     pattern song model, renderer (tick player), module -> patterns, editor store, .ymt IO
+src/tracker     pattern song model, renderer (tick player), module -> patterns, register dump -> patterns (fromRegs), editor store, .ymt IO
 src/ui          React UI (FT2-flavoured skin), converter tab, pattern editor tab, A/B audio
 docs            documentation sources (Markdown; docs/06-tooltips.md is generated from the UI by scripts/build-docs.ts)
 public/docs     the generated Help page

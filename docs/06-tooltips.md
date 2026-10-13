@@ -14,6 +14,7 @@ Hover over any control for a tooltip. This chapter lists every one of them (gene
 | AY pattern editor | Edit a song as patterns for one YM2149 (FastTracker 2 style) |
 | Subtune | Which subtune of the SNDH file to run |
 | Seconds | 0 = use the length from the file's TIME tag |
+| Edit as AY patterns → | Turn this register dump into an editable pattern song: the tempo and notes are found, every sound becomes a step-table instrument, digidrums and Q/S/U effects come along |
 | Level | Overall loudness mapped onto the 16 YM volume steps |
 | Drum priority | How strongly kicks/snares/hats win a voice against melody notes |
 | Voice stickiness | Higher = a note stays on the same YM voice (less jumping, fewer clicks) |
@@ -73,6 +74,7 @@ Hover over any control for a tooltip. This chapter lists every one of them (gene
 | New | Start an empty song |
 | Load .ymt… | Open a YM Tracker song (.ymt) |
 | Load maxYMiser… | maxYMiser song (.mys, with its .myv voice bank selected too) or a single instrument (.myi) |
+| Load .sndh/.ym… | Turn an .sndh or .ym register dump into editable patterns (subtune 1 of an SNDH; use the converter page to pick another subtune) |
 | Load Arkos… | Arkos Tracker 3 song (.aks) |
 | Save .ymt | Save the song as a .ymt file (Ctrl+S) |
 | Undo | Undo the last change (Ctrl+Z) |

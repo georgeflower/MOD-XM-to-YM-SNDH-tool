@@ -50,6 +50,8 @@ Example: a *Lead* note at volume 7 scores 15, the same as a *Normal* note at ful
 
 *Edit as AY patterns* uses the same priorities and roles you set in the Converter. The converter is a *rendering* of the module; the pattern song is an *editable approximation* of it, with row-level voice allocation and step-table instruments, and all editor effects available.
 
+A loaded `.sndh` or `.ym` can be opened the same way. Its register dump has no notes in it, so the tool works them out again: it finds the tempo, the note starts and the sound of every note, and writes them as patterns whose step-table instruments reproduce what the chip did (see [Edit an existing SNDH or YM tune](#howto-edit-tune)).
+
 ## Instruments in the editor {#concepts-instruments}
 
 The editor has two kinds of instrument:

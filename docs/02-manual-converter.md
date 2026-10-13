@@ -14,7 +14,7 @@ The **Converter** tab is where a module (or an existing SNDH/YM tune) is loaded,
 What happens after loading depends on the file type:
 
 * **MOD / XM** — converted automatically with default settings. The *Module*, *Conversion*, *Export*, *Preview*, *Instruments*, *Source channels* and *Report* panels appear.
-* **SNDH / YM** — not converted, only *played*: a `.ym` is read as the register dump it is, a `.sndh` is run in a built-in 68000 emulator. You get the *Loaded tune* panel, the preview and the exports. See [Loading SNDH and YM](#howto-load-sndh).
+* **SNDH / YM** — not converted, only *played*: a `.ym` is read as the register dump it is, a `.sndh` is run in a built-in 68000 emulator. You get the *Loaded tune* panel, the preview and the exports. To change the music, press **Edit as AY patterns →** in the *Loaded tune* panel. See [Loading SNDH and YM](#howto-load-sndh) and [Edit an existing SNDH or YM tune](#howto-edit-tune).
 * **YMT** — opens in the AY pattern editor.
 
 ## Module panel {#manual-module}
@@ -146,7 +146,8 @@ Shown instead of *Module* when a `.sndh` or `.ym` is loaded.
 | Timer | (SNDH) VBL or Timer A–D and its rate; non-50 Hz tunes are resampled to 50 Hz. |
 | **Subtune** | (SNDH with several subtunes.) Choose which one to run. |
 | **Seconds** | Length to run the emulator for; 0 = use the file's `TIME` tag. |
-| **Composer** | Written to the exports. |
+| **Composer** | Written to the exports (and to the song, if you open it as patterns). |
+| **Edit as AY patterns →** | Turns the tune into an editable pattern song in the AY pattern editor tab. The report of what was found (tempo, notes, instruments, drums, effects) opens above the song bar. For an SNDH the subtune and length currently shown are used. |
 
 ## Conversion report {#manual-report}
 

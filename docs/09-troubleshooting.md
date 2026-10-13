@@ -26,6 +26,19 @@
 | The buzzer bass never appears | The buzzer is used only for loud notes (level ≥ 12) at low pitch (envelope period ≥ 32, up to about 240 Hz for a saw), one voice at a time. Raise **Level**, or force *saw buzzer* on that instrument. |
 | Everything sounds a bit "dull" or "buzzy" | That is the chip: 3 voices, square waves, 16 volume steps. Use the editor to write a more idiomatic version. |
 
+## Edit as AY patterns from an SNDH or YM {#troubleshooting-fromregs}
+
+| Problem | Cause and fix |
+|---|---|
+| There is no **Edit as AY patterns** button | Load the file first: the button is in the *Loaded tune* panel (below the Composer field), or use **Load .sndh/.ym…** in the pattern editor. |
+| One frame per row; patterns are very long | The tune has no regular tempo that the note starts agree with (the report says *no regular tempo found*), for example because of swing, frequent speed changes or a play rate that is not 50 Hz. The result is still accurate; shorten the work with **Repeat** / **Clone pat**, or re-time it by hand. |
+| The notes are all there but there are no arpeggios or vibrato effects | The register dump only says what the voice did, so these are inside the step-table instruments. Open the instrument (double-click) to change them. |
+| Instruments are called *Tone 0A*, *Buzzer 12* | They are named by what they do. Rename them in the instrument editor. |
+| *distinct sounds do not fit in 255 instruments* | The most similar ones were merged. If the difference matters, import fewer subtunes or shorter sections, or fix the affected notes by hand. |
+| A drum plays on the wrong voice | The drum column always plays on voice C. The report says how many hits were moved. |
+| The first notes are late or a *no free effect slot* warning | A tune that starts a few frames before its first row needs `F` speed effects on rows 0 and 1; they were not possible because every channel already had an effect there. Move the effect and add the `F` cells by hand. |
+| The editor sounds slightly different from the original | Pitches are snapped within about 7 cents and merged instruments differ by a level step. For an exact copy use the Converter tab: the original dump is exported untouched. |
+
 ## Pattern editor {#troubleshooting-editor}
 
 | Problem | Cause and fix |

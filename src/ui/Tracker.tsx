@@ -16,6 +16,9 @@ import { songToMaxymiser, instrumentToMyi } from '../maxymiser/convert';
 import { maxymiserToSong, myiToInstrument } from '../maxymiser/import';
 import { songToAks, aksFile } from '../arkos/aks';
 import { aksToSong } from '../arkos/import';
+import { parseYm, isYm } from '../import/ym';
+import { parseSndh, isSndh } from '../import/sndh';
+import { regsToSong } from '../tracker/fromRegs';
 import { songToFur, furName } from '../furnace/fur';
 import { download } from './download';
 import { NumField, TextField } from './fields';
@@ -66,7 +69,7 @@ const Row = memo(function Row({ r, cells, cur, col, editing, s1, s2, play, hl }:
 
 type Dialog = null | { kind: 'scale'; scope: Scope } | { kind: 'transpose' } | { kind: 'echo' };
 
-export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; onError: (m: string) => void }) {
+export function Tracker({ ed, active, onError, onReport }: { ed: Editor; active: boolean; onError: (m: string) => void; onReport?: (lines: string[]) => void }) {
   const ver = useSyncExternalStore(ed.subscribe, ed.getVersion);
   const [secs, setSecs] = useState(0);
   const [warns, setWarns] = useState<string[]>([]);
@@ -253,14 +256,26 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
     try {
       const b = new Uint8Array(await f.arrayBuffer());
       if (!isYmt(b)) throw new Error(`${f.name} is not a .ymt song file`);
-      ed.loadSong(await decodeYmt(b), f.name);
+      ed.loadSong(await decodeYmt(b), f.name); onReport?.([]);
     } catch (e) { onError(String((e as Error).message ?? e)); }
   };
   /** Arkos Tracker 3 song (.aks) */
   const loadAks = async (f: File) => {
     try {
       const r = await aksToSong(new Uint8Array(await f.arrayBuffer()), f.name);
+      ed.loadSong(r.song, f.name); onReport?.([]);
+      if (r.warnings.length) onError(r.warnings.join('; '));
+    } catch (e) { onError(String((e as Error).message ?? e)); }
+  };
+  /** .sndh / .ym register dump: the tempo and notes are worked out again and written as patterns */
+  const loadDump = async (f: File) => {
+    try {
+      const b = new Uint8Array(await f.arrayBuffer());
+      const t = isSndh(b) ? parseSndh(b, { subtune: 1 }) : isYm(b) ? parseYm(b) : null;
+      if (!t) throw new Error(`${f.name} is not an .sndh or .ym file`);
+      const r = regsToSong(t);
       ed.loadSong(r.song, f.name);
+      onReport?.([...r.report, ...r.warnings.map((w) => 'warning: ' + w)]);
       if (r.warnings.length) onError(r.warnings.join('; '));
     } catch (e) { onError(String((e as Error).message ?? e)); }
   };
@@ -272,7 +287,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
       const mys = files.find((f) => ext(f) === 'mys'), myv = files.find((f) => ext(f) === 'myv'), myi = files.find((f) => ext(f) === 'myi');
       if (mys) {
         const r = maxymiserToSong(await bytes(mys), myv ? await bytes(myv) : null, mys.name);
-        ed.loadSong(r.song, mys.name);
+        ed.loadSong(r.song, mys.name); onReport?.([]);
         if (r.warnings.length) onError(r.warnings.join('; '));
       } else if (myi) {
         const r = myiToInstrument(await bytes(myi));
@@ -363,6 +378,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
           <button title="Start an empty song" className="btn" onClick={() => { if (!ed.dirty || confirm('Discard the current song?')) ed.newSong(); }}>New</button>
           <label title="Open a YM Tracker song (.ymt)" className="btn">Load .ymt…<input type="file" accept=".ymt,.YMT" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadYmt(f); e.target.value = ''; }} /></label>
           <label className="btn" title="maxYMiser song (.mys, with its .myv voice bank selected too) or a single instrument (.myi)">Load maxYMiser…<input type="file" multiple accept=".mys,.MYS,.myv,.MYV,.myi,.MYI" hidden onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) void loadMaxymiser(fs); e.target.value = ''; }} /></label>
+          <label className="btn" title="Turn an .sndh or .ym register dump into editable patterns (subtune 1 of an SNDH; use the converter page to pick another subtune)">Load .sndh/.ym…<input type="file" accept=".sndh,.snd,.ym,.SNDH,.SND,.YM" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadDump(f); e.target.value = ''; }} /></label>
           <label className="btn" title="Arkos Tracker 3 song (.aks)">Load Arkos…<input type="file" accept=".aks,.AKS" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadAks(f); e.target.value = ''; }} /></label>
           <button className="btn" onClick={() => void saveYmt()} title="Save the song as a .ymt file (Ctrl+S)">Save .ymt</button>
           <span className="sep" />

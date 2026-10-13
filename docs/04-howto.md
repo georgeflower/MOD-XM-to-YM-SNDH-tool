@@ -83,7 +83,7 @@ Digidrums need a timer interrupt: they work in SNDH, YM6, the game kit and maxYM
 
 1. Press **Edit as AY patterns →** (in the Conversion panel or in the manual import dialog).
 2. The module becomes an editable song: patterns with row-level voice allocation, one step-table instrument per module instrument, arpeggios folded into `0xy`, `Fxx` speed changes for exact row timing, slides and vibrato translated into `1xx`/`2xx`/`4xy`. If the module has percussion, a **drum channel** (fourth column) and a *Digidrums* bank instrument are added.
-3. The conversion report is kept in a collapsed panel above the song bar.
+3. The conversion report is kept in a collapsed *Import report* panel above the song bar.
 4. Press **Space** to start edit mode and **Right Ctrl** to play the song.
 5. Save with **Ctrl+S** as `.ymt` to keep the song for later.
 
@@ -156,18 +156,40 @@ Timer effects work in SNDH, YM6, game kit, WAV and maxYMiser exports. They need 
 6. Add patterns with **New pat**, **Clone pat**, **Repeat**. Set the loop point with **Loop here**.
 7. Save with **Ctrl+S**.
 
+## Edit an existing SNDH or YM tune {#howto-edit-tune}
+
+An `.sndh` or `.ym` file is a recording of what the chip did, 50 times a second. It holds no notes, instruments or patterns, so the tool works them out again.
+
+1. Load the file (**Load MOD / XM / SNDH / YM / YMT…**, or drop it on the page). For an SNDH with several subtunes, choose the **Subtune** (and, if the length is wrong, **Seconds**) first.
+2. Press **Edit as AY patterns →** in the *Loaded tune* panel. In the pattern editor you can also press **Load .sndh/.ym…**, which takes subtune 1.
+3. The *Import report* above the song bar says what was found, for example *YM import: 3840 frames -> 481 rows at 8 frames per row … 870 notes -> 255 step-table instruments*.
+4. Press **Space**, then **Right Ctrl** to play it, and compare with the original (Converter tab, preview).
+5. Edit as for any song: change notes, replace an instrument, add drums, then save with **Ctrl+S** as `.ymt` or export.
+
+What you get, and what to expect:
+
+* **Tempo.** The rows run at the tune's own speed (frames per row), found from where the notes start. If a tune has no regular tempo the song runs at one frame per row (speed 1): everything is still there, but patterns are long and notes are hard to read. A tune that begins a few frames before its first full row gets a short first row (an `Fxx` speed change on row 0 and row 1).
+* **Notes and instruments.** Every note start becomes a note. What the voice did until the next note (volume, pitch relative to the note, noise, tone, hardware envelope) is written as a **step-table instrument** named *Tone*, *Noise*, *Tone+noise* or *Buzzer* plus a number. Notes that sounded the same share an instrument, and notes that differ only in loudness share one too (the loudness goes to the volume column). Held notes loop their tail and end with `===`. Arpeggios, vibrato and slides are inside the step tables, not in `0xy` / `4xy` / `1xx` columns, because the register dump has no way to tell them apart from notes. Edit the step table to change them, or replace the instrument.
+* **Tuning.** Tunes that were converted from samples are often slightly off A = 440 Hz. The tune's overall offset is added to every step, so semitone values such as `-0.2` or `2.8` are normal in imported instruments. Pitches are snapped to clean values when the difference is under 0.4 % (about 7 cents).
+* **Digidrums** of a YM5/YM6 file or an SNDH become a bank on a **Drum** channel (note = drum number). A drum that played on voice A or B is moved to voice C, which is where the drum channel plays; the report counts them.
+* **Timer effects** (SID voice, sinus-SID, sync-buzzer) become `Q`, `S` and `U` on the voice's note, repeated after every new note on that voice.
+* **Loop.** The tune's loop frame becomes the order position the song restarts at.
+* **Too many sounds.** There are 255 instrument slots. If a tune has more distinct sounds, the most similar ones are merged and the report says how many and how large the difference is. A note that plays the wrong instrument sounds slightly different (a volume step or a fraction of a semitone), not wrong.
+* **Check by ear.** The editor plays the same registers as the original to within a few percent of the frames (a few frames differ at merged instruments and where the tune does something the editor's voice model cannot, such as changing the buzzer period during a note).
+
 ## Load SNDH and YM files {#howto-load-sndh}
 
 * **SNDH** (`.sndh`, `.snd`, also ICE!-packed): the file is *run* in a built-in 68000 emulator and the chip writes are captured at 50 Hz. Use **Subtune** to pick one, **Seconds** to set the length (0 = use the TIME tag). Tunes whose player never returns or waits for hardware that is not emulated report *did not return*.
 * **YM** (`.ym`: YM2!, YM3!, YM3b!, YM5!, YM6!, LHA-packed): read as the register dump it is. YM5/YM6 digidrums and YM6 timer effects are imported with their samples.
-* You get the piano roll, the YM preview and the exports SNDH / YM5 / game kit / WAV / regs. SNDH timer-interrupt effects are recognised and classified (digidrum, Q, S, U); one drum and one effect at a time, so overlapping ones keep the first and the import says how many it dropped.
+* You get the piano roll, the YM preview and the exports SNDH / YM5 / game kit / WAV / regs, and **Edit as AY patterns →** to turn the tune into patterns ([Edit an existing SNDH or YM tune](#howto-edit-tune)). SNDH timer-interrupt effects are recognised and classified (digidrum, Q, S, U); one drum and one effect at a time, so overlapping ones keep the first and the import says how many it dropped.
 
 ## Load maxYMiser, Arkos and `.ymt` files {#howto-load-other}
 
 All three are in the **AY pattern editor** tab:
 
 * **Load .ymt…** — YM Tracker songs. Step tables written by this tool are kept; the YM Tracker ignores them (it shows plain default instruments).
-* **Load maxYMiser…** — select the `.mys` song **and** its `.myv` voice bank in the same dialog (Ctrl/Shift-click), or a single `.myi` instrument. Instruments are played tick by tick into step tables.
+* **Load .sndh/.ym…** — turns a register dump into patterns ([Edit an existing SNDH or YM tune](#howto-edit-tune)).
+* **Load maxYMiser…** — select the `.mys` song **and** its `.myv` voice bank in the same dialog (Ctrl/Shift-click): the song loads as patterns and all its instruments come in as step-table instruments. A single `.myi` instrument replaces the instrument that is selected in the instrument list (select the slot first; **Ctrl+Z** undoes it). A `.myv` on its own cannot be loaded, and if a `.mys` and a `.myi` are picked together only the song is loaded. What cannot be carried over (the STe DMA track, some effects) is listed in the red message under the song bar.
 * **Load Arkos…** — an Arkos Tracker 3 `.aks`. Arkos Tracker 2 files are rejected with a message. After loading, the warnings list what was not imported (sample instruments, notes outside C-1…B-8, mid-note arpeggio/pitch-table changes, extra PSGs).
 
 ## Export {#howto-export}

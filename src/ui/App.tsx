@@ -19,6 +19,7 @@ import type { AyTune } from '../import/tune';
 import { Preview, type Source } from './audio';
 import { Editor } from '../tracker/editor';
 import { moduleToSong } from '../tracker/fromModule';
+import { regsToSong } from '../tracker/fromRegs';
 import { decodeYmt, isYmt } from '../tracker/ymt';
 import { Tracker } from './Tracker';
 import { download } from './download';
@@ -244,6 +245,25 @@ export function App() {
     }, 30);
   };
 
+  /** .sndh / .ym register dump -> editable pattern song */
+  const tuneToPatterns = () => {
+    if (!tune) return;
+    const e = getEd();
+    if (e.dirty && !confirm('Replace the song that is open in the pattern editor?')) return;
+    preview().stop(); setPlaying(false);
+    setBusy('Turning the register dump into patterns…');
+    setTimeout(() => {
+      try {
+        const r = regsToSong(tune);
+        if (author.trim()) r.song.author = author.trim();
+        e.loadSong(r.song, fileName);
+        setSongReport([...r.report, ...r.warnings.map((w) => 'warning: ' + w)]);
+        setTab('ed');
+      } catch (err) { setError(String((err as Error).message ?? err)); }
+      setBusy('');
+    }, 30);
+  };
+
   // ---- exports
   const out: { regs: Uint8Array; nframes: number; loopFrame: number; drums?: DrumTrack; fx?: FxTrack } | null = mod ? res : tune;
   const base = slug((mod ? mod.title : tune?.title) || fileName);
@@ -308,11 +328,11 @@ export function App() {
         <>
           {songReport.length > 0 && (
             <details className="panel">
-              <summary>Converted from {fileName} — report</summary>
+              <summary>Import report</summary>
               <pre className="log">{songReport.join('\n')}</pre>
             </details>
           )}
-          <Tracker ed={getEd()} active onError={setError} />
+          <Tracker ed={getEd()} active onError={setError} onReport={setSongReport} />
         </>
       )}
 
@@ -321,7 +341,7 @@ export function App() {
         <section className="panel welcome">
           <h2>Start here</h2>
           <ol>
-            <li>Load a <b>.MOD</b> or <b>.XM</b> file (or drop it anywhere on this page) — or press <b>Demo</b>. <b>.SNDH</b> and <b>.YM</b> files load too: they are played, shown and re-exported as they are.</li>
+            <li>Load a <b>.MOD</b> or <b>.XM</b> file (or drop it anywhere on this page) — or press <b>Demo</b>. <b>.SNDH</b> and <b>.YM</b> files load too: they are played, shown and re-exported as they are, or turned into editable patterns with <b>Edit as AY patterns</b>.</li>
             <li>The tool reduces it to <b>one YM2149 chip (3 voices + noise)</b> at 50 Hz and lets you listen to both: <kbd>Tab</kbd> flips between original and YM.</li>
             <li>Fine-tune with the options, then export an <b>SNDH</b>, a <b>.YM</b> or a <b>game kit</b> (C header + 30-line replayer).</li>
             <li>Or press <b>Edit as AY patterns</b> to turn the module into an editable 3-voice tracker song (FastTracker 2 keys) — or open the <b>AY pattern editor</b> tab and write a tune from scratch.</li>
@@ -366,6 +386,7 @@ export function App() {
                   <input type="text" className="txt" value={author} maxLength={40} onChange={(e) => setAuthor(e.target.value)} />
                 </label>
                 {tune.warnings.length > 0 && <pre className="log">{tune.warnings.map((w) => 'warning: ' + w).join('\n')}</pre>}
+                <button className="btn small primary" disabled={!!busy} onClick={tuneToPatterns} title="Turn this register dump into an editable pattern song: the tempo and notes are found, every sound becomes a step-table instrument, digidrums and Q/S/U effects come along">Edit as AY patterns →</button>
               </section>
             )}
             {mod && <section className="panel">
@@ -447,7 +468,7 @@ export function App() {
               {packed && out && (
                 <p className="note">Packed stream: <b>{packed.data.length.toLocaleString()}</b> bytes ({(packed.data.length / (out.nframes / 50)).toFixed(0)} B/s). SNDH adds a {PLAYER_BLOB.length}-byte player{hasDrums(out.drums) || hasFx(out.fx) ? ' (with the digidrum / timer-effect engine)' : ''}.</p>
               )}
-              <p className="note soft">Arkos Tracker and maxYMiser export: in the AY pattern editor ("Edit as AY patterns").</p>
+              <p className="note soft">Arkos Tracker, Furnace and maxYMiser export: in the AY pattern editor ("Edit as AY patterns" — for a module, an .sndh or a .ym).</p>
             </section>
           </div>
 
