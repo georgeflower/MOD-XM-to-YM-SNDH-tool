@@ -2,7 +2,7 @@
  * Module -> YM2149 register stream. Replays the module, turns every sounding channel into an
  * AY event (tone period + level, or a drum macro), then picks the best 3 events per frame.
  */
-import type { Module } from './types';
+import type { Module, Sample } from './types';
 import { replay, FPS, type ChanState } from './replay';
 import { analyseSample, fold, ended, type SampleInfo } from './samples';
 import { powerSpectrum } from './fft';
@@ -96,7 +96,7 @@ interface Cand {
 const A4_TO_C4 = 261.6255653;
 const noteHz = (note: number) => A4_TO_C4 * Math.pow(2, (note - 49) / 12);
 
-function drumMacro(kind: DrumKind, age: number, base: number): Omit<Cand, 'ch' | 'inst' | 'drum'> | null {
+export function drumMacro(kind: DrumKind, age: number, base: number): Omit<Cand, 'ch' | 'inst' | 'drum'> | null {
   if (kind === 'kick') {
     const lv = [1.0, 0.8, 0.55, 0.3];
     if (age >= lv.length) return null;
@@ -112,6 +112,23 @@ function drumMacro(kind: DrumKind, age: number, base: number): Omit<Cand, 'ch' |
   const npv = [12, 10, 8, 8];
   if (age >= lv.length) return null;
   return { kind: 'noise', per: null, np: npv[age], lvl: base * lv[age] };
+}
+
+/** kick / snare / hat decision (and RMS) for a non-tonal sample */
+export function classifyDrum(m: Module, s: Sample, inf: SampleInfo, forced?: DrumKind): { kind: DrumKind; rms: number } {
+  const d = s.data;
+  const rateC5 = (m.amiga ? 3546894.6 / 428 * 2 : 8363 * Math.pow(2, (s.rel * 128 + s.fine) / (12 * 128)) * 2);
+  const win = new Float64Array(d.length);
+  for (let i = 0; i < d.length; i++) win[i] = d[i] * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / Math.max(1, d.length - 1)));
+  const { power, size } = powerSpectrum(win);
+  let num = 0, den = 0;
+  for (let k = 0; k < power.length; k++) { num += power[k] * ((k * rateC5) / size); den += power[k]; }
+  const cen = num / Math.max(den, 1e-12);
+  const durTicks = d.length / rateC5 / (1 / FPS);
+  const kind: DrumKind = forced ?? (inf.cls === 'kick' || cen < 400 ? 'kick' : durTicks <= 2.0 ? 'hat' : 'snare');
+  let sq = 0;
+  for (let i = 0; i < d.length; i++) sq += d[i] * d[i];
+  return { kind, rms: Math.sqrt(sq / d.length) };
 }
 
 export interface InstrumentReport {
@@ -222,23 +239,11 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
         const key = `${st.inst}:${st.ksmp}`;
         let bc = drumCache.get(key);
         if (!bc) {
-          const d = s.data;
-          const rateC5 = (m.amiga ? 3546894.6 / 428 * 2 : 8363 * Math.pow(2, (s.rel * 128 + s.fine) / (12 * 128)) * 2);
-          const win = new Float64Array(d.length);
-          for (let i = 0; i < d.length; i++) win[i] = d[i] * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / Math.max(1, d.length - 1)));
-          const { power, size } = powerSpectrum(win);
-          let num = 0, den = 0;
-          for (let k = 0; k < power.length; k++) { num += power[k] * ((k * rateC5) / size); den += power[k]; }
-          const cen = num / Math.max(den, 1e-12);
-          const durTicks = d.length / rateC5 / dt;
           const over = forcedDrum ?? options.drumClass?.[st.inst];
-          const kind: DrumKind = over ?? (inf.cls === 'kick' || cen < 400 ? 'kick' : durTicks <= 2.0 ? 'hat' : 'snare');
-          let sq = 0;
-          for (let i = 0; i < d.length; i++) sq += d[i] * d[i];
-          bc = { kind, rms: Math.sqrt(sq / d.length) };
+          bc = classifyDrum(m, s, inf, over);
           drumCache.set(key, bc);
           const ir = instReports.find((r) => r.inst === st.inst);
-          if (ir) ir.drum = kind;
+          if (ir) ir.drum = bc.kind;
         }
         const mac = drumMacro(bc.kind, st.age, bc.rms * st.vol * o.drumGain);
         if (mac) lst.push({ ...mac, ch: ci, inst: st.inst, drum: bc.kind });

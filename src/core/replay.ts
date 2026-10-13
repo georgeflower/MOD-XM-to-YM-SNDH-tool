@@ -28,8 +28,13 @@ export interface ChanState {
   noteRate: number;
 }
 
+/** one played pattern row: where it sits in the frame list and the timing it ran at */
+export interface RowLog { order: number; pat: number; row: number; frame: number; len: number; speed: number; bpm: number }
+
 export interface ReplayResult {
   frames: (ChanState | null)[][];
+  /** every row in the order it was played (pattern jumps / breaks / loops unrolled) */
+  rows: RowLog[];
   /** frame index at which each order position starts (first visit) */
   orderFrame: Map<number, number>;
   /** frame to loop back to */
@@ -82,6 +87,7 @@ export function replay(m: Module, opts: ReplayOptions = {}): ReplayResult {
   const slideUnit = amiga ? 1 : 4;
 
   const frames: (ChanState | null)[][] = [];
+  const rowLog: RowLog[] = [];
   const orderFrame = new Map<number, number>();
   const visited = new Map<string, number>();
   let loopFrame = -1;
@@ -157,6 +163,8 @@ export function replay(m: Module, opts: ReplayOptions = {}): ReplayResult {
     const sig = `${orderI}:${rowI}:${ch.map((c) => c.loopCount).join(',')}`;
     if (visited.has(sig)) { loopFrame = visited.get(sig)!; break; }
     visited.set(sig, nextFrame);
+    const rl: RowLog = { order: orderI, pat: m.order[orderI], row: rowI, frame: frames.length, len: 0, speed, bpm };
+    rowLog.push(rl);
 
     let posJump: number | null = null, brkRow: number | null = null, rowDelay = 0, loopTo: number | null = null;
     let tick = 0;
@@ -278,6 +286,7 @@ export function replay(m: Module, opts: ReplayOptions = {}): ReplayResult {
       ticks++;
       if (ticks >= maxTicks) break main;
     }
+    rl.len = frames.length - rl.frame; rl.speed = speed; rl.bpm = bpm;
     // ---- next row
     if (loopTo !== null && posJump === null && brkRow === null) { rowI = loopTo; continue; }
     if (posJump !== null) { orderI = posJump; rowI = brkRow ?? 0; }
@@ -287,7 +296,7 @@ export function replay(m: Module, opts: ReplayOptions = {}): ReplayResult {
   }
   if (loopFrame < 0) loopFrame = 0;
   for (const [k, v] of warn) void k, v;
-  return { frames, orderFrame, loopFrame, warnings: warn };
+  return { frames, rows: rowLog, orderFrame, loopFrame, warnings: warn };
 
   function tonePortaStep(c: Ch) {
     if (!c.active) return;
