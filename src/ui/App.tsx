@@ -9,6 +9,7 @@ import { writeSndh } from '../export/sndh';
 import { PLAYER_BLOB } from '../player68k/blob';
 import { gameKitFiles } from '../export/gamekit';
 import { hasDrums, type DrumTrack } from '../core/drums';
+import { hasFx, type FxTrack } from '../core/fx';
 import { renderYm } from '../export/ymemu';
 import { encodeWav } from '../export/wav';
 import { zip } from '../export/zip';
@@ -107,7 +108,7 @@ export function App() {
             setAuthor(t.author);
             preview().setSource('ay'); setSource('ay');
             preview().loadOriginal(null);
-            preview().setAy(renderYm(t.regs, t.nframes, 44100, 50, 4, t.drums));
+            preview().setAy(renderYm(t.regs, t.nframes, 44100, 50, 4, t.drums, t.fx));
           } catch (e) { setError(String((e as Error).message ?? e)); setTune(null); }
           setBusy('');
         }, 30);
@@ -127,7 +128,7 @@ export function App() {
     setTimeout(() => {
       try {
         const t = parseSndh(bytes, { subtune: sub, seconds: secs || undefined });
-        setTune(t); preview().setAy(renderYm(t.regs, t.nframes, 44100, 50, 4, t.drums)); setPos(0);
+        setTune(t); preview().setAy(renderYm(t.regs, t.nframes, 44100, 50, 4, t.drums, t.fx)); setPos(0);
       } catch (e) { setError(String((e as Error).message ?? e)); }
       setBusy('');
     }, 30);
@@ -222,25 +223,25 @@ export function App() {
   };
 
   // ---- exports
-  const out: { regs: Uint8Array; nframes: number; loopFrame: number; drums?: DrumTrack } | null = mod ? res : tune;
+  const out: { regs: Uint8Array; nframes: number; loopFrame: number; drums?: DrumTrack; fx?: FxTrack } | null = mod ? res : tune;
   const base = slug((mod ? mod.title : tune?.title) || fileName);
   const title = ((mod ? mod.title : tune?.title) || base).slice(0, 32);
-  const packed = useMemo(() => (out ? packStream(out.regs, out.nframes, out.loopFrame, out.drums) : null), [out]);
+  const packed = useMemo(() => (out ? packStream(out.regs, out.nframes, out.loopFrame, out.drums, hasFx(out.fx) ? out.fx : null) : null), [out]);
   const meta = { title, author: author || 'unknown' };
   const exp = {
-    sndh: () => out && download(`${base}.sndh`, writeSndh(out.regs, out.nframes, out.loopFrame, meta, out.drums)),
+    sndh: () => out && download(`${base}.sndh`, writeSndh(out.regs, out.nframes, out.loopFrame, meta, out.drums, out.fx)),
     ym: () => {
       if (!out) return;
       const comment = `${mod ? 'converted' : 'imported'} from ${fileName}`;
-      if (hasDrums(out.drums)) {
-        const y = writeYm6(out.regs, out.nframes, out.loopFrame, out.drums, title, meta.author, comment);
+      if (hasDrums(out.drums) || hasFx(out.fx)) {
+        const y = writeYm6(out.regs, out.nframes, out.loopFrame, out.drums, title, meta.author, comment, 50, out.fx);
         if (y.warnings.length) setError(y.warnings.join('; '));
         download(`${base}.ym`, y.data);
       } else download(`${base}.ym`, writeYm5(out.regs, out.nframes, out.loopFrame, title, meta.author, comment));
     },
-    game: () => { if (out) download(`${base}_gamekit.zip`, zip(gameKitFiles(base, out.regs, out.nframes, out.loopFrame, out.drums)), 'application/zip'); },
+    game: () => { if (out) download(`${base}_gamekit.zip`, zip(gameKitFiles(base, out.regs, out.nframes, out.loopFrame, out.drums, out.fx)), 'application/zip'); },
     regs: () => out && download(`${base}.regs`, out.regs),
-    wav: () => out && download(`${base}_ym.wav`, encodeWav(renderYm(out.regs, out.nframes, 44100, 50, 4, out.drums), 44100), 'audio/wav'),
+    wav: () => out && download(`${base}_ym.wav`, encodeWav(renderYm(out.regs, out.nframes, 44100, 50, 4, out.drums, out.fx), 44100), 'audio/wav'),
     log: () => { const r = mod ? res?.report : tune && [`${tune.source.toUpperCase()} import: ${fileName}`, tune.title && `title: ${tune.title}`, tune.author && `author: ${tune.author}`, `${tune.nframes} frames, loop at ${tune.loopFrame}`, ...tune.warnings.map((w) => 'warning: ' + w)].filter(Boolean) as string[]; if (r) download(`${base}_report.txt`, r.join('\n') + '\n', 'text/plain'); },
   };
 

@@ -8,6 +8,7 @@ import { writeSndh } from '../export/sndh';
 import { writeYm5, writeYm6 } from '../export/ym';
 import { gameKitFiles } from '../export/gamekit';
 import { hasDrums } from '../core/drums';
+import { hasFx } from '../core/fx';
 import { renderYm } from '../export/ymemu';
 import { encodeWav } from '../export/wav';
 import { zip } from '../export/zip';
@@ -256,16 +257,16 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
     try { fn(ed.renderForExport()); } catch (e) { onError(String((e as Error).message ?? e)); }
   };
   const exp = {
-    sndh: withRender((r) => download(`${base}.sndh`, writeSndh(r.regs, r.nframes, r.loopFrame, meta, r.drums))),
+    sndh: withRender((r) => download(`${base}.sndh`, writeSndh(r.regs, r.nframes, r.loopFrame, meta, r.drums, r.fx))),
     ym: withRender((r) => {
-      if (hasDrums(r.drums)) {
-        const y = writeYm6(r.regs, r.nframes, r.loopFrame, r.drums, meta.title, meta.author, 'made in the AY pattern editor');
+      if (hasDrums(r.drums) || hasFx(r.fx)) {
+        const y = writeYm6(r.regs, r.nframes, r.loopFrame, r.drums, meta.title, meta.author, 'made in the AY pattern editor', 50, r.fx);
         if (y.warnings.length) onError(y.warnings.join('; '));
         download(`${base}.ym`, y.data);
       } else download(`${base}.ym`, writeYm5(r.regs, r.nframes, r.loopFrame, meta.title, meta.author, 'made in the AY pattern editor'));
     }),
-    game: withRender((r) => download(`${base}_gamekit.zip`, zip(gameKitFiles(base, r.regs, r.nframes, r.loopFrame, r.drums)), 'application/zip')),
-    wav: withRender((r) => download(`${base}_ym.wav`, encodeWav(renderYm(r.regs, r.nframes, 44100, 50, 4, r.drums), 44100), 'audio/wav')),
+    game: withRender((r) => download(`${base}_gamekit.zip`, zip(gameKitFiles(base, r.regs, r.nframes, r.loopFrame, r.drums, r.fx)), 'application/zip')),
+    wav: withRender((r) => download(`${base}_ym.wav`, encodeWav(renderYm(r.regs, r.nframes, 44100, 50, 4, r.drums, r.fx), 44100), 'audio/wav')),
     regs: withRender((r) => download(`${base}.regs`, r.regs.subarray(0, r.nframes * 14))),
   };
 
@@ -417,7 +418,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
           <tr><td>Shift / Ctrl+Shift / Alt + F3 F4 F5</td><td>cut / copy / paste the track / the pattern / the block</td></tr>
           <tr><td>Ctrl / Alt / Shift + V</td><td>scale volume in block / track / pattern (Ctrl+Shift = whole song)</td></tr>
           <tr><td>Ctrl+Z · Ctrl+Y · Ctrl+S</td><td>undo · redo · save .ymt</td></tr>
-          <tr><td>Effect column</td><td>type 0–9 A–H K L M P R T X Y Q S U Z. Digits typed in the parameter without an effect make an arpeggio (047 = major chord).</td></tr>
+          <tr><td>Effect column</td><td>type 0–9 A–H K L M P R T X Y Q S U Z (Q SID voice, S sinus-SID, U sync-buzzer: see the hint line). Digits typed in the parameter without an effect make an arpeggio (047 = major chord).</td></tr>
         </tbody></table>
       </details>
 

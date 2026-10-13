@@ -8,6 +8,8 @@ import { packDrumTable } from '../src/export/drumtable';
 import { writeCHeader } from '../src/export/cheader';
 import { replayerHeader } from '../src/export/replayer';
 import { starterKit, compactDrums } from '../src/core/drums';
+import { writeSndh } from '../src/export/sndh';
+import { fxEvents, fxHzOf, fxKindOf } from '../src/core/fx';
 const dir = process.argv[2];
 const s = newSong(4); s.drumChannel = 3;
 s.patterns[0] = emptyPattern(32, 4);
@@ -18,12 +20,14 @@ s.patterns[0].cells[0][3] = c(1, 1);
 s.patterns[0].cells[8][1] = c(0, 1, parseEffectChar('Z'), 2);
 s.patterns[0].cells[16][3] = c(3, 1);
 s.patterns[0].cells[17][3] = c(2, 0);
+s.patterns[0].cells[16][0] = c(49, 1, parseEffectChar('Q'), 0x34);   // SID voice starting in the frame of a drum trigger
+s.patterns[0].cells[24][0] = c(49, 1);                                // ... and ending with a plain note
 const r = renderSong(s);
 const loop = Math.max(0, r.loopFrame);
 const d = compactDrums(r.drums!);
-const p = packStream(r.regs, r.nframes, loop, d);
+const p = packStream(r.regs, r.nframes, loop, d, r.fx);
 writeFileSync(`${dir}/song.h`, writeCHeader('song', p.data, r.nframes, loop, p.loopOffset, packDrumTable(d.drums)));
-writeFileSync(`${dir}/ymplay.h`, replayerHeader('song', true));
+writeFileSync(`${dir}/ymplay.h`, replayerHeader('song', true, true));
 let ref = '';
 for (let f = 0; f < r.nframes; f++) {
   ref += `${f} ${d.trig[f]}`;
@@ -31,4 +35,6 @@ for (let f = 0; f < r.nframes; f++) {
   ref += '\n';
 }
 writeFileSync(`${dir}/expected.txt`, ref);
-console.log(r.nframes, 'frames');
+writeFileSync(`${dir}/combo.sndh`, writeSndh(r.regs, r.nframes, loop, { title: 'combo', author: 'test', seconds: 12 }, r.drums, r.fx));
+writeFileSync(`${dir}/combo.regs`, r.regs);
+console.log(r.nframes, 'frames', JSON.stringify(fxEvents(r.fx!, r.nframes, loop).map((e) => [e.frame, fxKindOf(e.state), Math.round(fxHzOf(e.state))])));

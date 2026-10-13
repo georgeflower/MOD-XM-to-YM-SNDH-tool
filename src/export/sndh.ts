@@ -3,6 +3,7 @@ import { PLAYER_BLOB } from '../player68k/blob';
 import { packStream } from './stream';
 import { packDrumTable } from './drumtable';
 import { type DrumTrack, compactDrums, hasDrums } from '../core/drums';
+import { type FxTrack, hasFx } from '../core/fx';
 
 export interface SndhMeta {
   title: string;
@@ -22,10 +23,10 @@ function z(s: string): number[] {
 const ascii = (s: string) => Array.from(s).map((c) => c.charCodeAt(0));
 
 export function writeSndh(
-  regs: Uint8Array, nframes: number, loopFrame: number, meta: SndhMeta, drumTrack?: DrumTrack | null,
+  regs: Uint8Array, nframes: number, loopFrame: number, meta: SndhMeta, drumTrack?: DrumTrack | null, fx?: FxTrack | null,
 ): Uint8Array {
   const drums = hasDrums(drumTrack) ? compactDrums(drumTrack) : null;
-  const { data, loopOffset } = packStream(regs, nframes, loopFrame, drums);
+  const { data, loopOffset } = packStream(regs, nframes, loopFrame, drums, hasFx(fx) ? fx : null);
   const table = drums ? packDrumTable(drums.drums) : new Uint8Array(0);
   const seconds = meta.seconds ?? Math.max(1, Math.round(nframes / 50));
   const tags: number[] = [];

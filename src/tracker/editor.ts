@@ -12,6 +12,7 @@ import {
 import { renderSong, type RenderResult, type RowMark } from './render';
 import { renderYm } from '../export/ymemu';
 import { type DrumTrack, type DrumSample, drumToAudio } from '../core/drums';
+import type { FxTrack } from '../core/fx';
 
 export type Column = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;      // note, inst hi/lo, vol hi/lo, fx letter, param hi/lo
 export interface Sel { r1: number; c1: number; r2: number; c2: number }
@@ -65,7 +66,7 @@ export class Editor {
   private redoStack: Song[] = [];
   private clip: Clip | null = null;
   private audio: AudioSink | null = null;
-  private lastRender: { regs: Uint8Array; nframes: number; loopFrame: number; rows: RowMark[]; key: string; drums?: DrumTrack } | null = null;
+  private lastRender: { regs: Uint8Array; nframes: number; loopFrame: number; rows: RowMark[]; key: string; drums?: DrumTrack; fx?: FxTrack } | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private raf = 0;
   private patternSong: Song | null = null;       // temp song while looping one pattern
@@ -491,9 +492,9 @@ export class Editor {
     if (!this.audio) return null;
     const song = this.playMode === 'pattern' ? this.songForPattern() : this.song;
     const res = renderSong(song, { mute: this.muteMask() });
-    this.lastRender = { regs: res.regs, nframes: res.nframes, loopFrame: res.loopFrame, rows: res.rows, key: this.renderKey(), drums: res.drums };
+    this.lastRender = { regs: res.regs, nframes: res.nframes, loopFrame: res.loopFrame, rows: res.rows, key: this.renderKey(), drums: res.drums, fx: res.fx };
     this.warnings = res.warnings;
-    const pcm = renderYm(res.regs, res.nframes, 44100, 50, 4, res.drums);
+    const pcm = renderYm(res.regs, res.nframes, 44100, 50, 4, res.drums, res.fx);
     const pos = keepPosition ? this.audio.position() : 0;
     this.audio.setSource?.('ay');
     this.audio.setAy(pcm);
@@ -504,14 +505,14 @@ export class Editor {
   /** register dump of the whole song for export (regs, nframes, loopFrame) */
   renderForExport() {
     const r = renderSong(this.song);
-    return { regs: r.regs, nframes: r.nframes, loopFrame: Math.max(0, r.loopFrame), warnings: r.warnings, drums: r.drums };
+    return { regs: r.regs, nframes: r.nframes, loopFrame: Math.max(0, r.loopFrame), warnings: r.warnings, drums: r.drums, fx: r.fx };
   }
   /** a rendered preview of the full song, memoised until the song changes */
   currentRender() {
     const key = this.renderKey();
     if (!this.lastRender || this.lastRender.key !== key) {
       const res = renderSong(this.playMode === 'pattern' ? this.songForPattern() : this.song, { mute: this.muteMask() });
-      this.lastRender = { regs: res.regs, nframes: res.nframes, loopFrame: res.loopFrame, rows: res.rows, key, drums: res.drums };
+      this.lastRender = { regs: res.regs, nframes: res.nframes, loopFrame: res.loopFrame, rows: res.rows, key, drums: res.drums, fx: res.fx };
       this.warnings = res.warnings;
     }
     return this.lastRender;
@@ -583,7 +584,7 @@ export class Editor {
     }
     const song = this.auditionSong(note);
     const res = renderSong(song, { maxFrames: 150, noLoopStop: true });
-    const pcm = renderYm(res.regs, res.nframes, 44100, 50, 4, res.drums);
+    const pcm = renderYm(res.regs, res.nframes, 44100, 50, 4, res.drums, res.fx);
     this.audNote = note;
     this.audio.audition(pcm);
   }

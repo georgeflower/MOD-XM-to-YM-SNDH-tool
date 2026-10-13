@@ -1,6 +1,7 @@
 // Small YM2149 emulator -> PCM, for in-browser preview. Tone / noise / mixer / volume / hardware envelope.
 import { NREGS } from './stream';
 import { type DrumTrack, mfpRate, trigVoice, trigDrum, TRIG_STOP } from '../core/drums';
+import { type FxTrack, FX_SID, FX_SINUS, FX_SYNC, fxKindOf, fxVoiceOf, fxHzOf, fxVoiceVol, sinusLevel, SINUS_STEPS } from '../core/fx';
 
 const CLK = 2_000_000;
 export const VOL = [0.0, 0.00465, 0.00772, 0.01095, 0.01625, 0.02359, 0.03317, 0.04658, 0.06655,
@@ -28,7 +29,7 @@ export function envLevel(shape: number, step: number): number {
   return ramped(up);
 }
 
-export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50, over = 4, drums?: DrumTrack | null): Float32Array {
+export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50, over = 4, drums?: DrumTrack | null, fx?: FxTrack | null): Float32Array {
   const spf = Math.floor((sr * over) / fps);
   const tStep = CLK / 16 / (sr * over);
   const toneStep = 2 * tStep;
@@ -41,6 +42,10 @@ export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50
   let envShape = 0, envStep = 0;          // envStep counts hardware-envelope steps (16 per ramp)
   // digidrums: a voice's volume register is driven by the sample (tone and noise held "on") until it ends
   const dr: ({ pcm: Uint8Array; pos: number; step: number } | null)[] = [null, null, null];
+  // timer effect state (one at a time): the timer phase and what the ISR has done so far
+  let fxPh = 0, fxTog = 0, fxPos = 0, fxPrev = 0;
+  const fxLevel = new Float64Array(spf);          // per oversampled sample: volume step 0..15 of the fx voice
+  const envStepAt = new Float64Array(spf);        // sync-buzzer: envelope step at each sample
   for (let f = 0; f < nframes; f++) {
     const r = regs.subarray(f * NREGS, f * NREGS + NREGS);
     const tg = drums ? drums.trig[f] ?? 0 : 0;
@@ -52,10 +57,35 @@ export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50
       }
     }
     if (r[13] !== 0xff) { envShape = r[13] & 15; envStep = 0; }
+    const fxs = fx ? fx[f] ?? 0 : 0;
+    const fxKind = fxKindOf(fxs), fxV = fxVoiceOf(fxs);
+    if (fxs !== fxPrev) { fxPh = 0; fxTog = 0; fxPos = 0; fxPrev = fxs; }   // the engine is (re)started by an event
     const envPer = Math.max(1, r[11] | (r[12] << 8));
     const envRate = CLK / (16 * envPer) / (sr * over);       // envelope steps per oversampled sample
     const envAt = new Float64Array(0);
     void envAt;
+    let syncOn = false;
+    if (fxs && (fxKind === FX_SID || fxKind === FX_SINUS)) {
+      // the interrupt (Timer A) fires `tick` times a second; every tick the ISR rewrites the voice's volume register
+      const tick = fxHzOf(fxs) * (fxKind === FX_SINUS ? SINUS_STEPS : 1), inc = tick / (sr * over);
+      const V = fxVoiceVol(r[8 + fxV]);
+      for (let n = 0; n < spf; n++) {
+        fxPh += inc;
+        const t = Math.floor(fxPh);
+        if (t > 0) { fxPh -= t; if (fxKind === FX_SID) fxTog = (fxTog + t) & 1; else fxPos = (fxPos + t) & 63; }
+        fxLevel[n] = fxKind === FX_SID ? (fxTog ? V : 0) : sinusLevel(fxPos, V);
+      }
+    } else if (fxs && fxKind === FX_SYNC) {
+      syncOn = true;
+      const inc = fxHzOf(fxs) / (sr * over);
+      let base = envStep, from = 0;
+      for (let n = 0; n < spf; n++) {
+        fxPh += inc;
+        if (fxPh >= 1) { fxPh -= Math.floor(fxPh); base = 0; from = n + 1; }   // the ISR rewrote R13: envelope restarts
+        envStepAt[n] = base + (n + 1 - from) * envRate;
+      }
+      envStep = base + (spf - from) * envRate;
+    }
     const mix = r[7];
     const nper = Math.max(1, r[6] & 31);
     acc.fill(0);
@@ -69,6 +99,7 @@ export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50
       const noiseOn = !(mix & (8 << v));
       const useEnv = (r[8 + v] & 16) !== 0;
       const vol = useEnv ? 1 : VOL[r[8 + v] & 15];
+      const fxHere = fxs && v === fxV && fxKind !== FX_SYNC;
       const start = ph[v];
       for (let n = 0; n < spf; n++) {
         const cur = dr[v];
@@ -81,11 +112,12 @@ export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50
         let sig = 1;
         if (toneOn) sig = Math.floor(pos) & 1;
         if (noiseOn) sig = toneOn ? sig * nbit[n] : nbit[n];
-        acc[n] += sig * (useEnv ? VOL[envLevel(envShape, Math.floor(envStep + (n + 1) * envRate))] : vol);
+        const lv = fxHere ? VOL[fxLevel[n]] : useEnv ? VOL[envLevel(envShape, Math.floor(syncOn ? envStepAt[n] : envStep + (n + 1) * envRate))] : vol;
+        acc[n] += sig * lv;
       }
       ph[v] = (start + (spf * toneStep) / per) % 4294967296;
     }
-    envStep += spf * envRate;
+    if (!syncOn) envStep += spf * envRate;
     if (envStep > 1e9) envStep = 64 + (envStep % 32);
     for (let i = 0; i < outFrames; i++) {
       let s = 0;

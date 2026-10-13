@@ -20,9 +20,9 @@ const LETTER_HELP: Record<string, string> = {
   'H': 'Global volume slide',
   'K': 'Key off (release the note)',
   'L': 'Set envelope position',
-  'Q': 'Timer FX Q (digidrum / sync effect): pitch x, octave y',
-  'S': 'Timer FX S (sync buzzer): pitch x, octave y',
-  'U': 'Timer FX U: pitch x, octave y',
+  'Q': 'SID voice: the voice volume toggles on/off at a timer rate, 20 Hz * 2^(octave y + pitch x/16). Q00 or a new note ends it',
+  'S': 'Sinus-SID: like Q, but the "on" half is a sine wave. S00 or a new note ends it',
+  'U': 'Sync-buzzer: the hardware envelope restarts at a timer rate (use an envelope instrument). U00 or a new note ends it',
   'Z': 'Trigger digidrum (Z00 stops)',
 };
 

@@ -10,13 +10,17 @@
  * one trigger code per frame, and the drum's voice is silenced in the registers while the sample plays.
  * The ST has one drum timer, so a new drum cuts the one before it.
  *
- * Not rendered (reported as warnings): SID voice (Q), sinus-SID (S), sync-buzzer (U)
- * and channels >= 3 (second chip).
+ * Timer effects Q (SID voice), S (sinus-SID) and U (sync-buzzer) come out as an FxTrack (one packed state per frame):
+ * the registers keep the voice's normal volume / envelope, the track says which MFP timer modulates it.
+ * The ST has one timer for this, so one effect plays at a time.
+ *
+ * Not rendered (reported as warnings): channels >= 3 (second chip).
  */
 import {
   type Song, type Cell, type Instrument, NOTE_OFF, noteToFreq, channelsOf, drumChannelOf, VOICES, EFFECT_LETTERS,
 } from './types';
 import { type DrumSample, type DrumTrack, drumFrames, trigCode, TRIG_STOP, MAX_DRUMS } from '../core/drums';
+import { type FxTrack, type FxKind, FX_SID, FX_SINUS, FX_SYNC, FX_LETTERS, fxSetting, packFx } from '../core/fx';
 
 export const NREGS = 14;
 const FPS = 50;
@@ -62,6 +66,8 @@ interface Chan {
   loopRow: number; loopCount: number;
   forceHardEnv: boolean; hardEnvShape: number; hardEnvPeriodOverride: number; hardEnvDivisorOverride: number; hardEnvShapeDirty: boolean;
   freshTrigger: boolean;
+  /** active timer effect (Q / S / U with its parameter), null = none */
+  fx: { kind: FxKind; param: number } | null;
   // step-table instruments
   seqPos: number; relTick: number; relStart: number;
 }
@@ -76,7 +82,7 @@ const newChan = (): Chan => ({
   volSlide: 0, arpeggio: 0, retrig: 0, retrigVolChange: 0,
   noteCutTick: -1, noteDelayTick: -1, delayedCell: null, loopRow: 0, loopCount: -1,
   forceHardEnv: false, hardEnvShape: 0, hardEnvPeriodOverride: 0, hardEnvDivisorOverride: 0, hardEnvShapeDirty: true,
-  freshTrigger: false, seqPos: 0, relTick: 0, relStart: 0,
+  freshTrigger: false, fx: null, seqPos: 0, relTick: 0, relStart: 0,
 });
 
 function hardEnvPeriodFor(ch: Chan, inst: Instrument): number {
@@ -149,6 +155,8 @@ export interface RenderResult {
   warnings: string[];
   /** digidrum samples and triggers, when the song plays any */
   drums?: DrumTrack;
+  /** timer effects (Q / S / U), one packed state per frame, when the song uses any */
+  fx?: FxTrack;
 }
 
 export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
@@ -187,6 +195,8 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
   const drumTable: DrumSample[] = [];
   const drumIdx = new Map<DrumSample, number>();
   const trigOut: number[] = [];
+  const fxOut: number[] = [];
+  let fxVoice = -1;
   interface DrumHit { voice: number; drum: DrumSample | null; owner: 'z' | 'chan' }
   let pendingHit: DrumHit | null = null;
   let live: { voice: number; owner: 'z' | 'chan'; endFrame: number } | null = null;
@@ -230,7 +240,7 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
         ch.portaUp = 0; ch.portaDown = 0; ch.tonePortaSpeed = 0; ch.tonePortaTarget = 0;
         ch.vibratoSpeed = 0; ch.vibratoDepth = 0; ch.tremoloSpeed = 0; ch.tremoloDepth = 0;
         ch.volSlide = 0; ch.arpeggio = 0; ch.retrig = 0; ch.noteCutTick = -1;
-        ch.seqPos = 0; ch.relTick = 0;
+        ch.seqPos = 0; ch.relTick = 0; ch.fx = null;       // a new note ends a timer effect unless the cell sets one again
         startAdsr(ch);
         ch.freshTrigger = true;
         if (ch.instrument && ch.instrument.vibratoDepth > 0) {
@@ -308,9 +318,9 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
       }
       case FX_X: ch.forceHardEnv = true; ch.hardEnvShape = p & 15; ch.hardEnvShapeDirty = true; break;
       case FX_Y: ch.hardEnvPeriodOverride = (ch.hardEnvPeriodOverride & 0x00ff) | ((p & 0xff) << 8); break;
-      case FX_Q: if (p) warn('Q', 'Qxx (SID voice) is not rendered yet'); break;
-      case FX_S: if (p) warn('S', 'Sxx (sinus-SID) is not rendered yet'); break;
-      case FX_U: if (p) warn('U', 'Uxx (sync-buzzer) is not rendered yet'); break;
+      case FX_Q: ch.fx = p ? { kind: FX_SID, param: p } : null; break;
+      case FX_S: ch.fx = p ? { kind: FX_SINUS, param: p } : null; break;
+      case FX_U: ch.fx = p ? { kind: FX_SYNC, param: p } : null; break;
       case FX_Z: {
         if (p === 0) { stopDrum(c); break; }
         const d = ch.instrument?.digiDrums?.[p - 1];
@@ -546,6 +556,26 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
         if (live && fi >= live.endFrame) live = null;
         if (live) { f[8 + live.voice] = 0; f[7] |= (1 << live.voice) | (8 << live.voice); }   // the sample owns the voice
         trigOut.push(tg);
+        // timer effect: the voice must be audible and not owned by a digidrum; only one effect can run at a time
+        const fxCand: number[] = [];
+        for (let c = 0; c < nCh; c++) {
+          if (!chans[c].fx || isMuted(c) || (live && live.voice === c) || (f[8 + c] & 31) === 0) continue;
+          fxCand.push(c);
+        }
+        const fxv = fxCand.includes(fxVoice) ? fxVoice : fxCand.length ? fxCand[0] : -1;   // keep the running one
+        const many = fxCand.length > 1;
+        if (many) warn('fxmany', 'timer effects (Q/S/U) on several voices at once: only one runs at a time (the ST has one spare timer), the others are ignored');
+        let fxs = 0;
+        if (fxv >= 0) {
+          const cf = chans[fxv].fx!;
+          const st = fxSetting(cf.kind, fxv, cf.param);
+          if (st) {
+            fxs = packFx(st);
+            if (st.clamped) warn(`fxrate${cf.kind}${cf.param}`, `${FX_LETTERS[cf.kind]}${cf.param.toString(16).toUpperCase().padStart(2, '0')}: the timer cannot run that fast / slow, it plays at about ${Math.round(st.hz)} Hz`);
+          }
+        }
+        fxVoice = fxv;
+        fxOut.push(fxs);
         for (let k = 0; k < NREGS; k++) out.push(f[k]);
         emitted = true;
       }
@@ -576,5 +606,6 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
   }
   const nframes = out.length / NREGS;
   const drums = drumTable.length && trigOut.some((t) => t) ? { drums: drumTable, trig: Uint8Array.from(trigOut) } : undefined;
-  return { regs: Uint8Array.from(out), nframes, loopFrame, rows, warnings, drums };
+  const fx = fxOut.some((x) => x) ? Uint32Array.from(fxOut) : undefined;
+  return { regs: Uint8Array.from(out), nframes, loopFrame, rows, warnings, drums, fx };
 }

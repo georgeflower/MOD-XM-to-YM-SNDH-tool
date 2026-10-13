@@ -9,9 +9,9 @@ A browser tool that turns **ProTracker `.MOD`** and **FastTracker II `.XM`** mod
 
 | Export | What it is |
 |---|---|
-| **SNDH** (`.sndh`) | Header + a position-independent 68000 player (≈0.8 KB, includes the digidrum engine) + packed register stream (+ digidrum table). Timer C 50 Hz (`TC50`). Verified bit-exact in an emulated 68000 (psgplay) incl. loop wrap-around and digidrum sample values. |
-| **YM** (`.ym`) | `YM5!` uncompressed register dump; `YM6!` with digidrums when the song has any (loads in ST-Sound and friends). |
-| **Game kit** (`.zip`) | `<name>.h` (packed stream as a C array, + digidrum table) + `ymplay.h` (small replayer; with digidrums also the 68000 drum engine). The game owns the PSG, so sound effects can steal a voice. |
+| **SNDH** (`.sndh`) | Header + a position-independent 68000 player (≈0.8 KB, includes the digidrum and timer-effect engines) + packed register stream (+ digidrum table). Timer C 50 Hz (`TC50`). Verified bit-exact in an emulated 68000 (psgplay) incl. loop wrap-around and digidrum sample values. |
+| **YM** (`.ym`) | `YM5!` uncompressed register dump; `YM6!` with digidrums / timer effects when the song has any (loads in ST-Sound and friends). |
+| **Game kit** (`.zip`) | `<name>.h` (packed stream as a C array, + digidrum table) + `ymplay.h` (small replayer; with digidrums / timer effects also the 68000 engine). The game owns the PSG, so sound effects can steal a voice. |
 | Raw regs / WAV / report | 14 bytes per frame; YM emulator preview; conversion log. |
 
 How the conversion works: the module is replayed tick-accurately (all XM/MOD effects, envelopes, auto-vibrato,
@@ -36,7 +36,7 @@ Besides modules the page loads **`.ym`** (YM2!/3!/3b/5!/6!, also LHA-packed) and
 They are not converted: a `.ym` is read as the register dump it is, a `.sndh` is *run* in a built-in 68000 emulator
 (init + play routine, YM writes captured per tick, resampled to 50 Hz, loop detected). You get the piano-roll view, the
 YM preview and all exports (SNDH / YM5 / game kit / WAV / regs). SNDH subtunes and the rendered length can be chosen.
-`.ym` files with YM5/YM6 digidrums are imported with their samples and play (and re-export) correctly. Limitation: an `.sndh` that needs MFP timer interrupts *within* a frame (SID voice, sync-buzzer, digidrums) is captured at
+`.ym` files with YM5/YM6 digidrums are imported with their samples and play (and re-export) correctly. `.ym` files with YM6 SID-voice / sinus-SID / sync-buzzer effects are imported as timer effects too. Limitation: an `.sndh` that needs MFP timer interrupts *within* a frame (SID voice, sync-buzzer, digidrums) is captured at
 frame granularity only. The emulator was checked against the Musashi core in `psgplay` (see `tools/verify`).
 
 ## AY pattern editor
@@ -61,8 +61,7 @@ parameter), same effect letters, same `.ymt` song files in both directions.
 * The editor plays through a register-level emulation of the chip (including the hardware envelope) and exports the same
   formats as the converter: **SNDH, YM, game kit, WAV, raw registers**.
 
-Limits worth knowing: `Q` / `S` / `U` (timer effects) are stored but **not rendered yet**;
-vibrato depth in `.ymt` tops out at about ±7 period units, so converted vibrato is approximate; a `.ymt` holds at most 255
+Limits worth knowing: vibrato depth in `.ymt` tops out at about ±7 period units, so converted vibrato is approximate; a `.ymt` holds at most 255
 patterns and 255 instruments.
 
 ## Digidrums
@@ -84,6 +83,28 @@ A digidrum is a short **4-bit sample** that the ST plays by writing a voice's vo
 * **Verification.** The 68000 engine runs in psgplay: sample values, rate (7989 Hz for 8 kHz requested), voice, cut by a
   new drum, stop, loops; the generated game-kit C code compiles with `m68k-linux-gnu-gcc` and runs the same way
   (`tools/verify/gamekit_check.sh`).
+
+## Timer effects (Q / S / U)
+
+The YM Tracker's three MFP-timer effects, with its parameter: `xx` = pitch (high nibble) and octave (low nibble), timer rate
+`20 Hz · 2^(octave + pitch/16)`, `00` = off. They need a note with sound on that voice; a new note without `Q`/`S`/`U` ends the effect.
+
+| | |
+|---|---|
+| **`Qxx` SID voice** | every timer tick the voice's volume toggles between its register value and 0 (the classic "SID" buzz) |
+| **`Sxx` sinus-SID** | like `Q`, but the *on* half is a rectified 32-step sine (the interrupt runs 32× the musical rate) |
+| **`Uxx` sync-buzzer** | the hardware-envelope shape register is rewritten at the timer rate, restarting the envelope (use an envelope instrument) |
+
+* **One effect at a time.** The ST has one MFP timer to spare for this (Timer A, vector `$134`; drums keep Timer D). If a second voice
+  asks for an effect while one runs, the first keeps going and the editor warns. Rates the MFP cannot make (below ≈ 48 Hz, above
+  20 kHz, sinus above ≈ 625 Hz) are clamped to the nearest one and also warned about.
+* **Exports.** SNDH and game kit carry the effect as a small event in the stream and run it from a Timer A interrupt (the engine
+  shares its code with the digidrums); YM6 uses the ST-Sound effect slots (`R1`/`R3` high nibble, repeated every frame the effect runs), and `.ym` files
+  with those codes are imported back. Preview in the editor is the register emulation plus the timer behaviour.
+* **Verification.** The 68000 engine runs in psgplay (Q: volume register alternates 15/0 at the exact rate; S: 32 sine steps per
+  period; U: R13 rewritten at the timer rate; stop restores the volume; the SNDH output without effects is unchanged), and the
+  generated game-kit C code does the same (`tools/verify/gamekit_check.sh`, which includes an effect that starts in the frame of a drum trigger).
+  YM6 effect rendering in ST-Sound itself could not be checked here.
 
 ## Using it
 
@@ -118,7 +139,7 @@ npx tsx scripts/export-cli.ts song.mod out/   # same exporters from the command 
 ```
 src/core        module loaders, tracker replayer, AY converter, digidrum samples (drums.ts, digi.ts)
 src/export      stream packer, YM5/YM6, SNDH, game kit, C header + replayer, YM emulator (preview), WAV, ZIP
-src/player68k   68000 SNDH player + digidrum engine (player.s, drumeng.s, gamedrum.s → blob.ts)
+src/player68k   68000 SNDH player + digidrum / timer-effect engine (player.s, drumeng.s, gamedrum.s → blob.ts)
 src/tracker     pattern song model, renderer (tick player), module -> patterns, editor store, .ymt IO
 src/ui          React UI (FT2-flavoured skin), converter tab, pattern editor tab, A/B audio
 public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of the A/B switch
@@ -127,7 +148,7 @@ public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of th
 ## Roadmap
 
 * Mapper follow-ups: sample → waveform (square duty/buzzer envelope), saving a mapping with the project
-* Timer effects `Q` / `S` / `U` (SID voice, sync buzzer); extracting digidrums from SNDH files
+* Extracting digidrums and timer effects from SNDH files; more than one timer effect at a time
 * Furnace `.fur`, Arkos Tracker `.aks`, Maxymiser `.MYS/.MYV/.MYI` export
 
 Note: SNDH files made here play in any SNDH player but cannot be opened *in* Maxymiser (it only loads its own songs) —

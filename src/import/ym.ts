@@ -1,6 +1,7 @@
 // .ym loader: YM2!/YM3!/YM3b/YM5!/YM6! (LHA-packed or raw) -> 14 registers per 50 Hz frame.
 import { isLha, lhaExtract } from './lha';
 import type { AyTune } from './tune';
+import { type FxTrack, type FxKind, FX_SID, FX_SINUS, FX_SYNC, fxSettingHz, packFx, MAX_FX_HZ } from '../core/fx';
 import { type DrumSample, type DrumTrack, MFP_PREDIV, nearestDac, trigCode, silenceDrumVoices, MAX_DRUMS } from '../core/drums';
 
 const ST_CLOCK = 2_000_000;
@@ -57,14 +58,6 @@ export function parseYm(file: Uint8Array): AyTune {
     if (il) regsIn = deinterleave(p, 16, nframes);
     else { regsIn = new Uint8Array(nframes * 16); regsIn.set(d.subarray(p, p + nframes * 16)); }
     if (magic === 'YM6!') {
-      let fx = false;
-      for (let f = 0; f < nframes && !fx; f++) {
-        for (const [rc] of [[1], [3]]) {
-          const code = regsIn[f * 16 + rc] & 0xf0;
-          if ((code & 0x30) && (code & 0xc0) !== 0x40) fx = true;       // SID / sinus-SID / sync-buzzer
-        }
-      }
-      if (fx) warnings.push('YM6 SID voice / sinus-SID / sync-buzzer effects are not reproduced (digidrums are)');
     }
   } else if (magic === 'YM4!' || magic === 'YM1!' || magic === 'MIX1') {
     throw new Error(`YM format ${magic} is not supported (use YM2/3/5/6)`);
@@ -126,8 +119,46 @@ export function parseYm(file: Uint8Array): AyTune {
       warnings.push(`${used} digidrum trigger(s) imported (${samples.length} sample(s))`);
     }
   }
+  // ---- YM6 timer effects: SID voice / sinus-SID / sync-buzzer, re-specified in every frame they run
+  let fx: FxTrack | undefined;
+  if (magic === 'YM6!') {
+    const track = new Uint32Array(outN);
+    let used = 0, many = 0, clamped = 0;
+    for (let f = 0; f < outN; f++) {
+      const sf = Math.min(nframes - 1, fps === 50 ? f : Math.floor((f * fps) / 50));
+      const r = regsIn.subarray(sf * 16, sf * 16 + 16);
+      const slots = [{ code: r[1] & 0xf0, pre: (r[6] >> 5) & 7, cnt: r[14] }, { code: r[3] & 0xf0, pre: (r[8] >> 5) & 7, cnt: r[15] }];
+      let found = false;
+      for (const sl of slots) {
+        const v = ((sl.code & 0x30) >> 4) - 1, type = sl.code & 0xc0;
+        if (v < 0 || v > 2 || type === 0x40) continue;
+        const kind: FxKind = type === 0 ? FX_SID : type === 0x80 ? FX_SINUS : FX_SYNC;
+        const div = MFP_PREDIV[sl.pre] * sl.cnt;
+        if (!div) continue;
+        if (found) { many++; continue; }
+        const hz = 2_457_600 / div;
+        const set = fxSettingHz(kind, v, hz);
+        if (!set) continue;
+        if (hz > MAX_FX_HZ / (kind === FX_SINUS ? 32 : 1) || set.clamped) clamped++;
+        track[f] = packFx(set); found = true; used++;
+      }
+    }
+    if (used) {
+      fx = track;
+      let shape = -1;                                          // a sync-buzzer repeats the shape every frame: only a change matters
+      for (let f = 0; f < outN; f++) {
+        const sh = regs[f * 14 + 13];
+        if (sh === 0xff) continue;
+        if (f > 0 && track[f] === track[f - 1] && (track[f] >>> 16 & 3) === FX_SYNC && sh === shape) regs[f * 14 + 13] = 0xff;
+        shape = sh;
+      }
+      warnings.push(`${used} timer-effect frame(s) imported (SID / sinus-SID / sync-buzzer)`);
+      if (many) warnings.push(`${many} frame(s) start a second effect; the ST has one timer to spare, only the first one is kept`);
+      if (clamped) warnings.push(`${clamped} timer-effect frame(s) are outside what the MFP can do and were clamped`);
+    }
+  }
   return {
-    title, author, comment, regs, nframes: outN, source: 'ym', warnings, drums,
+    title, author, comment, regs, nframes: outN, source: 'ym', warnings, drums, fx,
     loopFrame: Math.min(outN - 1, fps === 50 ? loopFrame : Math.round((loopFrame * 50) / fps)),
   };
 }
