@@ -36,8 +36,23 @@ Besides modules the page loads **`.ym`** (YM2!/3!/3b/5!/6!, also LHA-packed) and
 They are not converted: a `.ym` is read as the register dump it is, a `.sndh` is *run* in a built-in 68000 emulator
 (init + play routine, YM writes captured per tick, resampled to 50 Hz, loop detected). You get the piano-roll view, the
 YM preview and all exports (SNDH / YM5 / game kit / WAV / regs). SNDH subtunes and the rendered length can be chosen.
-`.ym` files with YM5/YM6 digidrums are imported with their samples and play (and re-export) correctly. `.ym` files with YM6 SID-voice / sinus-SID / sync-buzzer effects are imported as timer effects too. Limitation: an `.sndh` that needs MFP timer interrupts *within* a frame (SID voice, sync-buzzer, digidrums) is captured at
-frame granularity only. The emulator was checked against the Musashi core in `psgplay` (see `tools/verify`).
+`.ym` files with YM5/YM6 digidrums are imported with their samples and play (and re-export) correctly, and YM6 SID-voice / sinus-SID / sync-buzzer
+effects come in as timer effects.
+
+**Timer interrupts in SNDH files.** The runner also models the MFP timers (A, B, C, D in delay mode, with their enable / mask bits and vectors) and runs
+the tune's interrupt handlers in virtual time. Every YM write a handler makes is logged with a timestamp and then classified, whatever the driver looks like inside:
+
+| a handler writes … | becomes |
+|---|---|
+| a volume register at a steady rate with many different values | a **digidrum** sample (rate from the timer, deduplicated, triggered in the frame it starts) |
+| a volume register, alternating between two values | **`Q`** SID voice (rate = timer rate, level = the higher value) |
+| a volume register stepping through a repeating wave with silent gaps | **`S`** sinus-SID |
+| R13 at a steady rate | **`U`** sync-buzzer |
+| anything else | the last value in each frame goes into the frame image, as before |
+
+Limits: one drum plays at a time and one timer effect runs at a time, so overlapping ones (e.g. 3-voice "quartet" drivers) keep the first and the import says
+how many it dropped; a handler that mixes samples or changes a drum's pitch while it plays comes out as a plain sample at the average rate; drums are placed on the
+50 Hz frame they start in (up to 20 ms early). Tunes that busy-wait on a timer data register still hang (reported as "did not return"). The emulator was checked against the Musashi core in `psgplay` (see `tools/verify`).
 
 ## AY pattern editor
 
@@ -148,7 +163,7 @@ public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of th
 ## Roadmap
 
 * Mapper follow-ups: sample → waveform (square duty/buzzer envelope), saving a mapping with the project
-* Extracting digidrums and timer effects from SNDH files; more than one timer effect at a time
+* More than one timer effect or drum at a time (needs a second timer / mixing engine); timer-driven arpeggio and other handler effects that are not drums or Q/S/U
 * Furnace `.fur`, Arkos Tracker `.aks`, Maxymiser `.MYS/.MYV/.MYI` export
 
 Note: SNDH files made here play in any SNDH player but cannot be opened *in* Maxymiser (it only loads its own songs) —

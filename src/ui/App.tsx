@@ -407,7 +407,7 @@ export function App() {
                 <button className="btn" disabled={!out} onClick={exp.log}>Report (.txt)</button>
               </div>
               {packed && out && (
-                <p className="note">Packed stream: <b>{packed.data.length.toLocaleString()}</b> bytes ({(packed.data.length / (out.nframes / 50)).toFixed(0)} B/s). SNDH adds a {PLAYER_BLOB.length}-byte player{hasDrums(out.drums) ? ' (with the digidrum engine)' : ''}.</p>
+                <p className="note">Packed stream: <b>{packed.data.length.toLocaleString()}</b> bytes ({(packed.data.length / (out.nframes / 50)).toFixed(0)} B/s). SNDH adds a {PLAYER_BLOB.length}-byte player{hasDrums(out.drums) || hasFx(out.fx) ? ' (with the digidrum / timer-effect engine)' : ''}.</p>
               )}
               <p className="note soft">Furnace · Arkos · Maxymiser export: coming next.</p>
             </section>
