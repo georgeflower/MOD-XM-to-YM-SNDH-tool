@@ -1,5 +1,6 @@
 // Plays a song through the real maxYMiser replayer and compares it with this editor's own render.
-// usage: npx tsx scripts/maxymiser-check.ts <MYM_REPL.BIN> <module .mod/.xm | song .ymt> [frames]
+// usage: npx tsx scripts/maxymiser-check.ts <MYM_REPL.BIN> <module .mod/.xm | song .ymt> [frames]      (export check)
+//        npx tsx scripts/maxymiser-check.ts <MYM_REPL.BIN> <song .mys> [frames] [voice .myv]           (import check)
 // (MYM_REPL.BIN is part of the maxYMiser package by gwEm; it is not stored in this repository.)
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -10,15 +11,25 @@ import { moduleToSong } from '../src/tracker/fromModule';
 import { decodeYmt, isYmt } from '../src/tracker/ymt';
 import { renderSong } from '../src/tracker/render';
 import { songToMaxymiser } from '../src/maxymiser/convert';
+import { maxymiserToSong } from '../src/maxymiser/import';
 import { parseSndh } from '../src/import/sndh';
 
-const [bin, file, framesArg] = process.argv.slice(2);
+const [bin, file, framesArg, voiceArg] = process.argv.slice(2);
 if (!bin || !file) { console.error('usage: maxymiser-check.ts <MYM_REPL.BIN> <module|ymt> [frames]'); process.exit(2); }
 const data = new Uint8Array(readFileSync(file));
-const song = isYmt(data) ? await decodeYmt(data) : moduleToSong(loadModule(data), {}).song;
-const ours = renderSong(song);
-const m = songToMaxymiser(song);
 const dir = mkdtempSync(join(tmpdir(), 'mym-'));
+let song, m: { mys: Uint8Array; myv: Uint8Array; warnings: string[]; stats: { orders: number; patterns: number; instruments: number; sequences: number } };
+if (/\.mys$/i.test(file)) {
+  // import check: the real replayer plays the original files, the editor plays what the importer made of them
+  const voice = new Uint8Array(readFileSync(voiceArg ?? file.replace(/\.(mys)$/i, (_m, e: string) => (e === e.toUpperCase() ? '.MYV' : '.myv'))));
+  const imp = maxymiserToSong(data, voice, file);
+  song = imp.song;
+  m = { mys: data, myv: voice, warnings: imp.warnings, stats: { orders: imp.stats.orders, patterns: imp.stats.patterns, instruments: imp.stats.instruments, sequences: 0 } };
+} else {
+  song = isYmt(data) ? await decodeYmt(data) : moduleToSong(loadModule(data), {}).song;
+  m = songToMaxymiser(song);
+}
+const ours = renderSong(song);
 writeFileSync(join(dir, 's.mys'), m.mys); writeFileSync(join(dir, 's.myv'), m.myv);
 execFileSync(resolve('tools/verify/maxymiser/oracle.sh'), [resolve(bin), join(dir, 's.mys'), join(dir, 's.myv'), join(dir, 's.sndh')], { stdio: 'inherit' });
 const theirs = parseSndh(new Uint8Array(readFileSync(join(dir, 's.sndh'))));

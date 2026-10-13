@@ -9,13 +9,21 @@
  * hardware-envelope (buzzer) and noise/tone choices and step-table instruments all have a direct counterpart.
  * Notes always carry their instrument column so the sequences restart on every note, as they do in this editor.
  *
+ * Timer effects Q / S / U become copies of the instrument with a SID (kind 5) or sync-buzzer (kind 11) timer whose rate is pinned
+ * with a fixed-frequency sequence; a SID waveform is a short sequence of attenuation steps.
+ * Digidrums become digi instruments (mixer kind 13) over shared 8-bit samples; a drum owns the voice, and the voice stays silent
+ * after it until the next note.
+ *
  * Not exported (reported as warnings): ADSR release (a maxYMiser note-off cuts), volume slides, tremolo, global volume,
- * retrigger / note cut / delay, hardware-envelope period effects, timer effects Q/S/U, digidrums, tempo changes.
+ * retrigger / note cut / delay, hardware-envelope period effects, tempo changes.
  */
 import { type Song, type Instrument, type Cell, NOTE_OFF, EFFECT_LETTERS, channelsOf, drumChannelOf, VOICES, noteToFreq } from '../tracker/types';
+import { type DrumSample, mfpRate } from '../core/drums';
+import { FX_SID, FX_SINUS, FX_SYNC, fxSetting, sinusLevel, SINUS_STEPS } from '../core/fx';
+import { timerPeriodFor } from './timers';
 import { renderSong, LINEAR_TO_YM_VOL, VIB_TABLE, freqToYmPeriod } from '../tracker/render';
 import {
-  INST, MYM_ROWS, MYM_MAX_PATTERNS, MYM_MAX_ORDERS, MYM_MAX_SEQUENCES, MYM_SEQ_WORDS, MYM_INSTRUMENTS,
+  INST, MYM_ROWS, MYM_MAX_PATTERNS, MYM_MAX_ORDERS, MYM_MAX_SEQUENCES, MYM_SEQ_WORDS, MYM_INSTRUMENTS, MYM_SAMPLES,
   type MymCell, type MymSeq, type MymBank, type MymSong, emptyMymCell, isEmptyMymCell, newMymBank, newMymSong, encodeBank, encodeSong,
   encodeInstrument, emptySeq,
 } from './format';
@@ -30,7 +38,7 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const u16 = (v: number) => v & 0xffff;
 const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
 
-export interface MymResult { mys: Uint8Array; myv: Uint8Array; warnings: string[]; stats: { patterns: number; orders: number; sequences: number; instruments: number } }
+export interface MymResult { mys: Uint8Array; myv: Uint8Array; warnings: string[]; stats: { patterns: number; orders: number; sequences: number; instruments: number; samples: number } }
 
 // ------------------------------------------------------------------ sequences
 
@@ -114,7 +122,10 @@ interface Compiled {
   ids?: { vol: number; arp: number; vib: number; mix: number; noise: number; fix: number; mixBuzz: number };
 }
 
-const MIX_TONE = 0x0100, MIX_NOISE = 0x1000, MIX_BUZZ = 0x0010;
+const MIX_TONE = 0x0100, MIX_NOISE = 0x1000, MIX_BUZZ = 0x0010, MIX_DIGI = 0x000d;
+/** the replayer's 4-bit DAC level -> signed 8-bit sample byte (and DACLevel maps it back) */
+const DAC_PCM = [128, 129, 130, 132, 133, 135, 138, 142, 148, 157, 170, 189, 216, 7, 82, 127];
+const MYM_SAMPLE_MAX = 32768;
 
 function compileInstrument(inst: Instrument, opt: { rowTicks: number; step: number; warn: (k: string, m: string) => void; label: string }): Compiled {
   const { rowTicks, warn, label } = opt;
@@ -131,6 +142,8 @@ function compileInstrument(inst: Instrument, opt: { rowTicks: number; step: numb
   let arpRepeat = 0;
   let vol: number[], arp: number[] | null = null, vib: MymSeq | null = null, mixV: number[], noiseV: number[] | null = null;
   let volRepeat = -1;
+  /** loop point shared by every sequence of a step table */
+  let stepRepeat = 0;
   let fix: MymSeq | null = null;
   let hard = false;
   const vibDefault = { speed: 0, depth: 0 };
@@ -162,6 +175,8 @@ function compileInstrument(inst: Instrument, opt: { rowTicks: number; step: numb
       }
       if (sq.loopFrom >= 0 && sq.loopFrom < n) volRepeat = Math.floor(sq.loopFrom / step);
       else volRepeat = cnt - 1;
+      stepRepeat = clamp(volRepeat, 0, cnt - 1);
+      arpRepeat = stepRepeat;
 
       if (arp.every((x) => x === 0)) arp = null;
       if (noiseV.every((x) => x === 0)) noiseV = null;
@@ -234,16 +249,16 @@ function compileInstrument(inst: Instrument, opt: { rowTicks: number; step: numb
   }
   rec[INST.seqSpeed] = step;
   if (detune) rec[INST.detuneMask] = 6;
-  const mixSeq: MymSeq = { values: mixV, length: mixV.length, repeat: 0 };
+  const mixSeq: MymSeq = { values: mixV, length: mixV.length, repeat: mixV.length > 1 ? stepRepeat : 0 };
   const mixBuzzVals = mixV.map((w) => (w & MIX_NOISE) | MIX_BUZZ | (inst.syncBuzz && inst.toneEnabled ? MIX_TONE : 0));
   return {
     name: nm, rec,
     vol: { values: vol, length: vol.length, repeat: clamp(volRepeat, 0, vol.length - 1) },
     arp: arp && { values: arp, length: arp.length, repeat: arpRepeat },
     vib, mix: mixSeq,
-    noise: noiseV && { values: noiseV, length: noiseV.length, repeat: 0 },
+    noise: noiseV && { values: noiseV, length: noiseV.length, repeat: noiseV.length > 1 ? stepRepeat : 0 },
     fix,
-    mixBuzz: { values: mixBuzzVals, length: mixBuzzVals.length, repeat: 0 },
+    mixBuzz: { values: mixBuzzVals, length: mixBuzzVals.length, repeat: mixBuzzVals.length > 1 ? stepRepeat : 0 },
     step, vibDefault, hard, velocity: !!inst.seq?.velocity, stepTable: !!inst.seq, detune,
   };
 }
@@ -334,7 +349,6 @@ export function songToMaxymiser(song: Song): MymResult {
   const toneChannels = drumCh >= 0 ? channelsOf(song) - 1 : channelsOf(song);
   const nCh = Math.min(VOICES, toneChannels);
   if (toneChannels > VOICES) warn('chips', `channels ${VOICES + 1}..${toneChannels} (second chip) are not exported`);
-  if (drumCh >= 0) warn('drumch', 'the digidrum channel is not exported (maxYMiser samples are a different system)');
 
   const r = renderSong(song);           // the order the player really walks (jumps, breaks, loops) and the loop point
   if (!r.rows.length) throw new Error('maxYMiser: the song is empty');
@@ -398,7 +412,6 @@ export function songToMaxymiser(song: Song): MymResult {
     const label = `instrument ${hex2(idx)}${inst.name ? ` "${inst.name}"` : ''}`;
     const step = seqSpeedFor(inst);
     const c = compileInstrument(inst, { rowTicks: Math.max(1, song.speed), step, warn, label });
-    if (inst.digiDrums?.length) warn('idrum:' + idx, `${label}: digidrums are not exported`);
     const ids = {
       vol: pool.add(c.vol), arp: c.arp ? pool.add(c.arp) : 0, vib: c.vib ? pool.add(c.vib) : 0, mix: pool.add(c.mix),
       noise: c.noise ? pool.add(c.noise) : 0, fix: c.fix ? pool.add(c.fix) : 0, mixBuzz: pool.add(c.mixBuzz),
@@ -426,6 +439,96 @@ export function songToMaxymiser(song: Song): MymResult {
       }
       vibIds.set(key, id);
     }
+    return id;
+  };
+
+  // ---- digidrums: a digi instrument (mixer kind 13) per drum and rate, 8-bit samples shared by content
+  const digiIds = new Map<string, number>();
+  const sampleIdx = new Map<string, number>();
+  const samples: Uint8Array[] = [];
+  const hashOf = (d: Uint8Array) => { let h = 2166136261; for (let i = 0; i < d.length; i++) h = Math.imul(h ^ d[i], 16777619) >>> 0; return `${d.length}:${h.toString(36)}`; };
+  const digiInstrument = (d: DrumSample): number => {
+    const sk = hashOf(d.pcm);
+    const hz = mfpRate(d.rateHz).hz;
+    const raw = Math.round(2_457_600 / (4 * hz));
+    const rate = clamp(raw, 24, 205);
+    const key = `${sk}/${rate}`;
+    const known = digiIds.get(key);
+    if (known !== undefined) return known;
+    let si = sampleIdx.get(sk);
+    if (si === undefined) {
+      if (samples.length >= MYM_SAMPLES) { warn('digislots', `more than ${MYM_SAMPLES} different digidrum samples: the later ones are left out`); digiIds.set(key, 0); return 0; }
+      let pcm = d.pcm;
+      if (pcm.length > MYM_SAMPLE_MAX) { warn('digilong:' + sk, `digidrum "${d.name}" is longer than a maxYMiser sample (${MYM_SAMPLE_MAX} bytes): cut`); pcm = pcm.subarray(0, MYM_SAMPLE_MAX); }
+      samples.push(Uint8Array.from(pcm, (x) => DAC_PCM[x & 15]));
+      si = samples.length - 1; sampleIdx.set(sk, si);
+    }
+    if (nextSlot >= MYM_INSTRUMENTS) { warn('digislots2', `no instrument slot left for a digidrum (a bank holds ${MYM_INSTRUMENTS} instruments)`); digiIds.set(key, 0); return 0; }
+    if (raw !== rate) warn('digirate:' + key, `digidrum "${d.name}" at ${Math.round(hz)} Hz is outside what maxYMiser plays (${Math.round(2_457_600 / (4 * 205))}..${Math.round(2_457_600 / (4 * 24))} Hz): it plays at the nearest rate`);
+    const rec = new Uint8Array(64);
+    const nm = (d.name || 'drum').replace(/[^\x20-\x7e]/g, '?').slice(0, 15);
+    for (let i = 0; i < nm.length; i++) rec[INST.name + i] = nm.charCodeAt(i);
+    rec[INST.seqSpeed] = 1; rec[INST.wave] = 14; rec[INST.sample] = si + 1; rec[INST.sampleRate] = rate;
+    rec[INST.volSeq] = pool.add({ values: [15], length: 1, repeat: 0 });
+    rec[INST.mixSeq] = pool.add({ values: [MIX_DIGI], length: 1, repeat: 0 });
+    bank.instruments[nextSlot].set(rec);
+    const id = ++nextSlot;
+    digiIds.set(key, id);
+    return id;
+  };
+
+  // ---- timer effects (Q S U): a copy of the instrument with the timer kind, its waveform and a fixed timer period
+  const timerIds = new Map<string, number>();
+  const timerVariant = (idx: number, kind: number, param: number): number => {
+    const cpv = compiled.get(idx);
+    if (!cpv) return 0;
+    const setting = fxSetting(kind as 1 | 2 | 3, 0, param);
+    if (!setting) return 0;
+    const key = `${idx}/${kind}/${setting.code}/${setting.count}`;
+    const known = timerIds.get(key);
+    if (known !== undefined) return known;
+    const letter = kind === FX_SID ? 'Q' : kind === FX_SINUS ? 'S' : 'U';
+    let fixed: { period: number; hz: number } | null = null;
+    let tim: number[], mixKind: number, steps = 2;
+    if (kind === FX_SID) {
+      // the editor toggles at the timer rate: a square wave of half that rate
+      tim = [15, 0]; mixKind = 5; steps = 2;
+      fixed = timerPeriodFor(5, 2, setting.hz);
+    } else if (kind === FX_SINUS) {
+      // 64 table positions per wave (one timer period = 32 interrupts of the editor's table); a step covers 64 / n of them
+      mixKind = 5;
+      for (steps = 16; steps >= 2; steps >>= 1) {
+        const wanted = (setting.hz * SINUS_STEPS) / (64 / steps);
+        fixed = timerPeriodFor(5, steps, wanted);
+        if (fixed) break;
+      }
+      const per = 64 / steps;
+      tim = Array.from({ length: steps }, (_, i) => {
+        let sum = 0;
+        for (let k = 0; k < per; k++) sum += sinusLevel(Math.floor(i * per + k), 15);
+        return 15 - clamp(Math.round(sum / per), 0, 15);
+      });
+    } else {
+      tim = [cpv.rec[INST.wave] & 15]; mixKind = 11; steps = 1;
+      fixed = timerPeriodFor(11, 1, setting.hz);
+    }
+    if (nextSlot >= MYM_INSTRUMENTS) { warn('fxslots', `no instrument slot left for a timer effect (a bank holds ${MYM_INSTRUMENTS} instruments)`); timerIds.set(key, 0); return 0; }
+    if (!fixed) { warn('fxrate:' + key, `${letter}${param.toString(16).toUpperCase().padStart(2, '0')}: the maxYMiser timer cannot run at about ${Math.round(setting.hz)} Hz`); timerIds.set(key, 0); return 0; }
+    if (setting.clamped) warn('fxclamp:' + key, `${letter}${param.toString(16).toUpperCase().padStart(2, '0')}: the timer plays at about ${Math.round(setting.hz)} Hz`);
+    const rec = cpv.rec.slice();
+    const mixVals = cpv.mix.values.map((w) => (w & 0xfff0) | mixKind | (kind === FX_SYNC ? MIX_BUZZ : 0));
+    rec[INST.mixSeq] = pool.add({ values: mixVals, length: mixVals.length, repeat: cpv.mix.repeat });
+    rec[INST.timSeq] = pool.add({ values: tim, length: tim.length, repeat: 0 });
+    if (rec[INST.fixSeq]) warn('fxfix:' + idx, `instrument ${hex2(idx)} already has a fixed-frequency sequence: its timer effect follows the note instead of the Q/S/U rate`);
+    else { rec[INST.fixSeq] = pool.add({ values: [fixed.period], length: 1, repeat: 0 }); rec[INST.fixMask] |= 1; }
+    if (kind === FX_SYNC) rec[INST.sync] = rec[INST.sync] || 1;
+    const nm = ((song.instruments[idx]?.name || '') + ' ' + letter).trim().slice(0, 15);
+    rec.fill(0, INST.name, INST.name + 16);
+    for (let i = 0; i < nm.length; i++) rec[INST.name + i] = nm.charCodeAt(i);
+    bank.instruments[nextSlot].set(rec);
+    const id = ++nextSlot;
+    timerIds.set(key, id);
+    void steps;
     return id;
   };
 
@@ -457,8 +560,8 @@ export function songToMaxymiser(song: Song): MymResult {
       case 'G': case 'H': unsup('gvol', 'global volume (Gxx Hxy)'); break;
       case 'L': case 'M': case 'P': case 'Y': unsup('hardenv', 'hardware-envelope effects (L M P Y)'); break;
       case 'R': unsup('retrig', 'retrigger (R)'); break;
-      case 'Q': case 'S': case 'U': unsup('timerfx', 'timer effects (Q S U): use the SNDH / YM export for these'); break;
-      case 'Z': unsup('digi', 'digidrums (Z)'); break;
+      case 'Q': case 'S': case 'U': break;
+      case 'Z': break;
       case 'E': {
         const sub = (cell.param >> 4) & 15;
         if (sub === 6) break;                                     // pattern loop: already unrolled by the player walk
@@ -472,8 +575,7 @@ export function songToMaxymiser(song: Song): MymResult {
   const perTick = (p: number) => (rowTicksNow > 1 ? Math.max(1, Math.round((p * (rowTicksNow - 1)) / rowTicksNow)) : p);
   const mixOverride = (c: Compiled): number => c.ids!.mixBuzz;
 
-  const speedCells: number[] = [];
-  void speedCells;
+  let drumInstNow = 1;
   for (const seg of segs) {
     const pat = song.patterns[song.order[seg.order] ?? 0];
     const tracks: MymCell[][] = Array.from({ length: 3 }, () => Array.from({ length: MYM_ROWS }, emptyMymCell));
@@ -580,6 +682,20 @@ export function songToMaxymiser(song: Song): MymResult {
           if (cell.param > 0 && cell.param < 0x20) { effs.push({ l: 'S', p: cell.param, prio: 1 }); rowTicksNow = cell.param; }
           else if (cell.param >= 0x20) unsup('tempo', 'tempo changes (Fxx >= 20): maxYMiser has one replay rate for the whole song');
         }
+        // --- timer effect: the note (or a re-trigger of the sounding one) plays the timer copy of its instrument
+        if (cp && (nmEff === 'Q' || nmEff === 'S' || nmEff === 'U') && cell.param && note !== NOTE_OFF && (st.active || emitInst)) {
+          const kind = nmEff === 'Q' ? FX_SID : nmEff === 'S' ? FX_SINUS : FX_SYNC;
+          const vid = timerVariant(st.inst, kind, cell.param);
+          if (vid) {
+            if (emitInst) out.inst = vid;
+            else if (!relTrig) {
+              out.note = mymNote(st.lastNote); out.inst = vid; relTrig = true; st.mAtt = 0; st.age = 0;
+              warn('fxmid', 'a timer effect (Q S U) on a note that is already sounding restarts the instrument');
+            }
+          }
+        } else if (nmEff === 'Q' || nmEff === 'S' || nmEff === 'U') {
+          if (!cell.param) unsup('fxoff', 'switching a timer effect off (Q00 S00 U00) while the note sounds');
+        }
         if ((emitInst || relTrig) && cp && cp.detune) {
           const per = freqToYmPeriod(noteToFreq(relTrig ? st.lastNote : note));
           const fine = clamp(Math.round(per * (1 - Math.pow(2, -cp.detune / 12))), -128, 127);
@@ -592,6 +708,24 @@ export function songToMaxymiser(song: Song): MymResult {
           if (hardInst && st.vol > 0) want = Math.min(want, 14);
           if (want !== st.mAtt) { out.vol = 0x10 | want; st.mAtt = want; }
         }
+        // --- digidrum (Z): the drum owns the voice; the voice stays silent after it until the next note
+        if (nmEff === 'Z') {
+          if (cell.param === 0) {
+            if (!out.note) { out.note = 1; st.active = false; st.arpOn = false; st.slideOn = false; st.vibKey = ''; st.mAtt = 0; }
+          } else {
+            const d = song.instruments[st.inst]?.digiDrums?.[cell.param - 1];
+            if (!d) unsup('digimissing', 'Z effects naming a digidrum the instrument does not have');
+            else {
+              const id = digiInstrument(d);
+              if (!id) unsup('digislots', 'digidrums that did not fit (8 samples, 32 instruments)');
+              else {
+                out.note = mymNote(note > 0 && note !== NOTE_OFF ? note : st.lastNote || 49); out.inst = id; out.vol = 0;
+                for (let k = effs.length - 1; k >= 0; k--) if (effs[k].l !== 'S') effs.splice(k, 1);
+                st.active = false; st.arpOn = false; st.slideOn = false; st.vibKey = ''; st.mAtt = 0;
+              }
+            }
+          }
+        }
         // --- last row of a short segment: pattern break goes on track 0 (handled below)
         // --- fill the two effect slots by priority
         effs.sort((a, b) => a.prio - b.prio);
@@ -599,6 +733,27 @@ export function songToMaxymiser(song: Song): MymResult {
         if (effs.length > 2) unsup('slots', 'cells with more effects than a maxYMiser cell holds (two): extra ones are dropped');
         if (kept[0]) { out.fx1 = ch(kept[0].l); out.p1 = kept[0].p & 255; }
         if (kept[1]) { out.fx2 = ch(kept[1].l); out.p2 = kept[1].p & 255; }
+      }
+      // --- the drum channel: a note picks a digidrum of the channel's instrument and plays it on voice C
+      if (drumCh >= 0 && rowCells?.[drumCh]) {
+        const dc = rowCells[drumCh];
+        if (dc.instrument && song.instruments[dc.instrument]) drumInstNow = dc.instrument;
+        const vc = VOICES - 1, out = tracks[vc][i], st = states[vc];
+        if (dc.note === NOTE_OFF) {
+          if (!out.note) { out.note = 1; st.active = false; st.arpOn = false; st.slideOn = false; st.vibKey = ''; st.mAtt = 0; }
+        } else if (dc.note > 0) {
+          const bankD = song.instruments[drumInstNow]?.digiDrums ?? [];
+          if (!bankD.length) unsup('nobank', 'drum-channel notes whose instrument has no digidrums');
+          else {
+            const id = digiInstrument(bankD[(dc.note - 1) % bankD.length]);
+            if (!id) unsup('digislots', 'digidrums that did not fit (8 samples, 32 instruments)');
+            else {
+              if (out.note > 1) unsup('drumover', 'digidrum hits that replace a note on voice C');
+              out.note = mymNote(49); out.inst = id; out.vol = 0;
+              st.active = false; st.arpOn = false; st.slideOn = false; st.vibKey = ''; st.mAtt = 0;
+            }
+          }
+        }
       }
       for (const st of states) st.age += rowTicksNow;
     }
@@ -618,6 +773,7 @@ export function songToMaxymiser(song: Song): MymResult {
 
   // ---- assemble
   bank.sequences = pool.seqs;
+  samples.forEach((pcm, k) => { bank.samples[k] = { pcm, params: new Uint8Array(4) }; });
   const ms: MymSong = newMymSong();
   ms.state.set([0, 5, 0, 0, 0, 1, 2, 0, 1, 0, 255, 255, 3, 6, 50, 4, 1, 0, 7, 7, 0, 0, 0, 7, 0, 0, 0, 0, 18, 1, 0, 0, 1, 1, 1, 1, 7, 0, 0, 0, 0, 0, 0, 0, 6, 6, 6, 4, 0, 0, 1, 0, 0, 1, 2, 0], 0);
   ms.state[13] = clamp(song.speed, 2, 255);
@@ -632,7 +788,7 @@ export function songToMaxymiser(song: Song): MymResult {
 
   return {
     mys: encodeSong(ms), myv: encodeBank(bank), warnings,
-    stats: { patterns: patterns.length, orders: orders.length, sequences: pool.seqs.length - 1, instruments: used.length },
+    stats: { patterns: patterns.length, orders: orders.length, sequences: pool.seqs.length - 1, instruments: used.length, samples: samples.length },
   };
 }
 

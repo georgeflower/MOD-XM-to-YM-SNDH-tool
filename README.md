@@ -12,7 +12,7 @@ A browser tool that turns **ProTracker `.MOD`** and **FastTracker II `.XM`** mod
 | **SNDH** (`.sndh`) | Header + a position-independent 68000 player (≈0.8 KB, includes the digidrum and timer-effect engines) + packed register stream (+ digidrum table). Timer C 50 Hz (`TC50`). Verified bit-exact in an emulated 68000 (psgplay) incl. loop wrap-around and digidrum sample values. |
 | **YM** (`.ym`) | `YM5!` uncompressed register dump; `YM6!` with digidrums / timer effects when the song has any (loads in ST-Sound and friends). |
 | **Game kit** (`.zip`) | `<name>.h` (packed stream as a C array, + digidrum table) + `ymplay.h` (small replayer; with digidrums / timer effects also the 68000 engine). The game owns the PSG, so sound effects can steal a voice. |
-| **maxYMiser** (`.mys` + `.myv`, `.myi`) | The song as native files for gwEm's [maxYMiser](https://preromanbritain.com/maxymiser/) tracker (song + voice bank, or one instrument), so a tune can be continued there. See below. |
+| **maxYMiser** (`.mys` + `.myv`, `.myi`) | The song as native files for gwEm's [maxYMiser](https://preromanbritain.com/maxymiser/) tracker (song + voice bank, or one instrument), so a tune can be continued there — digidrums and `Q` `S` `U` timer effects included. The same files load back into the editor (*Load maxYMiser…*). See below. |
 | Raw regs / WAV / report | 14 bytes per frame; YM emulator preview; conversion log. |
 
 How the conversion works: the module is replayed tick-accurately (all XM/MOD effects, envelopes, auto-vibrato,
@@ -135,13 +135,39 @@ use the editor's own file formats (song `MYM0`, voice bank version 0), so maxYMi
   ADSR / step-table **release** is played as a note re-trigger with a fade instrument (maxYMiser itself cuts on note-off).
 * **Effects that carry over:** `0xy` arpeggio, `1xx` `2xx` slides, `3xx` tone portamento, `4xy` vibrato, `Cxx` / volume column (as attenuation), `Fxx` speed, `Dxx`/`Bxx`/`E6x`
   (the player's real walk through the song is unrolled into positions, the loop point becomes the repeat position), `Xxx` forced buzzer, `Kxx` key off.
-* **Not exported** (listed as warnings): volume slides, tremolo, global volume, retrigger / note cut / delay, `L M P Y` envelope effects, tempo changes, the digidrum channel
-  and `Z` (use the SNDH / YM export for digidrums), timer effects `Q S U`, instruments beyond 32, second-chip channels.
+* **Digidrums** (`Z` effect and the drum channel) become *digi* instruments (mixer kind 13) over 8-bit samples: each 4-bit drum is written through the replayer's own DAC table
+  (so it reads back as the same 16 levels), samples are shared by content, the rate is `2457600 / (4 × n)` Hz with n = 24…205. A drum owns its voice and the voice stays
+  silent after it until the next note. At most 8 different samples of 32 KB and the 32 instrument slots; what does not fit is listed.
+* **Timer effects** `Q` (SID), `S` (sinus-SID) and `U` (sync-buzzer) become a copy of the instrument whose mixer selects the SID (5) or sync-buzzer (11) timer, whose `Tim`
+  sequence is the waveform (square `15,0`; the sinus table in 16 steps, fewer when the rate needs it; the buzzer shape for `U`) and whose timer is pinned to the wanted rate with a
+  fixed-frequency sequence (the arithmetic of the replayer's rate table is in `src/maxymiser/timers.ts`). The Hz you asked for is what plays, within the MFP's limits (warned when clamped).
+  A `Q`/`S`/`U` on a note that is already sounding re-triggers it.
+* **Not exported** (listed as warnings): volume slides, tremolo, global volume, retrigger / note cut / delay, `L M P Y` envelope effects, tempo changes, `Q S U` switch-off while a
+  note sounds, instruments beyond 32, second-chip channels.
 * **Verified against the real replayer.** `scripts/maxymiser-check.ts <MYM_REPL.BIN> <song>` wraps the export in an SNDH with gwEm's own replayer
   (`tools/verify/maxymiser/`) and compares every frame with the editor's render: simple songs are identical, converted modules match except where noted (fractional
   tuning that varies per step, vibrato phase). The format code also round-trips gwEm's example songs, banks and instruments byte for byte, and the files decode in
   [go-MaxYMiser](https://github.com/olivierh59500/go-MaxYMiser). The replayer binary and gwEm's files are not part of this repository.
 * maxYMiser is © Gareth Morris "gwEm"; its licence asks that anything released that was made with it says so.
+
+### maxYMiser import
+
+*Load maxYMiser…* takes a `.MYS` (select its `.MYV` voice bank too) or a single `.MYI`. The song becomes a normal pattern song: each song position is a pattern of the three tracks,
+a pattern break shortens it, the repeat position is the restart position, the replay rate is the BPM (× 2.5), `Sxx` is `Fxx`. Looping "jam" patterns are skipped as the player does.
+
+* **Instruments are played tick by tick** into step tables (volume, arpeggio, vibrato, fixed pitch and coarse detune folded into a semitone offset, noise, tone), so sequences
+  with their own speed, loop points and different lengths come out right. Buzzer sounds become hardware-envelope instruments (shape, fixed envelope period, divisor, arpeggio /
+  vibrato as macros). The instrument's component masks decide where arpeggio, vibrato, portamento, transpose and detune apply, as in the replayer.
+* **Digi instruments** become instruments with digidrums (sample → 4-bit through the replayer's DAC thresholds, volume and attenuation baked in) and a `Z` on each hit.
+  **SID / sync-buzzer instruments** get a `Q` / `S` / `U` next to each note (timer rate from the note's frequency × waveform steps; a two-level waveform is a `Q`, anything else
+  an `S`; pulse widths are not kept).
+* **Effects:** `X` → `0xy`, `H` → `1xx`/`2xx`, `P` → `3xx` (scaled for the tick the editor skips), `V` → `4xy` (depth is limited to what `4xy` can do), `W`/`M` → `Xx` (buzzer),
+  `S`, `T`, `E` (a tuned copy of the step-table instrument per note). The editor has one effect per cell, maxYMiser two: timers / drums win, then speed, buzzer, vibrato,
+  arpeggio, slides; arpeggio and slides are repeated on every row they last. What does not fit is counted in the warnings.
+* **Not imported:** the STe DMA track, sequence-switching effects (`A F I L N Q`), `C D O Y U` effects, timer kinds other than SID / digi / sync-buzzer (the other replayer builds
+  have more).
+* Checked against the real replayer register by register (`scripts/maxymiser-check.ts <MYM_REPL.BIN> song.mys`): gwEm's own example songs and songs exported from here
+  play identically except for slides (the replayer also slides on the first tick) and fractional tuning.
 
 ## Using it
 
@@ -189,6 +215,6 @@ public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of th
 * Mapper follow-ups: sample → waveform (square duty/buzzer envelope), saving a mapping with the project
 * More than one timer effect or drum at a time (needs a second timer / mixing engine); timer-driven arpeggio and other handler effects that are not drums or Q/S/U
 * Furnace `.fur`, Arkos Tracker `.aks` export
-* maxYMiser: digidrums as DMA/Timer-D samples, timer effects as mixer-sequence timers, `.MYS` / `.MYV` import
+* maxYMiser: the STe DMA track (sampled sound), sequence-switching effects, more than one timer effect on the voices at once
 
 Note: SNDH files made here play in any SNDH player but cannot be opened *in* maxYMiser (it only loads its own songs) — use the maxYMiser export for that.

@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { newSong, emptyPattern, parseEffectChar, NOTE_OFF } from '../src/tracker/types';
+import { maxymiserToSong } from '../src/maxymiser/import';
+import { timerFrequency, timerPeriodFor } from '../src/maxymiser/timers';
+import { fxParamHz } from '../src/core/fx';
 import { songToMaxymiser, instrumentToMyi, mymNote } from '../src/maxymiser/convert';
 import { LINEAR_TO_YM_VOL } from '../src/tracker/render';
+import { mfpRate } from '../src/core/drums';
 import {
   newMymSong, newMymBank, encodeSong, decodeSong, encodeBank, decodeBank, encodeInstrument, decodeInstrument,
   emptyMymCell, INST, SONG_HEADER,
@@ -156,10 +160,10 @@ describe('song -> maxYMiser', () => {
 
   it('reports what it leaves out', () => {
     const s = mkSong();
-    s.patterns[0].cells[0][0] = cell(49, 1, 'Q', 0x24);
+    s.patterns[0].cells[0][0] = cell(49, 1, '7', 0x24);
     s.patterns[0].cells[2][0] = cell(49, 1, 'A', 0x04);
     const r = songToMaxymiser(s);
-    expect(r.warnings.some((w) => /timer effects/.test(w))).toBe(true);
+    expect(r.warnings.some((w) => /tremolo/.test(w))).toBe(true);
     expect(r.warnings.some((w) => /volume slides/.test(w))).toBe(true);
   });
 
@@ -170,5 +174,115 @@ describe('song -> maxYMiser', () => {
     const f = decodeInstrument(data);
     expect(f.inst[INST.wave]).toBe(12);
     expect(f.sequences[3].values[0] & 0xf0).not.toBe(0);              // buzzer bit in the mixer sequence
+  });
+});
+
+describe('song -> maxYMiser: digidrums', () => {
+  const kick = Uint8Array.from({ length: 300 }, (_, i) => (i * 7) % 16);
+  const snare = Uint8Array.from({ length: 500 }, (_, i) => (i * 5 + 3) % 16);
+  const withDrums = () => {
+    const s = mkSong();
+    s.instruments[2].digiDrums = [{ name: 'kick', pcm: kick, rateHz: 9452 }, { name: 'snare', pcm: snare, rateHz: 12000 }];
+    return s;
+  };
+  it('writes samples through the DAC table and plays them with digi instruments', () => {
+    const s = withDrums();
+    s.patterns[0].cells[0][1] = cell(49, 2, 'Z', 1);
+    s.patterns[0].cells[8][1] = cell(49, 2, 'Z', 2);
+    s.patterns[0].cells[16][1] = cell(49, 2, 'Z', 1);
+    const r = songToMaxymiser(s);
+    const song = decodeSong(r.mys), bank = decodeBank(r.myv);
+    expect(r.stats.samples).toBe(2);
+    expect(bank.samples[0].pcm.length).toBe(300);
+    expect(bank.samples[0].pcm[1]).toBe(142);                           // level 7 -> DAC byte
+    expect(bank.samples[0].pcm[0]).toBe(128);                           // level 0
+    const t1 = song.patterns[song.orders[0][1]];
+    const k = bank.instruments[t1[0].inst - 1];
+    expect(bank.sequences[k[INST.mixSeq]].values[0]).toBe(0x000d);
+    expect(k[INST.sample]).toBe(1);
+    expect(k[INST.sampleRate]).toBe(Math.round(2457600 / (4 * mfpRate(9452).hz)));
+    expect(bank.instruments[t1[8].inst - 1][INST.sample]).toBe(2);
+    expect(t1[16].inst).toBe(t1[0].inst);                               // same drum, same instrument
+    expect(r.warnings.some((w) => /digidrum/i.test(w))).toBe(false);
+  });
+  it('plays the drum channel on voice C and comes back through the importer unchanged', () => {
+    const s = withDrums();
+    s.channelCount = 4; s.drumChannel = 3; s.patterns[0] = emptyPattern(64, 4);
+    s.patterns[0].cells[0][3] = cell(1, 2);
+    s.patterns[0].cells[4][3] = cell(2);
+    s.patterns[0].cells[8][0] = cell(49, 1);
+    const r = songToMaxymiser(s);
+    const song = decodeSong(r.mys);
+    const t2 = song.patterns[song.orders[0][2]];
+    expect(t2[0].inst).toBeGreaterThan(0); expect(t2[4].inst).toBeGreaterThan(0); expect(t2[4].inst).not.toBe(t2[0].inst);
+    const back = maxymiserToSong(r.mys, r.myv, 'd.mys').song;
+    const drums = back.instruments.flatMap((i) => i.digiDrums ?? []);
+    expect(drums.length).toBe(2);
+    expect(Array.from(drums[0].pcm)).toEqual(Array.from(kick));
+    expect(Array.from(drums[1].pcm)).toEqual(Array.from(snare));
+  });
+  it('says so when the samples do not fit', () => {
+    const s = mkSong();
+    s.instruments[2].digiDrums = Array.from({ length: 10 }, (_, i) => ({ name: `d${i}`, pcm: Uint8Array.from({ length: 50 }, (_, k) => (k + i) % 16), rateHz: 9000 }));
+    for (let i = 0; i < 10; i++) s.patterns[0].cells[i * 2][1] = cell(49, 2, 'Z', i + 1);
+    const r = songToMaxymiser(s);
+    expect(r.stats.samples).toBe(8);
+    expect(r.warnings.some((w) => /more than 8 different digidrum/.test(w))).toBe(true);
+  });
+});
+
+describe('song -> maxYMiser: timer effects', () => {
+  const sidSong = (eff: string, param: number, inst = 1) => {
+    const s = mkSong();
+    s.instruments[2].useHardEnv = true; s.instruments[2].hardEnvShape = 12; s.instruments[2].adsr.useAdsr = false; s.instruments[2].volEnv = [15]; s.instruments[2].syncBuzz = true;
+    s.patterns[0].cells[0][0] = cell(49, inst, eff, param);
+    return s;
+  };
+  it('Q: a SID instrument with a pinned timer rate', () => {
+    const r = songToMaxymiser(sidSong('Q', 0x6a));
+    const song = decodeSong(r.mys), bank = decodeBank(r.myv);
+    const inst = bank.instruments[song.patterns[song.orders[0][0]][0].inst - 1];
+    expect(bank.sequences[inst[INST.mixSeq]].values[0] & 15).toBe(5);
+    expect(bank.sequences[inst[INST.timSeq]].values).toEqual([15, 0]);
+    expect(inst[INST.fixMask] & 1).toBe(1);
+    const period = bank.sequences[inst[INST.fixSeq]].values[0];
+    const want = 20 * Math.pow(2, 10 + 6 / 16);                           // clamped by the MFP: nearest it can do
+    const hz = timerFrequency(period, 5, 2);
+    expect(hz / Math.min(want, 19819)).toBeGreaterThan(0.93); expect(hz / Math.min(want, 19819)).toBeLessThan(1.07);
+    expect(song.state[36]).toBe(7);                                       // timers enabled
+  });
+  it('S: a sixteen-step waveform; U: a buzzer shape at the timer rate', () => {
+    const rs = songToMaxymiser(sidSong('S', 0x04));
+    const bs = decodeBank(rs.myv), ss = decodeSong(rs.mys);
+    const i1 = bs.instruments[ss.patterns[ss.orders[0][0]][0].inst - 1];
+    const wave = bs.sequences[i1[INST.timSeq]];
+    expect(wave.length).toBe(16);
+    expect(Math.min(...wave.values)).toBeLessThan(5); expect(Math.max(...wave.values)).toBe(15);     // some peak, some silence
+    expect(timerFrequency(bs.sequences[i1[INST.fixSeq]].values[0], 5, 16)).toBeGreaterThan(0.9 * 16 * fxParamHz(0x04) / 2);
+
+    const ru = songToMaxymiser(sidSong('U', 0x20, 2));
+    const bu = decodeBank(ru.myv), su = decodeSong(ru.mys);
+    const i2 = bu.instruments[su.patterns[su.orders[0][0]][0].inst - 1];
+    expect(bu.sequences[i2[INST.mixSeq]].values[0] & 15).toBe(11);
+    expect(bu.sequences[i2[INST.timSeq]].values).toEqual([12]);
+    expect(timerFrequency(bu.sequences[i2[INST.fixSeq]].values[0], 11, 1) / fxParamHz(0x20)).toBeGreaterThan(0.94);
+  });
+  it('re-triggers a sounding note and warns about it; the result reads back as a Q effect', () => {
+    const s = mkSong();
+    s.patterns[0].cells[0][0] = cell(49, 1);
+    s.patterns[0].cells[8][0] = cell(0, 0, 'Q', 0x50);
+    const r = songToMaxymiser(s);
+    expect(r.warnings.some((w) => /already sounding/.test(w))).toBe(true);
+    const back = maxymiserToSong(r.mys, r.myv, 'q.mys').song;
+    const row8 = back.patterns[back.order[0]].cells[8][0];
+    expect(row8.effect).toBe(parseEffectChar('Q'));
+  });
+  it('finds a fixed period for a wanted interrupt rate', () => {
+    for (const hz of [800, 3000, 9000]) {
+      const f = timerPeriodFor(5, 2, hz)!;
+      expect(f).not.toBeNull();
+      expect(Math.abs(Math.log(f.hz / hz))).toBeLessThan(0.06);
+    }
+    expect(timerPeriodFor(5, 2, 90000)).toBeNull();
   });
 });

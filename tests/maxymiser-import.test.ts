@@ -203,7 +203,7 @@ describe('maxYMiser import: reading a hand-made song', () => {
     expect(q.effect).toBe(parseEffectChar('Q'));
     expect(fxParamHz(q.param) / (2 * hz)).toBeGreaterThan(0.97); expect(fxParamHz(q.param) / (2 * hz)).toBeLessThan(1.03);
     expect(sn.effect).toBe(parseEffectChar('S'));
-    expect(fxParamHz(sn.param) / hz).toBeGreaterThan(0.97); expect(fxParamHz(sn.param) / hz).toBeLessThan(1.03);
+    expect(fxParamHz(sn.param) / (2 * hz)).toBeGreaterThan(0.97); expect(fxParamHz(sn.param) / (2 * hz)).toBeLessThan(1.03);
     expect(u.effect).toBe(parseEffectChar('U'));
     expect(r.song.instruments[3].useHardEnv).toBe(true);
     expect(r.song.instruments[3].hardEnvShape).toBe(12);

@@ -349,7 +349,7 @@ export function convertSong(ms: MymSong, bank0: MymBank | null, title = ''): Mym
       const t = b.tim ?? ZERO_SEQ;
       const n = Math.max(1, Math.min(16, t.length));
       const lv = new Set(t.values.slice(0, n).map((v) => 15 - Math.min(15, v & 15)));
-      if (lv.size > 2) { warn('sidwave:' + b.nameOf, `instrument "${b.nameOf}": a SID waveform with more than two levels is played as a sine`); const p = fxParamForHz(f); return p ? { eff: 'S', p, prio: 0 } : null; }
+      if (lv.size > 2) { warn('sidwave:' + b.nameOf, `instrument "${b.nameOf}": a SID waveform with more than two levels is played as a sine`); const p = fxParamForHz(f * 2); return p ? { eff: 'S', p, prio: 0 } : null; }
       if (n !== 2 || lv.size !== 2) warn('sidpw:' + b.nameOf, `instrument "${b.nameOf}": a SID waveform that is not a plain square is played as a square`);
       const p = fxParamForHz(f * 2);
       return p ? { eff: 'Q', p, prio: 0 } : null;
