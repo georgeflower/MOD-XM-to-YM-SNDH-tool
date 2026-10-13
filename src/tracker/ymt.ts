@@ -153,7 +153,7 @@ export async function encodeYmt(song: Song, opts: { gzip?: boolean } = {}): Prom
   for (const [ins, i] of withSeq) {
     const sq = ins.seq!;
     p.u16(i); p.i16(sq.loopFrom); p.u8(sq.velocity ? 1 : 0); p.u8(sq.release); p.u16(sq.steps.length);
-    for (const s of sq.steps) { p.i16(Math.round(s.vol * 100)); p.i16(Math.round(s.semi * 100)); p.u8(s.noise); p.u8(s.tone ? 1 : 0); }
+    for (const s of sq.steps) { p.i16(Math.round(s.vol * 100)); p.i16(Math.round(s.semi * 100)); p.u8(s.noise); p.u8((s.tone ? 1 : 0) | (s.plain ? 2 : 0)); }
   }
   p.bytes(new TextEncoder().encode('XAUT')); p.str16(song.author ?? '');
   const withSync = song.instruments.map((ins, i) => [ins, i] as const).filter(([ins]) => ins.syncSquare);
@@ -194,7 +194,7 @@ export async function decodeYmt(buf: Uint8Array): Promise<Song> {
       for (let k = 0; k < n; k++) {
         const idx = r.u16(), loopFrom = r.i16(), velocity = !!r.u8(), release = r.u8(), cnt = r.u16();
         const steps = [];
-        for (let j = 0; j < cnt; j++) steps.push({ vol: r.i16() / 100, semi: r.i16() / 100, noise: r.u8(), tone: !!r.u8() });
+        for (let j = 0; j < cnt; j++) { const vol = r.i16() / 100, semi = r.i16() / 100, noise = r.u8(), tb = r.u8(); steps.push(tb & 2 ? { vol, semi, noise, tone: !!(tb & 1), plain: true } : { vol, semi, noise, tone: !!tb }); }
         if (instruments[idx]) instruments[idx].seq = { steps, loopFrom, velocity, release };
       }
     } else if (tag === 'XAUT') song.author = r.str16();

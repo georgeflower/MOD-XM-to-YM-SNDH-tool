@@ -15,6 +15,7 @@ import { zip } from '../export/zip';
 import { songToMaxymiser, instrumentToMyi } from '../maxymiser/convert';
 import { maxymiserToSong, myiToInstrument } from '../maxymiser/import';
 import { songToAks, aksFile } from '../arkos/aks';
+import { aksToSong } from '../arkos/import';
 import { songToFur, furName } from '../furnace/fur';
 import { download } from './download';
 import { NumField, TextField } from './fields';
@@ -255,6 +256,14 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
       ed.loadSong(await decodeYmt(b), f.name);
     } catch (e) { onError(String((e as Error).message ?? e)); }
   };
+  /** Arkos Tracker 3 song (.aks) */
+  const loadAks = async (f: File) => {
+    try {
+      const r = await aksToSong(new Uint8Array(await f.arrayBuffer()), f.name);
+      ed.loadSong(r.song, f.name);
+      if (r.warnings.length) onError(r.warnings.join('; '));
+    } catch (e) { onError(String((e as Error).message ?? e)); }
+  };
   /** .mys (+ .myv) opens as a song, a lone .myi replaces the selected instrument */
   const loadMaxymiser = async (files: File[]) => {
     try {
@@ -354,6 +363,7 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
           <button className="btn" onClick={() => { if (!ed.dirty || confirm('Discard the current song?')) ed.newSong(); }}>New</button>
           <label className="btn">Load .ymt…<input type="file" accept=".ymt,.YMT" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadYmt(f); e.target.value = ''; }} /></label>
           <label className="btn" title="maxYMiser song (.mys, with its .myv voice bank selected too) or a single instrument (.myi)">Load maxYMiser…<input type="file" multiple accept=".mys,.MYS,.myv,.MYV,.myi,.MYI" hidden onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) void loadMaxymiser(fs); e.target.value = ''; }} /></label>
+          <label className="btn" title="Arkos Tracker 3 song (.aks)">Load Arkos…<input type="file" accept=".aks,.AKS" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadAks(f); e.target.value = ''; }} /></label>
           <button className="btn" onClick={() => void saveYmt()} title="Ctrl+S">Save .ymt</button>
           <span className="sep" />
           <button className="btn" disabled={!ed.canUndo} onClick={() => ed.undo()} title="Ctrl+Z">Undo</button>

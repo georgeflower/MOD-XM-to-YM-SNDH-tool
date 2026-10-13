@@ -490,7 +490,7 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
         if (st.semi) per = Math.round((ch.period + ch.periodOffset) / Math.pow(2, st.semi / 12));
         toneOn = st.tone; noiseOn = st.noise > 0; np = st.noise;
         if (volByte === 0) { off(); continue; }
-        if (inst.useHardEnv || ch.forceHardEnv) {
+        if ((inst.useHardEnv || ch.forceHardEnv) && !st.plain) {
           // buzzer + step table: the steps gate the sound and drive the tone / noise (acid bass: buzzer at the note, square swept above it)
           volByte = 0x10;
           envShape = ch.forceHardEnv ? ch.hardEnvShape : inst.hardEnvShape; envPeriod = hardEnvPeriodFor(ch, inst);

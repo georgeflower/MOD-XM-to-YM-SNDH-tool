@@ -124,7 +124,7 @@ function compileInstrument(inst: Instrument, index: number, warn: (k: string, m:
   // wave: tone / noise / envelope bits
   const waveVals = ticks.map((t, i) => {
     const on = volVals[i] > 0;
-    if (hard) return on ? ((t.tone ? 1 : 0) | (t.noise ? 2 : 0) | 4) : 0;
+    if (hard && !t.plain) return on ? ((t.tone ? 1 : 0) | (t.noise ? 2 : 0) | 4) : 0;
     return (t.tone ? 1 : 0) | (t.noise ? 2 : 0);
   });
   const wave = seqMacro(MAC.wave, waveVals, loopStart);

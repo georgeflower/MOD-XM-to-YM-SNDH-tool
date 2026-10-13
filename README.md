@@ -13,7 +13,7 @@ A browser tool that turns **ProTracker `.MOD`** and **FastTracker II `.XM`** mod
 | **YM** (`.ym`) | `YM5!` uncompressed register dump; `YM6!` with digidrums / timer effects when the song has any (loads in ST-Sound and friends). |
 | **Game kit** (`.zip`) | `<name>.h` (packed stream as a C array, + digidrum table) + `ymplay.h` (small replayer; with digidrums / timer effects also the 68000 engine). The game owns the PSG, so sound effects can steal a voice. |
 | **maxYMiser** (`.mys` + `.myv`, `.myi`) | The song as native files for gwEm's [maxYMiser](https://preromanbritain.com/maxymiser/) tracker (song + voice bank, or one instrument), so a tune can be continued there — digidrums and `Q` `S` `U` timer effects included. The same files load back into the editor (*Load maxYMiser…*). See below. |
-| **Arkos Tracker 3** (`.aks`) | The song as an Arkos Tracker 3 file: the editor's envelopes, arpeggios, pitch macros, step tables and buzzer instruments are baked into Arkos instruments, notes, volume, arpeggio, slide and speed go into the patterns. See below. |
+| **Arkos Tracker 3** (`.aks`) | The song as an Arkos Tracker 3 file: the editor's envelopes, arpeggios, pitch macros, step tables and buzzer instruments are baked into Arkos instruments, notes, volume, arpeggio, vibrato, slide and speed go into the patterns. Also loads back (*Load Arkos…*). See below. |
 | **Furnace** (`.fur`) | The song as a Furnace Tracker file on an AY-3-8910 / YM2149 chip (2 MHz): instruments become Furnace macros, notes, volume, effects, speed and pattern flow go into the patterns. See below. |
 | Raw regs / WAV / report | 14 bytes per frame; YM emulator preview; conversion log. |
 
@@ -207,14 +207,27 @@ a pattern break shortens it, the repeat position is the restart position, the re
 * **Instruments are baked per tick.** ADSR / volume envelope, arpeggio and pitch macros, built-in vibrato and the step tables (drum, acid, chord-ornament presets) become the
   instrument's cells; periodic macros are unrolled to their common period and looped. Buzzer instruments use a software + hardware link (envelope period from the note, tone
   free to sweep), buzzer-only ones a hardware link; shapes 0-7 are played as 9 / 15 (Arkos has 8-15 only).
-* **Effects that carry over:** notes (note-off = a silent instrument), volume column / `Cxx` (as Arkos' 16 levels), `0xy` arpeggio, `1xx` `2xx` slides, `3xx` glide (to a note without
-  instrument), `Fxx` speed (speed track), `Dxx` (shorter pattern).
-* **Approximations** (listed as warnings): slides and glides run evenly over the row instead of only on the ticks after the first, fractional semitone offsets are rounded, release tails are cut
-  (Arkos note-off is silent at once), sync-square and `Q S U` / `Z` timer effects and digidrums are left out, `4xy` vibrato, tremolo, volume slides, BPM changes, `Bxx` are not exported.
+* **Release tails** are kept: a note-off plays the instrument's release part as its own instrument (continuing the arpeggio / vibrato cycle), and fractional semitone offsets become per-note
+  copies of the instrument with exact periods.
+* **Effects that carry over:** notes, volume column / `Cxx` (as Arkos' 16 levels), `0xy` arpeggio, `1xx` `2xx` slides, `3xx` glide (to a note without instrument), `4xy` vibrato (as a pitch
+  table), `Fxx` speed (speed track), `Dxx` (shorter pattern).
+* **Approximations** (listed as warnings): slides and glides run evenly over the row instead of only on the ticks after the first, sync-square and `Q S U` / `Z` timer effects and digidrums are
+  left out, tremolo, volume slides, BPM changes, `Bxx` are not exported.
 * **Verified** by loading the exported file in an independent Arkos replayer (the Rust `ym2149-arkos-replayer`, not part of this repository) and comparing every frame with the editor's
-  render: ADSR, volume, arpeggio macros, speed changes, note-off, the drum, hat, tom and acid-bass presets and the sync-bass step table are register-identical; slides differ by a few
-  period units inside a row; converted modules agree on volume and, within the rounded semitone, on pitch. The official Arkos Tracker 3 could not be run here, so open the file
-  there and tell me if it complains.
+  render: ADSR, release tails, volume, arpeggio macros, vibrato, fractional pitch, speed changes, note-off, the drum, hat, tom and acid-bass presets and the sync-bass step table are
+  register-identical; slides differ by a few period units inside a row; converted modules agree on volume and, within a few percent of the frames, on pitch. The official Arkos Tracker 3 could
+  not be run here, so open the file there and tell me if it complains.
+
+### Arkos import
+
+*Load Arkos…* opens an Arkos Tracker 3 song (`.aks`, zipped or plain XML; Arkos Tracker 2 files are rejected with a message). One editor pattern per position, speed track → `Fxx`,
+replay frequency → BPM. Instruments are baked into step tables (cell speed and loop kept, envelope cells become buzzer steps); an arpeggio table, a pitch table or a volume slide started with
+a note becomes a copy of the instrument for that note; pitch slides and glides become `1xx` `2xx` `3xx`.
+
+* Not imported (listed after loading): sample instruments, notes outside C-1…B-8, `forceInstrumentSpeed`, hardware-to-software links, extra PSGs, and arpeggio / pitch tables or volume slides that
+  change in the middle of a note (the editor cannot change an instrument without a new note).
+* Checked against the independent Arkos replayer on about 40 real songs (not part of this repository): most match register for register; the rest differ in slide phase and rounding at low
+  volumes.
 
 ## Furnace export
 

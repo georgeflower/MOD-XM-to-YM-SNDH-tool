@@ -24,6 +24,8 @@ export interface Tk {
   semi: number;
   /** what the whole semitones leave out (step tables only): the tick sounds `semi + frac` semitones above the note */
   frac: number;
+  /** envelope instruments: this tick plays as a plain tone / noise voice, not through the hardware envelope */
+  plain?: boolean;
   /** period units added to the tone period (vibrato + pitch macro; positive lowers the pitch) */
   pitch: number;
 }
@@ -82,7 +84,7 @@ export function bakeInstrument(
     if (frac && warnFrac) warn('frac:' + label, `${label}: fractional semitone offsets are rounded (${target} pitch is in ${pitchUnit})`);
     for (let t = 0; t < Math.min(n, maxTicks); t++) {
       const s = steps[t];
-      ticks.push({ vol: clamp(Math.round(s.vol), 0, 15), noise: s.noise > 0 ? s.noise & 31 : 0, tone: s.tone, semi: Math.round(s.semi), frac: s.semi - Math.round(s.semi), pitch: 0 });
+      ticks.push({ vol: clamp(Math.round(s.vol), 0, 15), noise: s.noise > 0 ? s.noise & 31 : 0, tone: s.tone, semi: Math.round(s.semi), frac: s.semi - Math.round(s.semi), pitch: 0, plain: !!s.plain });
     }
     if (n > maxTicks) warn('long:' + label, `${label}: the step table is cut to ${maxTicks} steps`);
     if (sq.loopFrom >= 0 && sq.loopFrom < ticks.length) loopStart = sq.loopFrom; else looping = false;

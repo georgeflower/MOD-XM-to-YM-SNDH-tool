@@ -26,6 +26,8 @@ export interface MacroStep {
   noise: number;
   /** tone on/off (off + noise = pure noise) */
   tone: boolean;
+  /** in an envelope (buzzer) instrument: this step plays as a plain tone / noise voice, not through the hardware envelope */
+  plain?: boolean;
 }
 export interface Macro {
   steps: MacroStep[];

@@ -3,8 +3,9 @@
  *
  * An .aks is a zip holding one XML file (formatVersion 3.0). Notes, instruments, volume, 0xy arpeggios, 1xx/2xx slides,
  * 3xx glides, speed changes and the hardware envelope (buzzer, sync-buzzer, acid-style step tables) carry over; instruments are
- * baked into per-tick cells. What Arkos has no equivalent for is counted in `warnings` (release tails, vibrato effect,
- * digidrums, timer effects, sync-square, fractional semitones, BPM changes).
+ * baked into per-tick cells; a release tail becomes a second instrument that a note-off plays. What Arkos has no equivalent for is counted in `warnings` (vibrato effect,
+ * digidrums, timer effects, sync-square, BPM changes); the 4xy vibrato becomes a pitch table. Step tables with fractional semitones get one instrument copy per note
+ * (Arkos' pitch is in period units).
  *
  * Arkos facts used here (from the player source): note n sounds 440 * 2^((n - 57) / 12) Hz (so editor note n = Arkos n - 1);
  * the software period of a cell is the note's period, "SoftwareToHardware" with ratio r gives the envelope period
@@ -15,7 +16,9 @@
 import {
   type Song, type Cell, type Instrument, NOTE_OFF, VOICES, channelsOf, EFFECT_LETTERS,
 } from '../tracker/types';
-import { bakeInstrument, clamp, logVol, type Tk } from '../export/bake';
+import { bakeInstrument, clamp, logVol, gcd, type Tk } from '../export/bake';
+import { noteToFreq } from '../tracker/types';
+import { VIB_TABLE } from '../tracker/render';
 import { zip } from '../export/zip';
 
 export interface AksResult { xml: string; warnings: string[]; stats: { positions: number; patterns: number; tracks: number; instruments: number } }
@@ -26,6 +29,15 @@ interface ICell { volume: number; noise: number; link: Link; arpNote: number; ar
 interface AInst { name: string; cells: ICell[]; loopStart: number; end: number; looping: boolean; retrig: boolean }
 
 const MAX_CELLS = 255;
+
+interface Compiled {
+  main: AInst;
+  /** the tail instrument for a note that has played `age` ticks; `pv` = the per-tick pitch of a per-note copy */
+  release: ((age: number, pv?: number[]) => AInst) | null;
+  /** step tables with fractional semitones: `copyFor(note)` is the instrument with the note's period correction (null = the plain one is close enough) */
+  frac: boolean;
+  copyFor: (note: number) => { key: string; inst: AInst; pv: number[] } | null;
+}
 
 const esc = (s: string) => s.replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]!)).replace(/[^\x09\x0a\x0d\x20-￿]/g, '');
 
@@ -55,47 +67,70 @@ function hardLink(inst: Instrument, tone: boolean, warn: (k: string, m: string) 
   return { link: 'hardwareOnly', ratio: 4, hwEnv: shape, secPeriod: 0, secNote: 0, secOct: 4 - k };
 }
 
-function compileInstrument(inst: Instrument, index: number, warn: (k: string, m: string) => void, rowTicks: number): AInst {
+function compileInstrument(inst: Instrument, index: number, warn: (k: string, m: string) => void, rowTicks: number): Compiled {
   const label = `instrument ${index.toString(16).toUpperCase().padStart(2, '0')} "${inst.name}"`;
-  const baked = bakeInstrument(inst, label, warn, MAX_CELLS, 'Arkos', 'period units', true, rowTicks);
+  const baked = bakeInstrument(inst, label, warn, MAX_CELLS, 'Arkos', 'period units', false, rowTicks);
   const { ticks, loopStart, looping, hard } = baked;
-  if (baked.release.length) warn('release:' + label, `${label}: release tails are cut (Arkos note-off silences at once)`);
-  const bake = (t: number): Tk => ticks[t];
   if (inst.syncSquare) warn('syncsq:' + label, `${label}: sync-square is left out (Arkos has no equivalent)`);
 
-  const cells: ICell[] = [];
   const hl = hard ? hardLink(inst, true, warn, label) : null;
   const hlNoTone = hard ? hardLink(inst, false, warn, label) : null;
-  for (let t = 0; t < ticks.length; t++) {
-    const k = bake(t);
+  /** one baked tick -> one Arkos cell; `vol` overrides the tick's level (release tails) */
+  const cellOf = (k: Tk, vol = k.vol, pitch = -Math.round(k.pitch)): ICell => {
     const c = emptyCell();
     c.noise = k.noise;
     const sp = splitSemi(k.semi);
     c.arpNote = sp.note; c.arpOct = sp.oct;
-    c.pitch = -Math.round(k.pitch);                              // Arkos subtracts the pitch: positive raises the sound
-    if (hard) {
-      if (k.vol === 0) { c.link = 'noSoftwareNoHardware'; c.volume = 0; c.noise = 0; }
+    c.pitch = pitch;                                             // Arkos subtracts the pitch: positive raises the sound
+    if (hard && !k.plain) {
+      if (vol === 0) { c.link = 'noSoftwareNoHardware'; c.volume = 0; c.noise = 0; }
       else {
         const h = k.tone ? hl! : hlNoTone!;
         c.link = h.link; c.ratio = h.ratio; c.hwEnv = h.hwEnv; c.secPeriod = h.secPeriod; c.secNote = h.secNote; c.secOct = h.secOct; c.volume = 15;
       }
     } else {
-      c.volume = k.vol;
+      c.volume = vol;
       c.link = k.tone ? 'softwareOnly' : 'noSoftwareNoHardware';
       if (!k.tone && !k.noise) c.volume = 0;
     }
-    cells.push(c);
-  }
+    return c;
+  };
+
+  const cells = ticks.map((k) => cellOf(k));
   if (!cells.length) cells.push(emptyCell());
   const end = cells.length - 1;
   const ls = loopStart >= 0 ? Math.min(loopStart, end) : end;
-  return { name: inst.name || `Instrument ${index}`, cells, loopStart: ls, end, looping, retrig: hard };
+  const main: AInst = { name: inst.name || `Instrument ${index}`, cells, loopStart: ls, end, looping, retrig: hard };
+
+  // Arkos has no release phase: a note-off plays a second instrument that holds the sustained sound and runs the tail
+  // (the level steps the editor plays after a note-off, ending in silence). It does not retrigger the hardware envelope.
+  let release: Compiled['release'] = null;
+  const n = ticks.length, cyc = loopStart >= 0 ? n - loopStart : 1;
+  // the sustained part keeps cycling (arpeggio / pitch / vibrato) while the tail runs: `age` ticks have passed since the note started
+  const idx = (t: number) => (t < n ? t : loopStart >= 0 ? loopStart + ((t - loopStart) % cyc) : n - 1);
+  if (baked.release.length && n) {
+    release = (age, pv) => {
+      const rc = baked.release.map((v, j) => { const ti = idx(age + j); return cellOf(ticks[ti], v, pv ? pv[ti] : undefined); });
+      return { name: `${inst.name || `Instrument ${index}`} (release)`, cells: rc, loopStart: rc.length - 1, end: rc.length - 1, looping: true, retrig: false };
+    };
+  }
+  // step tables with fractional semitones: Arkos' pitch is in period units, so a per-note copy carries the correction
+  const frac = ticks.some((t) => Math.abs(t.frac) > 0.02);
+  const periodOf = (note: number, semi = 0) => 2_000_000 / (16 * noteToFreq(note) * 2 ** (semi / 12));
+  const copyFor = (note: number) => {
+    if (!frac) return null;
+    const pn = Math.round(periodOf(note));
+    const pv = ticks.map((k) => Math.round(Math.round(periodOf(note + k.semi)) - pn / 2 ** ((k.semi + k.frac) / 12)) - Math.round(k.pitch));
+    if (pv.every((v, i) => Math.abs(v - cells[i].pitch) <= 1)) return null;
+    return { key: pv.join(','), pv, inst: { ...main, cells: cells.map((c, i) => ({ ...c, pitch: pv[i] })) } };
+  };
+  return { main, release, frac, copyFor };
 }
 
 // ------------------------------------------------------------------------------------------------ patterns
 
 interface ACell { index: number; note: number | null; instrument: number | null; effects: { name: string; value: number }[] }
-interface ChState { inst: number; last: number; vol15: number; arp: boolean; slide: boolean; vol64: number }
+interface ChState { vs: number; vd: number; vp: number; vkey: string; note: number; age: number; inst: number; last: number; vol15: number; arp: boolean; slide: boolean; vol64: number }
 
 const FX = (c: string) => EFFECT_LETTERS.indexOf(c) + 1;
 
@@ -113,14 +148,66 @@ export function songToAks(song: Song, opts: AksOptions = {}): AksResult {
   const used = new Set<number>();
   for (const p of song.patterns) for (const row of p.cells) for (let c = 0; c < nch; c++) if (row[c]?.instrument) used.add(row[c].instrument);
   const instMap = new Map<number, number>();
+  const comp = new Map<number, Compiled>();
+  const relVariant = new Map<string, number>();
   const insts: AInst[] = [{ name: 'Empty', cells: [emptyCell()], loopStart: 0, end: 0, looping: true, retrig: false }];
   for (const i of [...used].sort((a, b) => a - b)) {
     const inst = song.instruments[i];
     if (!inst) continue;
     if (insts.length > 254) { warn('inst', 'more than 254 instruments: the extra ones are left out'); break; }
     instMap.set(i, insts.length);
-    insts.push(compileInstrument(inst, i, warn, song.speed || 6));
+    const ci = compileInstrument(inst, i, warn, song.speed || 6);
+    insts.push(ci.main);
+    comp.set(i, ci);
   }
+  const addInst = (r: AInst, key: string, map: Map<string, number>): number => {
+    let ix = map.get(key);
+    if (ix === undefined) {
+      if (insts.length > 254) { warn('inst', 'more than 254 instruments (incl. per-note copies and release tails): the extra ones use the plain instrument / silence'); return -1; }
+      ix = insts.length; insts.push(r); map.set(key, ix);
+    }
+    return ix;
+  };
+  const copies = new Map<string, number>();
+  // vibrato (4xy): a pitch table that replays the editor's sine, including its stall on the first tick of every row
+  const pitchTabs: number[][] = [];
+  const pitchKey = new Map<string, number>();
+  const vibratoTable = (vs: number, vd: number, pos0: number, n: number): number => {
+    const key = `${vs},${vd},${pos0 & 63},${n}`;
+    let ix = pitchKey.get(key);
+    if (ix !== undefined) return ix;
+    if (pitchTabs.length >= 254) { warn('pitchfull', 'more than 254 vibrato tables: further vibrato phases are left out'); return 0; }
+    const step = (vs * (n - 1)) % 64;
+    let T = n * (64 / gcd(64, step || 64));
+    if (!vs) T = 1;
+    if (T > MAX_CELLS) { warn('vibcut', `vibrato (4xy): a vibrato cycle longer than ${MAX_CELLS} ticks is cut`); T = MAX_CELLS; }
+    const vals: number[] = [];
+    for (let t = 0; t < T; t++) {
+      const idx = vs ? t - Math.ceil(t / n) : 0;
+      vals.push(-Math.round(VIB_TABLE[(pos0 + vs * idx) & 63] * vd / 128));       // Arkos subtracts the pitch table value
+    }
+    pitchTabs.push(vals);
+    ix = pitchTabs.length;                                                 // table 0 is the empty one
+    pitchKey.set(key, ix);
+    return ix;
+  };
+  /** the instrument to play editor note `note` with: the plain one, or its copy with the note's period correction */
+  const playIndex = (ii: number, note: number): number => {
+    const base = instMap.get(ii)!;
+    const cp = comp.get(ii)?.copyFor(note);
+    if (!cp) return base;
+    const ix = addInst(cp.inst, `${ii}:${cp.key}`, copies);
+    return ix < 0 ? base : ix;
+  };
+  /** the release instrument for editor instrument `ii` when its note has been playing for `age` ticks (identical tails are shared) */
+  const releaseFor = (ii: number, note: number, age: number): number => {
+    const c = comp.get(ii);
+    if (!c?.release) return 0;
+    const cp = c.copyFor(note);
+    const r = c.release(age, cp?.pv);
+    const ix = addInst(r, JSON.stringify(r.cells), relVariant);
+    return ix < 0 ? 0 : ix;
+  };
 
   // ---- tracks
   const tracks: ACell[][] = [];
@@ -140,7 +227,7 @@ export function songToAks(song: Song, opts: AksOptions = {}): AksResult {
     return ix;
   };
 
-  const st: ChState[] = Array.from({ length: nch }, () => ({ inst: 0, last: -1, vol15: 15, arp: false, slide: false, vol64: 64 }));
+  const st: ChState[] = Array.from({ length: nch }, () => ({ vs: 0, vd: 0, vp: 0, vkey: '', note: 0, age: 0, inst: 0, last: -1, vol15: 15, arp: false, slide: false, vol64: 64 }));
   let speed = song.speed || 6;
   const initialSpeed = speed;
   const positions: { pattern: number; height: number }[] = [];
@@ -162,6 +249,9 @@ export function songToAks(song: Song, opts: AksOptions = {}): AksResult {
     const perChan: ACell[][] = Array.from({ length: nch }, () => []);
     const spd: { index: number; value: number }[] = [];
     for (let r = 0; r < height; r++) {
+      const rowOuts: ACell[] = [];
+      const vibCmd: (number | undefined)[] = [];
+      const vibOff: boolean[] = [];
       for (let c = 0; c < nch; c++) {
         const cell: Cell = pat.cells[r][c];
         const s = st[c];
@@ -170,8 +260,9 @@ export function songToAks(song: Song, opts: AksOptions = {}): AksResult {
         const p = cell.param;
         const noteOn = cell.note > 0 && cell.note < NOTE_OFF;
         const porta3 = eff === '3';
-        if (cell.note === NOTE_OFF) {
-          if (s.last >= 0) { out.note = s.last; out.instrument = 0; s.vol64 = 64; }
+        if (cell.note === NOTE_OFF || (eff === 'K' && !noteOn && s.last >= 0)) {
+          // note-off / key-off: the instrument's release tail (or silence)
+          if (s.last >= 0) { out.note = s.last; out.instrument = releaseFor(s.inst, s.note, s.age); if (cell.note === NOTE_OFF) s.vol64 = 64; }
         } else if (noteOn) {
           const ar = cell.note - 1;
           if (ar < 0 || ar > 127) { warn('noterange', 'notes outside the Arkos range 0-127 are left out'); }
@@ -183,7 +274,7 @@ export function songToAks(song: Song, opts: AksOptions = {}): AksResult {
             const ai = ii ? instMap.get(ii) : undefined;
             if (ai === undefined) unsup('notes without an instrument');
             else {
-              out.note = ar; out.instrument = ai; s.inst = ii; s.last = ar;
+              out.note = ar; out.instrument = playIndex(ii, cell.note); s.inst = ii; s.last = ar; s.age = 0; s.note = cell.note; if (s.vkey) vibOff[c] = true; s.vs = s.vd = s.vp = 0; s.vkey = '';
               if (cell.instrument) s.vol64 = 64;
             }
           }
@@ -216,13 +307,29 @@ export function songToAks(song: Song, opts: AksOptions = {}): AksResult {
           else warn('bpm', `tempo (BPM) changes are not exported (Arkos plays at one fixed replay frequency); the first BPM, ${song.bpm}, is used`);
         }
         // everything else
-        if (eff && !'0123BCDF'.includes(eff)) {
-          const names: Record<string, string> = { '4': 'vibrato (4xy)', '5': 'vibrato + volume slide', '6': 'volume slide', '7': 'tremolo', '8': 'tremolo', 'A': 'volume slide', 'E': 'extended effects (Exy)', 'G': 'global volume', 'H': 'global volume slide', 'K': 'key off', 'L': 'envelope position', 'M': 'envelope period', 'P': 'envelope divisor', 'R': 'retrigger', 'T': 'effect T', 'X': 'envelope shape', 'Y': 'envelope period', 'Q': 'timer effects (Q/S/U)', 'S': 'timer effects (Q/S/U)', 'U': 'timer effects (Q/S/U)', 'Z': 'digidrums (Z)' };
-          if (!(eff === '3' || eff === '1' || eff === '2')) unsup(names[eff] ?? `effect ${eff}`);
+        if (eff && !'01234BCDFK'.includes(eff)) {
+          const names: Record<string, string> = { '5': 'vibrato + volume slide', '6': 'volume slide', '7': 'tremolo', '8': 'tremolo', 'A': 'volume slide', 'E': 'extended effects (Exy)', 'G': 'global volume', 'H': 'global volume slide', 'L': 'envelope position', 'M': 'envelope period', 'P': 'envelope divisor', 'R': 'retrigger', 'T': 'effect T', 'X': 'envelope shape', 'Y': 'envelope period', 'Q': 'timer effects (Q/S/U)', 'S': 'timer effects (Q/S/U)', 'U': 'timer effects (Q/S/U)', 'Z': 'digidrums (Z)' };
+          if (!(eff === '3' || eff === '1' || eff === '2' || eff === '4')) unsup(names[eff] ?? `effect ${eff}`);
         }
         out.effects = effs;
-        if (out.note !== null || out.instrument !== null || effs.length) perChan[c].push(out);
+        rowOuts[c] = out;
+        if (eff === '4') vibCmd[c] = p;
       }
+      // vibrato (4xy): needs the row's final speed, so it runs after all channels of the row
+      for (let c = 0; c < nch; c++) {
+        const s = st[c], vc = vibCmd[c];
+        const bi = song.instruments[s.inst];
+        if (bi && bi.vibratoDepth > 0 && bi.vibratoSpeed > 0) { if (vc !== undefined) unsup('vibrato (4xy) on an instrument with built-in vibrato'); continue; }
+        if (vc !== undefined) { if ((vc >> 4) & 15) s.vs = (vc >> 4) & 15; if (vc & 15) s.vd = vc & 15; }
+        if (s.vd > 0) {
+          const key = `${s.vs},${s.vd},${speed}`;
+          if (key !== s.vkey) { rowOuts[c].effects.push({ name: 'pitchTable', value: vibratoTable(s.vs, s.vd, s.vp, speed) }); s.vkey = key; }
+          else if (vibOff[c]) rowOuts[c].effects.push({ name: 'pitchTable', value: 0 });
+          s.vp += s.vs * (speed - 1);
+        } else if (vibOff[c]) rowOuts[c].effects.push({ name: 'pitchTable', value: 0 });      // a new note ends the editor's vibrato; Arkos' table keeps running
+      }
+      for (let c = 0; c < nch; c++) { const o = rowOuts[c]; if (o.note !== null || o.instrument !== null || o.effects.length) perChan[c].push(o); }
+      for (const x of st) x.age += speed;                              // ticks since the note started (the row lasted `speed` ticks)
     }
     const tix = perChan.map((cells) => addTrack(cells));
     const sx = addSpeed(spd);
@@ -283,7 +390,8 @@ export function songToAks(song: Song, opts: AksOptions = {}): AksResult {
   w('  </instruments>');
   const expr = (arp: boolean) => `    <expression>\n      <name>Empty</name>\n      <isArpeggio>${arp}</isArpeggio>\n      <speed>0</speed>\n      <shift>0</shift>\n      <loopStartIndex>0</loopStartIndex>\n      <endIndex>0</endIndex>\n      <values>\n        <value>0</value>\n      </values>\n    </expression>`;
   w('  <arpeggios>\n' + expr(true) + '\n  </arpeggios>');
-  w('  <pitches>\n' + expr(false) + '\n  </pitches>');
+  const pitchXml = pitchTabs.map((vals, i) => `    <expression>\n      <name>Vibrato ${i + 1}</name>\n      <isArpeggio>false</isArpeggio>\n      <speed>0</speed>\n      <shift>0</shift>\n      <loopStartIndex>0</loopStartIndex>\n      <endIndex>${vals.length - 1}</endIndex>\n      <values>\n${vals.map((v) => `        <value>${v}</value>`).join('\n')}\n      </values>\n    </expression>`);
+  w('  <pitches>\n' + [expr(false), ...pitchXml].join('\n') + '\n  </pitches>');
   w('  <subsongs>');
   w('    <subsong>');
   w(`      <title>${esc(song.name || 'Main')}</title>`);
