@@ -92,6 +92,8 @@ export interface Instrument {
   digiDrums?: DigiDrumSample[];
   /** extension: when present the step table drives volume / pitch offset / noise / tone */
   seq?: StepSeq;
+  /** extension: restart the voice's square wave at every note start (sync-square: real YM2149 hardware, SNDH / game-kit / WAV) */
+  syncSquare?: boolean;
 }
 
 export function defaultInstrument(name = ''): Instrument {

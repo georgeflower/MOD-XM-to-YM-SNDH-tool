@@ -175,6 +175,9 @@ export function InstrumentEditor({ ed, idx, onClose }: { ed: Editor; idx: number
             speed <NumField value={inst.vibratoSpeed} min={0} max={15} onCommit={(v) => up({ vibratoSpeed: v })} />
             depth <NumField value={inst.vibratoDepth} min={0} max={15} onCommit={(v) => up({ vibratoDepth: v })} />
           </Field>
+          <Field label="Sync-square" hint="Restarts the square wave at the start of every note (a very short period is written for 8 PSG clocks, then the real one), so every note starts in the same phase: tight, punchy bass attacks and thin pulses. Needs the SNDH or game-kit player (not YM files) and an STFM-style 4:1 CPU/PSG clock; the STE can miss the edge.">
+            <Check label="restart the tone at each note" value={!!inst.syncSquare} onChange={(v) => up({ syncSquare: v || undefined })} />
+          </Field>
           <Field label="Hard envelope" hint="The YM2149's own envelope generator: buzzy bass and synth sounds. One envelope is shared by all three voices.">
             <Check label="use" value={inst.useHardEnv} onChange={(v) => up({ useHardEnv: v })} />
             <Check label="also play the tone (sync buzz)" value={inst.syncBuzz} onChange={(v) => up({ syncBuzz: v })} />

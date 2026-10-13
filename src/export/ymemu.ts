@@ -100,7 +100,7 @@ export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50
       const useEnv = (r[8 + v] & 16) !== 0;
       const vol = useEnv ? 1 : VOL[r[8 + v] & 15];
       const fxHere = fxs && v === fxV && fxKind !== FX_SYNC;
-      const start = ph[v];
+      const start = r[8 + v] & 0x20 ? 0 : ph[v];          // sync-square: the tone counter restarts on this frame
       for (let n = 0; n < spf; n++) {
         const cur = dr[v];
         if (cur) {

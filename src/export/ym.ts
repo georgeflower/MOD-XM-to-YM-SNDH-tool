@@ -31,6 +31,7 @@ export function writeYm5(
     for (let f = 0; f < nframes; f++) {
       let v = 0;
       if (r < NREGS) v = regs[f * NREGS + r];
+      if (r >= 8 && r <= 10) v &= 0x1f;       // bit 5 = this tool's sync-square flag, not part of the YM format
       if (r === 13 && !env) v = 0xff; // envelope unused: never restart it (0xFF = no write)
       body[r * nframes + f] = v;
     }
@@ -73,6 +74,7 @@ export function writeYm6(
   for (let f = 0; f < nframes; f++) {
     const fr = new Uint8Array(16);
     for (let r = 0; r < NREGS; r++) fr[r] = regs[f * NREGS + r];
+    for (let v = 8; v <= 10; v++) fr[v] &= 0x1f;                 // bit 5 = sync-square flag of this tool, not part of the YM format
     if (!env) fr[13] = 0xff;
     const t = dt.trig[f] ?? 0;
     if (t && trigDrum(t) !== TRIG_STOP && trigDrum(t) < dt.drums.length) {

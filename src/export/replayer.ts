@@ -104,7 +104,25 @@ static int ymfx_voice(void) { int s = YMDRUM_B(YMFX_SEL); return s == 0xff ? -1 
 #define YMPLAY_IRQ_OFF(sr)     ((sr) = 0)
 #define YMPLAY_IRQ_RESTORE(sr) ((void)(sr))
 #endif`;
-  const writeFn = engine ? `
+  const syncFn = `
+/* Sync-square: bit 5 of a volume register (R8-R10) in ymplay_reg asks to restart that voice's square wave.  The tone counter
+   only toggles when it reaches the period, so a very short period held for >= 8 PSG clocks (32 CPU cycles) forces an edge;
+   the real period then goes back, high byte first.  STFM only (the STE clocks CPU and PSG apart and can miss the edge).
+   \`periods\` holds R0-R5 of this frame. */
+static void ymplay_sync(int v, const unsigned char *periods)
+{
+    volatile unsigned char *sel = (volatile unsigned char *)0xffff8800L;
+    volatile unsigned char *wr  = (volatile unsigned char *)0xffff8802L;
+    *sel = (unsigned char)(2 * v);     *wr = 0;
+    *sel = (unsigned char)(2 * v + 1); *wr = 0;
+#if defined(__GNUC__) && defined(__mc68000__)
+    __asm__ volatile ("nop\\n\\tnop\\n\\tnop\\n\\tnop\\n\\tnop\\n\\tnop\\n\\tnop\\n\\tnop");
+#endif
+    *sel = (unsigned char)(2 * v + 1); *wr = periods[2 * v + 1];
+    *sel = (unsigned char)(2 * v);     *wr = periods[2 * v];
+}
+`;
+  const writeFn = syncFn + (engine ? `
 /* Write the registers to the PSG (supervisor mode).  Drum / effect events are handled here: stops first, then the
    register writes (not the volume of a voice that a drum or an effect owns; IPL 6 so the timer interrupts cannot
    interleave), then new drums / effects start.  The shadow copy is what the effect interrupts read. */
@@ -118,10 +136,12 @@ static void ymplay_write(void)
 ${drums ? '    if (ymplay_trig && (ymplay_trig & 63) == 63) ymdrum_stop();\n' : ''}${fx ? '    if (ymplay_fxev == 1) ymfx_stop();\n' : ''}    YMPLAY_IRQ_OFF(sr);
 ${drums ? '    if (ymdrum_busy()) skip = ymdrum_voice() + 8;\n' : ''}    fskip = ${fx ? 'ymfx_voice() >= 0 ? ymfx_voice() + 8 : -1' : '-1'};
     for (k = 0; k < 14; k++) {
-        if (k == 13 && ymplay_reg[13] == 0xff) continue;
-        sh[k] = ymplay_reg[k];
+        unsigned char val = ymplay_reg[k];
+        if (k == 13 && val == 0xff) continue;
+        if (k >= 8 && k <= 10 && (val & 0x20)) { ymplay_sync(k - 8, ymplay_reg); val &= 0x1f; }
+        sh[k] = val;
         if (k == skip || k == fskip) continue;
-        *sel = (unsigned char)k; *wr = ymplay_reg[k];
+        *sel = (unsigned char)k; *wr = val;
     }
     YMPLAY_IRQ_RESTORE(sr);
 ${drums ? '    if (ymplay_trig && (ymplay_trig & 63) != 63) ymdrum_start((ymplay_trig >> 6) - 1, ymplay_trig & 63);\n' : ''}${fx ? '    if (ymplay_fxev == 2) ymfx_start(ymplay_fxvoice, ymplay_fxkind, ymplay_fxcode, ymplay_fxcount);\n' : ''}}
@@ -133,11 +153,13 @@ static void ymplay_write(void)
     volatile unsigned char *wr  = (volatile unsigned char *)0xffff8802L;
     int k;
     for (k = 0; k < 14; k++) {
-        if (k == 13 && ymplay_reg[13] == 0xff) continue;
-        *sel = (unsigned char)k; *wr = ymplay_reg[k];
+        unsigned char val = ymplay_reg[k];
+        if (k == 13 && val == 0xff) continue;
+        if (k >= 8 && k <= 10 && (val & 0x20)) { ymplay_sync(k - 8, ymplay_reg); val &= 0x1f; }
+        *sel = (unsigned char)k; *wr = val;
     }
 }
-`;
+`);
   const parse = fx ? `        if (b & 0x80) {
             unsigned char t = *ymplay_p++;
             if ((t & 0xc0) == 0) {                        /* timer effect: kind<<4 | voice<<2 | drum byte follows */

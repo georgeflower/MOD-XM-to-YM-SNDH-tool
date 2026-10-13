@@ -156,6 +156,8 @@ export async function encodeYmt(song: Song, opts: { gzip?: boolean } = {}): Prom
     for (const s of sq.steps) { p.i16(Math.round(s.vol * 100)); p.i16(Math.round(s.semi * 100)); p.u8(s.noise); p.u8(s.tone ? 1 : 0); }
   }
   p.bytes(new TextEncoder().encode('XAUT')); p.str16(song.author ?? '');
+  const withSync = song.instruments.map((ins, i) => [ins, i] as const).filter(([ins]) => ins.syncSquare);
+  if (withSync.length) { p.bytes(new TextEncoder().encode('XSYN')); p.u16(withSync.length); for (const [, i] of withSync) p.u16(i); }
   const payload = new Uint8Array(p.view());
   const body = useGzip ? await pipe(payload, new CompressionStream('gzip')) : payload;
   const h = new W();
@@ -196,6 +198,7 @@ export async function decodeYmt(buf: Uint8Array): Promise<Song> {
         if (instruments[idx]) instruments[idx].seq = { steps, loopFrom, velocity, release };
       }
     } else if (tag === 'XAUT') song.author = r.str16();
+    else if (tag === 'XSYN') { const n = r.u16(); for (let k = 0; k < n; k++) { const idx = r.u16(); if (instruments[idx]) instruments[idx].syncSquare = true; } }
     else break;
   }
   void NOTE_OFF;

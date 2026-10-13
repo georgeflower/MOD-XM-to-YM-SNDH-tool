@@ -125,7 +125,15 @@ play:   movem.l d0-d7/a0-a3,-(sp)
 .next:  lsr.w   #1,d1
         bcc.s   .skip
         move.b  (a0)+,d4
-        move.b  d4,FX_SH(a3,d0.w)       | shadow for the timer effects
+        cmp.b   #8,d0                   | sync-square: bit 5 of a volume byte (R8-R10) restarts that voice's tone counter
+        blo.s   .nosq
+        cmp.b   #10,d0
+        bhi.s   .nosq
+        btst    #5,d4
+        beq.s   .nosq
+        bsr     sync_sq
+        bclr    #5,d4
+.nosq:  move.b  d4,FX_SH(a3,d0.w)       | shadow for the timer effects
         cmp.b   FX_SEL(a3),d0           | the voice an effect drives is not ours to write
         beq.s   .skip
         move.b  d0,(a2)
@@ -159,6 +167,36 @@ play:   movem.l d0-d7/a0-a3,-(sp)
         move.w  d7,d3
         bsr     fx_start
 .fin:   movem.l (sp)+,d0-d7/a0-a3
+        rts
+
+| Restart the square wave of voice d0-8 (d0 = its volume register, a2 = PSG, a3 = fx_base; the period registers of this
+| frame are already in the shadow).  The tone counter only toggles when it reaches the period, so a very short period
+| written for at least 8 PSG clocks (32 CPU cycles) forces an edge; the real period goes back high byte first so no
+| stray short period appears.  STFM only: the STE clocks CPU and PSG apart, so it can miss an edge.
+sync_sq:
+        movem.l d0/d4,-(sp)
+        subq.b  #8,d0
+        add.b   d0,d0                   | R(2v) low byte of the period
+        moveq   #0,d4
+        move.b  d0,(a2)
+        move.b  d4,2(a2)
+        addq.b  #1,d0
+        move.b  d0,(a2)
+        move.b  d4,2(a2)                | period 0
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        move.b  d0,(a2)
+        move.b  FX_SH(a3,d0.w),2(a2)    | high nibble back first
+        subq.b  #1,d0
+        move.b  d0,(a2)
+        move.b  FX_SH(a3,d0.w),2(a2)
+        movem.l (sp)+,d0/d4
         rts
 
         .even

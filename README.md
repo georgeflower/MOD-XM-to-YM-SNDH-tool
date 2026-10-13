@@ -84,6 +84,13 @@ parameter), same effect letters, same `.ymt` song files in both directions.
   while a square wave on the same voice sweeps down onto it from 40 semitones above (gwEm, *Torture Your YM*, Alive 9). They are plain
   50 Hz register writes, so they need no timer and play on real hardware in every export; checked register-for-register against the real
   maxYMiser replayer. A step table with the hard envelope on gates the buzzer (its level can't be scaled) and drives tone and noise.
+* **Sync-square** (checkbox in the instrument editor, preset *Punchy bass*): the square wave restarts at every note. The
+  YM2149's tone counter only toggles when it reaches the period, so the player writes a very short period, waits 8 PSG clocks
+  (8 NOPs = 32 CPU cycles), then writes the real period back (high byte first, so no stray short period appears; Tattersall,
+  gwEm in Alive 9). Every note then starts in the same phase: tight bass attacks and thin pulses. In the stream it is bit 5 of
+  the voice's volume byte (the chip ignores it); the SNDH player and the game-kit `ymplay.h` act on it, the WAV render restarts
+  the phase, YM files and maxYMiser leave it out. Verified by tracing the 68000 player's writes (order, value, gap). It needs an
+  STFM-style 4:1 CPU/PSG clock: on an STE the clocks differ slightly and an edge can be missed.
 * **Echo…** copies each note a few rows later at a lower volume (delay, volume %, repeats), into empty cells only.
 * The editor plays through a register-level emulation of the chip (including the hardware envelope) and exports the same
   formats as the converter: **SNDH, YM, game kit, WAV, raw registers**.

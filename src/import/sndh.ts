@@ -86,6 +86,9 @@ class YmBus implements Bus {
   mfp = new Mfp();
   /** true while a timer interrupt handler runs: its YM data writes go to the log instead of the base image */
   isr = false;
+  /** optional trace of every YM data write outside timer interrupts (register, value as written, instruction count) */
+  trace: { r: number; v: number; i: number }[] | null = null;
+  clock: () => number = () => 0;
   logT: number[] = []; logR: number[] = []; logV: number[] = [];
   logFull = false;
   ioRead(addr: number, size: number): number {
@@ -108,6 +111,7 @@ class YmBus implements Bus {
       if (k === 0) this.sel = v & 15;
       else if (k === 2) {
         const r = this.sel;
+        if (this.trace && !this.isr) this.trace.push({ r, v, i: this.clock() });
         if (r < 14) {
           const m = [255, 15, 255, 15, 255, 15, 31, 255, 31, 31, 31, 255, 255, 15][r];
           this.regs[r] = v & m;
@@ -128,6 +132,8 @@ export interface SndhOptions {
   subtune?: number;          // 1-based
   seconds?: number;          // override the rendered length
   maxInstructions?: number;
+  /** collect every YM data write made by the play routine, in order (tests) */
+  trace?: { r: number; v: number; i: number }[];
 }
 
 export function parseSndh(file: Uint8Array, opt: SndhOptions = {}): AyTune & { info: SndhInfo } {
@@ -140,6 +146,7 @@ export function parseSndh(file: Uint8Array, opt: SndhOptions = {}): AyTune & { i
 
   const bus = new YmBus();
   const cpu = new M68k(bus);
+  if (opt.trace) { bus.trace = opt.trace; bus.clock = () => cpu.instructions; }
   cpu.mem.set(d.subarray(0, Math.min(d.length, 0x300000)), BASE);
   let budgetLeft = opt.maxInstructions ?? 600_000_000;
 

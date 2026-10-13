@@ -65,7 +65,7 @@ interface Chan {
   noteCutTick: number; noteDelayTick: number; delayedCell: Cell | null;
   loopRow: number; loopCount: number;
   forceHardEnv: boolean; hardEnvShape: number; hardEnvPeriodOverride: number; hardEnvDivisorOverride: number; hardEnvShapeDirty: boolean;
-  freshTrigger: boolean;
+  freshTrigger: boolean; syncPend: number;
   /** active timer effect (Q / S / U with its parameter), null = none */
   fx: { kind: FxKind; param: number } | null;
   // step-table instruments
@@ -82,7 +82,7 @@ const newChan = (): Chan => ({
   volSlide: 0, arpeggio: 0, retrig: 0, retrigVolChange: 0,
   noteCutTick: -1, noteDelayTick: -1, delayedCell: null, loopRow: 0, loopCount: -1,
   forceHardEnv: false, hardEnvShape: 0, hardEnvPeriodOverride: 0, hardEnvDivisorOverride: 0, hardEnvShapeDirty: true,
-  freshTrigger: false, fx: null, seqPos: 0, relTick: 0, relStart: 0,
+  freshTrigger: false, syncPend: 0, fx: null, seqPos: 0, relTick: 0, relStart: 0,
 });
 
 function hardEnvPeriodFor(ch: Chan, inst: Instrument): number {
@@ -243,6 +243,7 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
         ch.seqPos = 0; ch.relTick = 0; ch.fx = null;       // a new note ends a timer effect unless the cell sets one again
         startAdsr(ch);
         ch.freshTrigger = true;
+        ch.syncPend = ch.instrument?.syncSquare ? 4 : 0;
         if (ch.instrument && ch.instrument.vibratoDepth > 0) {
           ch.vibratoSpeed = ch.instrument.vibratoSpeed; ch.vibratoDepth = ch.instrument.vibratoDepth;
         }
@@ -550,6 +551,12 @@ export function renderSong(song: Song, opt: RenderOptions = {}): RenderResult {
     while (nextFrame / FPS < tickTime + dt - 1e-9 && nextFrame < maxFrames) {
       if (nextFrame / FPS >= tickTime - 1e-9) {
         const f = Uint8Array.from(regs);
+        for (let v = 0; v < VOICES; v++) {
+          // sync-square: bit 5 of the volume byte tells the player to restart this voice's square wave (only when it is audible)
+          if (chans[v].syncPend) {
+            if ((f[8 + v] & 31) && !(f[7] & (1 << v))) { f[8 + v] |= 0x20; chans[v].syncPend = 0; } else chans[v].syncPend--;   // wait up to 4 frames for the note to become audible
+          }
+        }
         if (pendingShape >= 0 && f[13] === 0xff) f[13] = pendingShape;
         pendingShape = -1;
         const fi = out.length / NREGS;

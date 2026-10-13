@@ -135,6 +135,7 @@ function compileInstrument(inst: Instrument, opt: { rowTicks: number; step: numb
   for (let i = 0; i < nm.length; i++) rec[INST.name + i] = nm.charCodeAt(i);
   rec[INST.portaMask] = rec[INST.arpMask] = rec[INST.vibMask] = rec[INST.transMask] = 7;
   rec[INST.wave] = 14; rec[INST.sampleRate] = 0x20;
+  if (inst.syncSquare) warn('syncsq:' + label, `${label}: sync-square is left out (maxYMiser has no equivalent)`);
 
   const sampleAt = <T,>(f: (t: number) => T, n: number): T[] => Array.from({ length: n }, (_, k) => f(k * step));
   const periodic = (len: number) => Math.ceil(len / step);
