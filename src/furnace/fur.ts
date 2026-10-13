@@ -6,7 +6,8 @@
  *
  * Instruments are baked into Furnace macros (see export/bake.ts): volume (with the release tail as the macro's release part),
  * wave (bit 0 tone, bit 1 noise, bit 2 envelope), duty (= 31 - noise period), arpeggio, pitch, and for buzzers the AY
- * envelope shape (ex2) plus the auto-envelope ratio (ex3 / alg) that makes the envelope follow the note.
+ * envelope shape (ex2) plus the envelope period (ex3 = 0, ex5), written out per played note because the editor ties the envelope
+ * to the written note, not to arpeggios / slides (a copy of the instrument per note).
  *
  * Furnace facts used (from its source, ay.cpp / macroInt.cpp / fur.cpp): note C-0 is 60 (editor note n = Furnace n + 59);
  * volume is subtractive (outVol = macro - (15 - channel volume)); the pitch macro subtracts from the register period in
@@ -16,7 +17,11 @@
 import {
   type Song, type Cell, type Instrument, NOTE_OFF, VOICES, channelsOf, EFFECT_LETTERS, noteToFreq,
 } from '../tracker/types';
+import { VIB_TABLE } from '../tracker/render';
 import { bakeInstrument, clamp, logVol, type Tk } from './../export/bake';
+
+const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+const lcm = (a: number, b: number) => (a / gcd(a, b)) * b;
 
 export interface FurOptions { title?: string; author?: string; comment?: string }
 export interface FurResult { bytes: Uint8Array; warnings: string[]; stats: { orders: number; patterns: number; instruments: number; rows: number } }
@@ -57,8 +62,11 @@ interface FInst {
   ticks: Tk[]; loopStart: number;
   /** the instrument has fractional semitones (step tables): one copy per played note carries the period correction */
   frac: boolean;
-  /** copies made for notes, with the pitch macro each carries */
-  variants: { inst: FInst; pitch: number[] }[];
+  /** a buzzer whose envelope follows the note in Furnace but is tied to the written note in the editor (arpeggio / pitch ticks):
+   *  every note gets a copy with the envelope period written out */
+  envFollow: boolean; envDiv: number;
+  /** copies made for notes, with the pitch macro and envelope period each carries */
+  variants: { inst: FInst; pitch: number[]; env: number }[];
   /** position in the file's instrument list (-1 = not used yet) */
   index: number;
 }
@@ -92,6 +100,7 @@ function compileInstrument(inst: Instrument, index: number, warn: (k: string, m:
   const label = `instrument ${index.toString(16).toUpperCase().padStart(2, '0')} "${inst.name}"`;
   const baked = bakeInstrument(inst, label, warn, MAX_MACRO - 1, 'Furnace', 'register period units', false, rowTicks);
   const hard = baked.hard;
+  let envFollow = false, envDiv = 1;
   let ticks: Tk[] = baked.ticks.length ? baked.ticks.slice() : [{ vol: 0, noise: 0, tone: false, semi: 0, frac: 0, pitch: 0 }];
   let loopStart = baked.loopStart;
   // a one-shot step table is silent after its last step
@@ -160,13 +169,13 @@ function compileInstrument(inst: Instrument, index: number, warn: (k: string, m:
       if (Math.abs(exact - div) > 1e-6) warn('div:' + label, `${label}: envelope divisor ${div} is played as ${exact}`);
       macros.push({ code: MAC.ex3, vals: [num], loop: 255, rel: 255, instant: false });
       macros.push({ code: MAC.alg, vals: [den], loop: 255, rel: 255, instant: false });
+      envFollow = true; envDiv = Math.max(1, inst.hardEnvDivisor || 1);
     }
-    if (ticks.some((t) => t.semi !== 0 || t.pitch !== 0)) warn('hardfollow:' + label, `${label}: Furnace's envelope follows the note's arpeggio / pitch (the editor keeps it on the written note)`);
   }
   macros.sort((a, b) => a.code - b.code);
   return {
     name: inst.name || `Instrument ${index}`, macros, hasTail: tail.length > 0, ticks, loopStart,
-    frac: ticks.some((t) => Math.abs(t.frac) > 0.02), variants: [], index: -1,
+    frac: ticks.some((t) => Math.abs(t.frac) > 0.02), envFollow, envDiv, variants: [], index: -1,
   };
 }
 
@@ -194,7 +203,7 @@ function writeInstrument(f: FInst): number[] {
 // ------------------------------------------------------------------------------------------------ patterns
 
 interface FCell { note: number; ins: number; vol: number; fx: [number, number][] }
-interface ChState { inst: number; furIns: number; last: number; vol64: number; vol15: number; arp: boolean; arpSpeed: number; slide: number; porta: number; vs: number; vd: number; vibFine: boolean }
+interface ChState { inst: number; furIns: number; last: number; vol64: number; vol15: number; arp: boolean; arpSpeed: number; slide: number; porta: number; vs: number; vd: number; vibFine: boolean; vibBaked: boolean }
 const FX = (c: string) => EFFECT_LETTERS.indexOf(c) + 1;
 
 /** one channel's pattern bytes */
@@ -258,18 +267,57 @@ export function songToFur(song: Song, opts: FurOptions = {}): FurResult {
     return f.index;
   };
   const periodOf = (note: number, semi = 0) => 2_000_000 / (16 * noteToFreq(note) * 2 ** (semi / 12));
-  /** the instrument to play `note` with: the template itself, or its copy with the note's period correction */
-  const variantFor = (t: FInst, note: number): number => {
-    if (!t.frac) return indexOf(t);
+  /** the pitch macro value (Furnace subtracts it from the period) of one baked tick of `note`; the fractional correction needs the note */
+  const pitchOf = (t: FInst, k: Tk, note: number): number => {
+    if (!t.frac) return -Math.round(k.pitch);
     const pn = Math.round(periodOf(note));
-    const pv = t.ticks.map((k) => Math.round(Math.round(periodOf(note + k.semi)) - pn / 2 ** ((k.semi + k.frac) / 12)) - Math.round(k.pitch));
-    if (pv.every((v) => Math.abs(v) <= 1)) return indexOf(t);
-    for (const v of t.variants) if (v.pitch.length === pv.length && v.pitch.every((x, i) => Math.abs(x - pv[i]) <= 1)) return indexOf(v.inst);
-    const copy: FInst = { ...t, macros: t.macros.filter((m) => m.code !== MAC.pitch).concat(seqMacro(MAC.pitch, pv, t.loopStart)).sort((a, b) => a.code - b.code), variants: [], index: -1 };
+    return Math.round(Math.round(periodOf(note + k.semi)) - pn / 2 ** ((k.semi + k.frac) / 12)) - Math.round(k.pitch);
+  };
+  const envPeriodOf = (note: number, div: number) => clamp(Math.round((2_000_000 / (256 * noteToFreq(note))) * div), 1, 65535);
+  /** a copy of `t` for `note` with its own pitch macro (fractional tuning, vibrato) and/or a written-out envelope period; shared when the same */
+  const copyFor = (t: FInst, note: number, pv: number[], loopStart: number, tol: number): number => {
+    const env = t.envFollow ? envPeriodOf(note, t.envDiv) : 0;
+    for (const v of t.variants) if (v.env === env && v.pitch.length === pv.length && v.pitch.every((x, i) => Math.abs(x - pv[i]) <= tol)) return indexOf(v.inst);
+    let macros = t.macros.filter((m) => m.code !== MAC.pitch);
+    if (pv.some((v) => v !== 0)) macros.push(seqMacro(MAC.pitch, pv, loopStart));
+    if (env) {
+      macros = macros.filter((m) => m.code !== MAC.ex3 && m.code !== MAC.alg);
+      macros.push({ code: MAC.ex3, vals: [0], loop: 255, rel: 255, instant: false }, { code: MAC.ex5, vals: [env], loop: 255, rel: 255, instant: false });
+    }
+    const copy: FInst = { ...t, macros: macros.sort((a, b) => a.code - b.code), variants: [], index: -1 };
     const ix = indexOf(copy);
-    if (ix < 0) return indexOf(t);
-    t.variants.push({ inst: copy, pitch: pv });
+    if (ix < 0) return -1;
+    t.variants.push({ inst: copy, pitch: pv, env });
     return ix;
+  };
+  /** the instrument to play `note` with: the template itself, or its copy with the note's period correction / envelope period */
+  const variantFor = (t: FInst, note: number): number => {
+    if (!t.frac && !t.envFollow) return indexOf(t);
+    const pv = t.ticks.map((k) => pitchOf(t, k, note));
+    if (!t.envFollow && pv.every((v) => Math.abs(v) <= 1)) return indexOf(t);
+    const ix = copyFor(t, note, pv, t.loopStart, 1);
+    return ix < 0 ? indexOf(t) : ix;
+  };
+  /** the copy for a note whose 4xy vibrato stays unchanged until the next note: the editor's vibrato (a sine that stalls on the first tick of every row)
+   *  is added to the pitch macro, which Furnace's own 04xy cannot match (it runs the other way and two ticks earlier). a cycle longer than a macro is cut */
+  const vibVariant = (t: FInst, note: number, vs: number, vd: number, n: number, t0: number): number => {
+    // loopStart < 0: the last tick is held forever if it sounds, otherwise the instrument has ended
+    const ls = t.loopStart >= 0 ? t.loopStart : t.ticks[t.ticks.length - 1].vol > 0 ? t.ticks.length - 1 : -1;
+    const lenLoop = ls >= 0 ? t.ticks.length - ls : 0;
+    const pre = Math.max(lenLoop ? ls : t.ticks.length, lenLoop ? t0 : 0);          // the combined cycle starts once both the instrument and the vibrato are running
+    const step = (vs * (n - 1)) % 64;
+    const Tv = n * (64 / gcd(64, step || 64));
+    let total = lenLoop ? pre + lcm(lenLoop, Tv) : pre;
+    const cut = total > MAX_MACRO - 1;
+    if (cut) { total = MAX_MACRO - 1; warn('vibcut', `vibrato (4xy): a vibrato cycle longer than ${MAX_MACRO - 1} ticks is written for its first ${MAX_MACRO - 1} ticks and then stops`); }
+    const pv: number[] = [];
+    for (let tt = 0; tt < total; tt++) {
+      const k = t.ticks[tt < t.ticks.length ? tt : ls + ((tt - ls) % lenLoop)];
+      const u = tt - t0;
+      const vib = u < 0 ? 0 : Math.round((VIB_TABLE[(vs * (u - Math.ceil(u / n))) & 63] * vd) / 128);
+      pv.push(pitchOf(t, k, note) - (cut && tt === total - 1 ? 0 : vib));        // a cut vibrato ends level
+    }
+    return copyFor(t, note, pv, lenLoop && !cut ? pre : -1, 0);
   };
 
   // ---- order list: song positions that exist
@@ -293,8 +341,32 @@ export function songToFur(song: Song, opts: FurOptions = {}): FurResult {
   if (song.patterns.some((p) => p.rows > 256)) warn('rows', 'patterns longer than 256 rows are cut (Furnace limit)');
   const patLen = Math.max(1, ...orderPats.map((o) => o.height));
 
+  /** the 4xy vibrato of the note at (order, row) in channel `c`, when it is one and the same command from its first appearance until the channel's next note
+   *  (no other vibrato command, no speed change or jump on the way): its parameter and the number of rows between the note and the first command */
+  const vibScan = (oi: number, r: number, c: number): { p: number; rows: number } | null => {
+    let found: { p: number; rows: number } | null = null;
+    let rows = 0;
+    for (let o = oi, rr = r; o < orderPats.length; o++, rr = 0) {
+      const op = orderPats[o];
+      for (; rr < op.height; rr++, rows++) {
+        for (let cc = 0; cc < nch; cc++) {
+          const e = op.pat.cells[rr][cc];
+          if ((e.effect === FX('F') && e.param > 0 && e.param < 0x20) || e.effect === FX('B')) return null;
+        }
+        const k = op.pat.cells[rr][c];
+        if (!(o === oi && rr === r) && k.note > 0 && k.note < NOTE_OFF && k.effect !== FX('3')) return found;
+        if (k.effect === FX('6')) return null;
+        if (k.effect === FX('4')) {
+          if (!found) { if (!((k.param >> 4) & 15) || !(k.param & 15)) return null; found = { p: k.param, rows }; }
+          else if (k.param !== found.p) return null;
+        }
+      }
+    }
+    return found;
+  };
+
   // ---- pattern pass
-  const st: ChState[] = Array.from({ length: nch }, () => ({ inst: 0, furIns: -1, last: -1, vol64: 64, vol15: 15, arp: false, arpSpeed: 1, slide: 0, porta: 0, vs: 0, vd: 0, vibFine: false }));
+  const st: ChState[] = Array.from({ length: nch }, () => ({ inst: 0, furIns: -1, last: -1, vol64: 64, vol15: 15, arp: false, arpSpeed: 1, slide: 0, porta: 0, vs: 0, vd: 0, vibFine: false, vibBaked: false }));
   let speed = song.speed || 6;
   const initialSpeed = speed;
   const chanRows: (FCell | null)[][][] = Array.from({ length: nch }, () => []);   // [channel][order][row]
@@ -332,9 +404,19 @@ export function songToFur(song: Song, opts: FurOptions = {}): FurResult {
           } else {
             const ii = cell.instrument ? cell.instrument : s.inst;
             const tpl = ii ? template(ii) : null;
-            const fi = tpl ? variantFor(tpl, cell.note) : -1;
+            let fi = -1, baked = false;
+            if (tpl) {
+              // a vibrato that starts with the note and stays as it is until the next note is written into the instrument's pitch macro
+              if (!porta) {
+                const bi = song.instruments[ii];
+                const vsn = bi && bi.vibratoDepth > 0 && bi.vibratoSpeed > 0 ? null : vibScan(oIdx, r, c);
+                if (vsn) { fi = vibVariant(tpl, cell.note, (vsn.p >> 4) & 15, vsn.p & 15, speed, vsn.rows * speed); baked = fi >= 0; }
+              }
+              if (fi < 0) fi = variantFor(tpl, cell.note);
+            }
             if (fi < 0) unsup('notes without an instrument');
             else {
+              s.vibBaked = baked;
               out.note = fn; s.inst = ii; s.last = cell.note; triggered = true;
               if (cell.instrument) s.vol64 = 64;
               if (cell.instrument || s.furIns !== fi) { out.ins = fi; s.furIns = fi; }
@@ -355,6 +437,7 @@ export function songToFur(song: Song, opts: FurOptions = {}): FurResult {
         // arpeggio (not persistent in the editor, persistent in Furnace)
         if (eff === '0' && p) {
           const sp = Math.max(1, song.instruments[s.inst]?.arpSpeed ?? 1);
+          if (sp > 1 && speed % sp) warn('arpspd', `arpeggio speed ${sp} with ${speed} ticks per row: Furnace's arpeggio counter keeps running across notes, so the cycle can start up to ${sp - 1} tick(s) off`);
           if (sp !== s.arpSpeed) { out.fx.push([0xe0, clamp(sp, 1, 255)]); s.arpSpeed = sp; }
           out.fx.push([0x00, p]); s.arp = true;
         } else if (s.arp) { out.fx.push([0x00, 0]); s.arp = false; }
@@ -369,7 +452,9 @@ export function songToFur(song: Song, opts: FurOptions = {}): FurResult {
         }
         // vibrato: the editor keeps speed / depth until the next note (a zero nibble keeps the old value); Furnace keeps them across notes
         const newNote = out.note >= 0 && out.note < FUR_NOTE_OFF && !(porta && !triggered);
-        if (eff === '4') {
+        if (eff === '4' && s.vibBaked) {
+          if (newNote && (s.vs || s.vd)) { out.fx.push([0x04, 0]); s.vs = 0; s.vd = 0; }
+        } else if (eff === '4') {
           const nvs = ((p >> 4) & 15) || (newNote ? 0 : s.vs), nvd = (p & 15) || (newNote ? 0 : s.vd);
           if (!s.vibFine) { out.fx.push([0xe4, 1]); s.vibFine = true; }   // vibrato range 1: 0.5 register-period unit per depth step, like the editor
           out.fx.push([0x04, (nvs << 4) | nvd]); s.vs = nvs; s.vd = nvd;

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { songToFur, furName } from '../src/furnace/fur';
 import { bakeInstrument } from '../src/export/bake';
-import { newSong, emptyPattern, defaultInstrument, parseEffectChar, type Song, type Instrument } from '../src/tracker/types';
+import { newSong, emptyPattern, defaultInstrument, parseEffectChar, noteToFreq, type Song, type Instrument } from '../src/tracker/types';
 
 // ---- a small reader for the file layout (the same fields Furnace's own loader reads for format 228)
 class R {
@@ -165,8 +165,36 @@ describe('Furnace .fur export', () => {
     const m = (code: number) => f.insts[0].macros.find((x) => x.code === code)?.vals;
     expect(m(3)![0]).toBe(4);                          // envelope bit only
     expect(m(6)).toEqual([10]);                        // R13 shape
-    expect(m(7)).toEqual([1]); expect(m(8)).toEqual([2]);   // auto-envelope num / den
+    expect(m(7)).toEqual([0]);                         // the envelope period is written out for the played note (the editor keeps it there)
+    expect(m(8)).toBeUndefined();
+    expect(m(16)![0]).toBe(Math.round((2_000_000 / (256 * noteToFreq(37))) * 2));   // x2 divisor
     expect(m(14)).toEqual([1]);                        // phase reset: R13 is rewritten on every note
+  });
+
+  it('gives a buzzer one copy per note so slides and arpeggios do not drag the envelope along', () => {
+    const s = mk();
+    s.instruments[1] = { ...defaultInstrument('buzz'), useHardEnv: true, hardEnvShape: 8, toneEnabled: false };
+    s.patterns[0].cells[0][0] = c(37, 1); s.patterns[0].cells[4][0] = c(41, 1); s.patterns[0].cells[8][0] = c(37, 1);
+    const f = parse(songToFur(s).bytes);
+    expect(f.insts.length).toBe(2);
+    expect(f.insts.map((i) => i.macros.find((m) => m.code === 16)!.vals[0])).toEqual([Math.round(2_000_000 / (256 * noteToFreq(37))), Math.round(2_000_000 / (256 * noteToFreq(41)))]);
+  });
+
+  it('writes a vibrato that starts with its note into the instrument; a changing one stays a Furnace effect', () => {
+    const s = mk(16);
+    s.instruments[1] = { ...defaultInstrument('v'), adsr: { useAdsr: true, attack: 0, decay: 0, sustain: 15, release: 0 } };
+    s.patterns[0].cells[0][0] = c(49, 1, '4', 0x4f);
+    s.patterns[0].cells[2][0] = c(0, 0, '4', 0x4f);                 // the same vibrato again: still baked
+    s.patterns[0].cells[8][1] = c(49, 1, '4', 0x4f);
+    s.patterns[0].cells[10][1] = c(0, 0, '4', 0x2f);                // a different one later: Furnace's own effect
+    const f = parse(songToFur(s).bytes);
+    expect(rowsOf(f, 0).flatMap((r) => r.fx).some(([e]) => e === 0x04)).toBe(false);
+    const ins0 = f.insts[rowsOf(f, 0)[0].ins!];
+    const pm = ins0.macros.find((m) => m.code === 4)!;
+    expect(pm.vals.length).toBeGreaterThan(8);
+    expect(Math.max(...pm.vals)).toBeGreaterThan(5); expect(Math.min(...pm.vals)).toBeLessThan(-5);
+    expect(rowsOf(f, 1).flatMap((r) => r.fx)).toContainEqual([0x04, 0x4f]);
+    expect(rowsOf(f, 1).flatMap((r) => r.fx)).toContainEqual([0x04, 0x2f]);
   });
 
   it('gives a step table with fractional semitones one copy per note, carrying the period correction', () => {

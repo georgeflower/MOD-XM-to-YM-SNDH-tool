@@ -236,18 +236,21 @@ YM2149 with the 2 MHz Atari ST clock, three channels, tick rate = BPM × 0.4 Hz,
 
 * **Instruments become macros.** The volume macro carries the envelope (a release tail is the macro's release part, played by the note-release command), the wave macro tone / noise / envelope
   bits, the duty macro the noise period; arpeggio, pitch and built-in vibrato are baked into the arpeggio and pitch macros (the song is flagged *non-linear pitch*, so pitch macro and slides
-  are in YM period units like in the editor). Buzzers write the envelope shape (`ex2`), restart it with every note (phase-reset macro) and use Furnace's auto-envelope (`ex3` / `alg`) for the
-  note-following envelope period; a fixed envelope period is written as such.
+  are in YM period units like in the editor). Buzzers write the envelope shape (`ex2`) and restart it with every note (phase-reset macro). The editor ties the envelope period to the written
+  note (not to arpeggios, slides or glides), so a buzzer gets one copy per played note with that period written out (`ex5`); a fixed envelope period is written as such.
 * **Fractional semitones** (the converter's step tables are tuned in fractions of a semitone) need the note: Furnace's pitch macro is in period units, so such an instrument is written once
   per note it plays, each copy carrying that note's period correction (copies within one period unit are shared).
 * **Effects that carry over:** notes and note-off (release when the instrument has a tail), volume column / `Cxx`, `0xy` arpeggio (with the instrument's arpeggio speed), `1xx` `2xx` slides,
   `3xx` tone portamento, `4xy` vibrato, `EDx` note delay, `ECx` note cut, `Kxx`, `Fxx` speed and BPM, `Dxx`, `Bxx`; shorter patterns end with a jump, the restart position is a jump at the end.
-* **Differences** (listed as warnings): a buzzer's envelope follows arpeggios / pitch of its note (the editor keeps it on the written note, which the acid-bass presets rely on); vibrato
-  starts in the opposite direction and two ticks earlier; the first tick of a release shows the held level (Furnace re-reads it) before the tail follows; sync-square, `Q S U` timer effects,
+* **Vibrato** (`4xy`): Furnace's own vibrato runs the other way and two ticks earlier than the editor's, so a vibrato that is the same command from its first row until the next note is
+  written into that note's instrument copy (pitch macro) instead — register-identical in Furnace. A vibrato whose command changes in the middle of a note stays a Furnace `04xy`
+  (opposite start direction, listed as a warning); a cycle longer than 254 ticks is cut.
+* **Differences** (listed as warnings): the first tick of a release shows the held level (Furnace re-reads the macro's release position) before the tail follows; an instrument arpeggio speed that does not divide
+  the ticks per row drifts by up to speed-1 ticks (Furnace's arpeggio counter runs on across notes); sync-square, `Q S U` timer effects,
   digidrums (`Z`, the drum channel), tremolo, volume slides, global volume, `X Y M P L R T`, `E1x` `E2x` `E6x` `E9x` `EAx` `EBx` and channels beyond the third are not exported.
 * **Verified** by playing the export in a real (headless) Furnace and comparing every register frame with the editor's render (`scripts/furnace-check.ts <furnace> <module|ymt|synth>`, needs a
   Furnace with the `-vgmout` option): ADSR, volume envelopes and tables, arpeggios, slides, tone portamento, speed / BPM changes, pattern lengths, `Dxx`, `Bxx`, restart, noise, step tables,
-  one-shot tables, fractional tuning and all buzzer shapes are register-identical; the converted modules agree on pitch within 2 % and on level within 2 steps for 99 % of the sounding frames.
+  one-shot tables, fractional tuning, vibrato and all buzzer shapes (also with arpeggios, slides and glides) are register-identical; the converted modules agree on pitch within 2 % and on level within 2 steps for 99 % of the sounding frames.
 
 ## Using it
 
