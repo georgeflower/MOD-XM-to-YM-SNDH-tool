@@ -15,6 +15,10 @@ import { parseYm, isYm } from '../import/ym';
 import { parseSndh, isSndh, type SndhInfo } from '../import/sndh';
 import type { AyTune } from '../import/tune';
 import { Preview, type Source } from './audio';
+import { Editor } from '../tracker/editor';
+import { moduleToSong } from '../tracker/fromModule';
+import { decodeYmt, isYmt } from '../tracker/ymt';
+import { Tracker } from './Tracker';
 import { download } from './download';
 import { AyRoll } from './AyRoll';
 import demoUrl from '../assets/back_in_town_again.mod?inline';
@@ -61,10 +65,34 @@ export function App() {
   const previewRef = useRef<Preview | null>(null);
   const preview = () => (previewRef.current ??= new Preview());
   const dropRef = useRef<HTMLDivElement>(null);
+  const [tab, setTab] = useState<'conv' | 'ed'>('conv');
+  const [songReport, setSongReport] = useState<string[]>([]);
+  const edRef = useRef<Editor | null>(null);
+  const edPreviewRef = useRef<Preview | null>(null);
+  /** the pattern editor and its own audio output are created on first use */
+  const getEd = () => {
+    if (!edRef.current) {
+      const e = new Editor();
+      edPreviewRef.current ??= new Preview();
+      e.attachAudio(edPreviewRef.current);
+      edRef.current = e;
+    }
+    return edRef.current;
+  };
+  const switchTab = (t: 'conv' | 'ed') => {
+    if (t === tab) return;
+    if (t === 'ed') { previewRef.current?.stop(); setPlaying(false); getEd(); } else edRef.current?.stop();
+    setTab(t);
+  };
 
   // ---- loading: modules are converted, .sndh/.ym are register dumps that are played/imported as they are
   const loadBytes = useCallback((name: string, data: Uint8Array) => {
     try {
+      if (isYmt(data)) {
+        decodeYmt(data).then((song) => { getEd().loadSong(song, name); setSongReport([]); setError(''); previewRef.current?.stop(); setPlaying(false); setTab('ed'); })
+          .catch((e) => setError(String((e as Error).message ?? e)));
+        return;
+      }
       setError(''); setFileName(name); setBytes(data);
       setPrio({}); setInstMap({}); setMacroSel(null); setOpts(DEFAULT_OPTS); setSubtune(1); setSecOverride(0);
       if (isSndh(data) || isYm(data)) {
@@ -149,6 +177,7 @@ export function App() {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
+      if (tab !== 'conv') return;
       if (t.tagName === 'INPUT' && (t as HTMLInputElement).type === 'text') return;
       if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
       if (e.code === 'Tab' && origOk && !e.shiftKey && mod && t.tagName !== 'SELECT') { e.preventDefault(); pickSource(source === 'ay' ? 'orig' : 'ay'); }
@@ -171,6 +200,24 @@ export function App() {
   const editMacro = (i: number, f: (m: Macro) => Macro) => {
     const cur = instMap[i]?.macro;
     if (cur) patchInst(i, { macro: f(cloneMacro(cur)) });
+  };
+
+  /** module -> editable pattern song */
+  const toPatterns = () => {
+    if (!mod) return;
+    const e = getEd();
+    if (e.dirty && !confirm('Replace the song that is open in the pattern editor?')) return;
+    previewRef.current?.stop(); setPlaying(false);
+    setBusy('Converting to AY patterns…');
+    setTimeout(() => {
+      try {
+        const r = moduleToSong(mod, { prio, inst: instMap, drumBonus: opts.drumBonus, sticky: opts.sticky, gainDb: opts.gainDb, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol });
+        e.loadSong(r.song, fileName);
+        setSongReport([...r.report, ...r.warnings.map((w) => 'warning: ' + w)]);
+        setTab('ed');
+      } catch (err) { setError(String((err as Error).message ?? err)); }
+      setBusy('');
+    }, 30);
   };
 
   // ---- exports
@@ -212,15 +259,33 @@ export function App() {
       <header className="titlebar">
         <h1>MOD/XM <span>→</span> YM2149 <small>Atari ST · SNDH · game stream</small></h1>
         <div className="actions">
-          <label className="btn">Load MOD / XM / SNDH / YM…
-            <input type="file" accept=".mod,.xm,.sndh,.snd,.ym,.MOD,.XM,.SNDH,.SND,.YM" hidden onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
+          <label className="btn">Load MOD / XM / SNDH / YM / YMT…
+            <input type="file" accept=".mod,.xm,.sndh,.snd,.ym,.ymt,.MOD,.XM,.SNDH,.SND,.YM,.YMT" hidden onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
           </label>
           <button className="btn" onClick={loadDemo}>Demo: back_in_town_again</button>
         </div>
       </header>
 
+      <nav className="tabs" role="tablist">
+        <button role="tab" aria-selected={tab === 'conv'} className={tab === 'conv' ? 'on' : ''} onClick={() => switchTab('conv')}>Converter</button>
+        <button role="tab" aria-selected={tab === 'ed'} className={tab === 'ed' ? 'on' : ''} onClick={() => switchTab('ed')}>AY pattern editor</button>
+      </nav>
+
       {error && <div className="panel err">{error}</div>}
 
+      {tab === 'ed' && (
+        <>
+          {songReport.length > 0 && (
+            <details className="panel">
+              <summary>Converted from {fileName} — report</summary>
+              <pre className="log">{songReport.join('\n')}</pre>
+            </details>
+          )}
+          <Tracker ed={getEd()} active onError={setError} />
+        </>
+      )}
+
+      {tab === 'conv' && <>
       {!mod && !tune && (
         <section className="panel welcome">
           <h2>Start here</h2>
@@ -228,6 +293,7 @@ export function App() {
             <li>Load a <b>.MOD</b> or <b>.XM</b> file (or drop it anywhere on this page) — or press <b>Demo</b>. <b>.SNDH</b> and <b>.YM</b> files load too: they are played, shown and re-exported as they are.</li>
             <li>The tool reduces it to <b>one YM2149 chip (3 voices + noise)</b> at 50 Hz and lets you listen to both: <kbd>Tab</kbd> flips between original and YM.</li>
             <li>Fine-tune with the options, then export an <b>SNDH</b>, a <b>.YM</b> or a <b>game kit</b> (C header + 30-line replayer).</li>
+            <li>Or press <b>Edit as AY patterns</b> to turn the module into an editable 3-voice tracker song (FastTracker 2 keys) — or open the <b>AY pattern editor</b> tab and write a tune from scratch.</li>
           </ol>
         </section>
       )}
@@ -312,6 +378,7 @@ export function App() {
               {opts.arpFill > 1 && <Slider label="Min. volume" value={opts.arpMinVol} min={1} max={12} step={1} onChange={(v) => setOpts({ ...opts, arpMinVol: v })}
                 hint="Dropped notes quieter than this AY volume are not worth an arpeggio slot" />}
               <button className="btn small" onClick={() => { setOpts(DEFAULT_OPTS); setPrio({}); setInstMap({}); setMacroSel(null); }}>Reset to auto</button>
+              <button className="btn small primary" disabled={!!busy} onClick={toPatterns} title="Turn the module into an editable pattern song for one YM2149 (uses the options above)">Edit as AY patterns →</button>
             </section>}
 
             <section className="panel">
@@ -456,6 +523,7 @@ export function App() {
           </section>}
         </>
       )}
+      </>}
       <footer>Runs entirely in your browser — files never leave your computer.</footer>
     </div>
   );
