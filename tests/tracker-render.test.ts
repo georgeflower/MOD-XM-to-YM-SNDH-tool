@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { newSong, parseEffectChar, noteToFreq, NOTE_OFF, defaultInstrument } from '../src/tracker/types';
 import { renderSong, freqToYmPeriod } from '../src/tracker/render';
+import { renderYm, envLevel } from '../src/export/ymemu';
 
 const per = (r: Uint8Array, f: number, v: number) => r[f * 14 + 2 * v] | (r[f * 14 + 2 * v + 1] << 8);
 const vol = (r: Uint8Array, f: number, v: number) => r[f * 14 + 8 + v];
@@ -100,5 +101,28 @@ describe('pattern renderer', () => {
 
   it('defaultInstrument is a plain sustained tone', () => {
     expect(defaultInstrument().adsr.sustain).toBe(15);
+  });
+});
+
+describe('hardware envelope in the preview emulator', () => {
+  it('follows the YM2149 shape table', () => {
+    const seqOf = (shape: number, n: number) => Array.from({ length: n }, (_, i) => envLevel(shape, i));
+    expect(seqOf(9, 20)).toEqual([...Array.from({ length: 16 }, (_, i) => 15 - i), 0, 0, 0, 0]);          // \___
+    expect(seqOf(15, 18).slice(14)).toEqual([14, 15, 0, 0]);                                                // /___
+    expect(seqOf(8, 18).slice(14)).toEqual([1, 0, 15, 14]);                                                 // \\\
+    expect(seqOf(10, 36).slice(14, 20)).toEqual([1, 0, 0, 1, 2, 3]);                                        // \/\/
+    expect(seqOf(11, 18).slice(14)).toEqual([1, 0, 15, 15]);                                                // \‾‾‾
+    expect(seqOf(13, 18).slice(14)).toEqual([14, 15, 15, 15]);                                              // /‾‾‾
+  });
+  it('a buzzer instrument is audible', () => {
+    const s = song1();
+    const ins = s.instruments[1];
+    ins.useHardEnv = true; ins.hardEnvShape = 8; ins.syncBuzz = false;
+    s.patterns[0].cells[0][0] = { note: 37, instrument: 1, volume: 0, effect: 0, param: 0 };
+    const r = renderSong(s);
+    const pcm = renderYm(r.regs, r.nframes);
+    let peak = 0;
+    for (let i = 0; i < pcm.length; i++) peak = Math.max(peak, Math.abs(pcm[i]));
+    expect(peak).toBeGreaterThan(0.05);
   });
 });

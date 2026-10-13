@@ -107,6 +107,31 @@ export class Preview {
 
   rewind() { this.stop(); this.offset = 0; }
 
+  // ---- short one-shot sounds (pattern editor note audition), independent of the main buffer
+  private audNode: AudioBufferSourceNode | null = null;
+  private audGain: GainNode | null = null;
+  audition(pcm: Float32Array, sr = 44100) {
+    this.stopAudition(0);
+    this.ctx.resume();
+    const b = this.ctx.createBuffer(1, pcm.length, sr);
+    b.copyToChannel(pcm as Float32Array<ArrayBuffer>, 0);
+    const g = this.ctx.createGain();
+    g.connect(this.ctx.destination);
+    const n = this.ctx.createBufferSource();
+    n.buffer = b; n.connect(g); n.start();
+    this.audNode = n; this.audGain = g;
+    n.onended = () => { if (this.audNode === n) { this.audNode = null; this.audGain = null; } };
+  }
+  stopAudition(fade = 0.04) {
+    const n = this.audNode, g = this.audGain;
+    this.audNode = null; this.audGain = null;
+    if (!n || !g) return;
+    const t = this.ctx.currentTime;
+    g.gain.setValueAtTime(g.gain.value, t);
+    g.gain.linearRampToValueAtTime(0, t + fade);
+    try { n.stop(t + fade + 0.01); } catch { /* already stopped */ }
+  }
+
   seek(sec: number) {
     if (this.playing) this.play(sec); else this.offset = sec;
   }

@@ -1,4 +1,4 @@
-// Small YM2149 emulator -> PCM, for in-browser preview. Tone/noise/mixer/volume (no envelope).
+// Small YM2149 emulator -> PCM, for in-browser preview. Tone / noise / mixer / volume / hardware envelope.
 import { NREGS } from './stream';
 
 const CLK = 2_000_000;
@@ -16,6 +16,17 @@ function noiseSeq(n: number): Uint8Array {
   return out;
 }
 
+/** hardware envelope level 0..15 after `step` steps since the shape register was written */
+export function envLevel(shape: number, step: number): number {
+  const A = shape & 4, AL = shape & 2, H = shape & 1, C = shape & 8;
+  const ramp = Math.floor(step / 16), pos = step % 16;
+  const ramped = (up: boolean) => (up ? pos : 15 - pos);
+  if (!C) return ramp === 0 ? ramped(!!A) : 0;
+  if (H) return ramp === 0 ? ramped(!!A) : AL ? (A ? 0 : 15) : (A ? 15 : 0);
+  const up = AL ? (A ? (ramp & 1) === 0 : (ramp & 1) === 1) : !!A;
+  return ramped(up);
+}
+
 export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50, over = 4): Float32Array {
   const spf = Math.floor((sr * over) / fps);
   const tStep = CLK / 16 / (sr * over);
@@ -26,8 +37,14 @@ export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50
   const outFrames = Math.floor(spf / over);
   const out = new Float32Array(nframes * outFrames);
   const acc = new Float64Array(spf);
+  let envShape = 0, envStep = 0;          // envStep counts hardware-envelope steps (16 per ramp)
   for (let f = 0; f < nframes; f++) {
     const r = regs.subarray(f * NREGS, f * NREGS + NREGS);
+    if (r[13] !== 0xff) { envShape = r[13] & 15; envStep = 0; }
+    const envPer = Math.max(1, r[11] | (r[12] << 8));
+    const envRate = CLK / (16 * envPer) / (sr * over);       // envelope steps per oversampled sample
+    const envAt = new Float64Array(0);
+    void envAt;
     const mix = r[7];
     const nper = Math.max(1, r[6] & 31);
     acc.fill(0);
@@ -39,17 +56,20 @@ export function renderYm(regs: Uint8Array, nframes: number, sr = 44100, fps = 50
       const per = Math.max(1, r[2 * v] | ((r[2 * v + 1] & 15) << 8));
       const toneOn = !(mix & (1 << v));
       const noiseOn = !(mix & (8 << v));
-      const vol = VOL[r[8 + v] & 15];
+      const useEnv = (r[8 + v] & 16) !== 0;
+      const vol = useEnv ? 1 : VOL[r[8 + v] & 15];
       const start = ph[v];
       for (let n = 0; n < spf; n++) {
         const pos = start + ((n + 1) * toneStep) / per;
         let sig = 1;
         if (toneOn) sig = Math.floor(pos) & 1;
         if (noiseOn) sig = toneOn ? sig * nbit[n] : nbit[n];
-        acc[n] += sig * vol;
+        acc[n] += sig * (useEnv ? VOL[envLevel(envShape, Math.floor(envStep + (n + 1) * envRate))] : vol);
       }
       ph[v] = (start + (spf * toneStep) / per) % 4294967296;
     }
+    envStep += spf * envRate;
+    if (envStep > 1e9) envStep = 64 + (envStep % 32);
     for (let i = 0; i < outFrames; i++) {
       let s = 0;
       for (let k = 0; k < over; k++) s += acc[i * over + k];
