@@ -5,10 +5,9 @@ import { keyToNote, keyToHex } from '../tracker/keymap';
 import { cellHint } from '../tracker/hints';
 import { encodeYmt, decodeYmt, isYmt } from '../tracker/ymt';
 import { writeSndh } from '../export/sndh';
-import { writeYm5 } from '../export/ym';
-import { packStream } from '../export/stream';
-import { writeCHeader } from '../export/cheader';
-import { replayerHeader } from '../export/replayer';
+import { writeYm5, writeYm6 } from '../export/ym';
+import { gameKitFiles } from '../export/gamekit';
+import { hasDrums } from '../core/drums';
 import { renderYm } from '../export/ymemu';
 import { encodeWav } from '../export/wav';
 import { zip } from '../export/zip';
@@ -251,21 +250,20 @@ export function Tracker({ ed, active, onError }: { ed: Editor; active: boolean; 
   };
   const meta = { title: song.name.slice(0, 32), author: song.author || 'unknown' };
   const base = slug(song.name);
-  const withRender = (fn: (r: { regs: Uint8Array; nframes: number; loopFrame: number }) => void) => () => {
+  const withRender = (fn: (r: ReturnType<Editor['renderForExport']>) => void) => () => {
     try { fn(ed.renderForExport()); } catch (e) { onError(String((e as Error).message ?? e)); }
   };
   const exp = {
-    sndh: withRender((r) => download(`${base}.sndh`, writeSndh(r.regs, r.nframes, r.loopFrame, meta))),
-    ym: withRender((r) => download(`${base}.ym`, writeYm5(r.regs, r.nframes, r.loopFrame, meta.title, meta.author, 'made in the AY pattern editor'))),
-    game: withRender((r) => {
-      const p = packStream(r.regs, r.nframes, r.loopFrame);
-      download(`${base}_gamekit.zip`, zip([
-        { name: `${base}.h`, data: writeCHeader(base, p.data, r.nframes, r.loopFrame, p.loopOffset) },
-        { name: 'ymplay.h', data: replayerHeader(base) },
-        { name: 'README.txt', data: `Packed YM2149 stream, ${r.nframes} frames @ 50 Hz, ${p.data.length} bytes.\nSee the comment at the top of ymplay.h.\n` },
-      ]), 'application/zip');
+    sndh: withRender((r) => download(`${base}.sndh`, writeSndh(r.regs, r.nframes, r.loopFrame, meta, r.drums))),
+    ym: withRender((r) => {
+      if (hasDrums(r.drums)) {
+        const y = writeYm6(r.regs, r.nframes, r.loopFrame, r.drums, meta.title, meta.author, 'made in the AY pattern editor');
+        if (y.warnings.length) onError(y.warnings.join('; '));
+        download(`${base}.ym`, y.data);
+      } else download(`${base}.ym`, writeYm5(r.regs, r.nframes, r.loopFrame, meta.title, meta.author, 'made in the AY pattern editor'));
     }),
-    wav: withRender((r) => download(`${base}_ym.wav`, encodeWav(renderYm(r.regs, r.nframes), 44100), 'audio/wav')),
+    game: withRender((r) => download(`${base}_gamekit.zip`, zip(gameKitFiles(base, r.regs, r.nframes, r.loopFrame, r.drums)), 'application/zip')),
+    wav: withRender((r) => download(`${base}_ym.wav`, encodeWav(renderYm(r.regs, r.nframes, 44100, 50, 4, r.drums), 44100), 'audio/wav')),
     regs: withRender((r) => download(`${base}.regs`, r.regs.subarray(0, r.nframes * 14))),
   };
 

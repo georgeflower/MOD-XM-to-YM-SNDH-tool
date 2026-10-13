@@ -62,3 +62,23 @@ describe('digidrum exports', () => {
     void TRIG_STOP; void drumFrames;
   });
 });
+
+import { gameKitFiles } from '../src/export/gamekit';
+describe('game kit', () => {
+  it('carries the drum table and engine only when there are drums', () => {
+    const kit = starterKit(), n = 40;
+    const trig = new Uint8Array(n); trig[2] = trigCode(1, 1);
+    const track: DrumTrack = { drums: kit, trig };
+    const regs = new Uint8Array(n * 14); for (let f = 0; f < n; f++) { regs[f * 14 + 7] = 0xff; regs[f * 14 + 13] = 0xff; }
+    const withD = gameKitFiles('song', regs, n, 0, track), without = gameKitFiles('song', regs, n, 0, null);
+    const h = withD.find((f) => f.name === 'song.h')!.data as string, y = withD.find((f) => f.name === 'ymplay.h')!.data as string;
+    expect(h).toContain('#define SONG_DRUMS 1');
+    expect(h).toContain('song_drums[');
+    expect(y).toContain('ymdrum_code[');
+    expect(y).toContain('ymdrum_init');
+    const h2 = without.find((f) => f.name === 'song.h')!.data as string, y2 = without.find((f) => f.name === 'ymplay.h')!.data as string;
+    expect(h2).not.toContain('_drums');
+    expect(y2).not.toContain('ymdrum_code');
+    expect(y2).toContain('ymplay_write');
+  });
+});

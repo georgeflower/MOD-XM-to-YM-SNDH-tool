@@ -4,10 +4,11 @@ import type { Module } from '../core/types';
 import { convert, type ConvertResult, type InstMap, type InstMode, type Macro, type MacroStep } from '../core/convert';
 import { MACRO_PRESETS, cloneMacro } from '../core/macros';
 import { packStream } from '../export/stream';
-import { writeYm5 } from '../export/ym';
+import { writeYm5, writeYm6 } from '../export/ym';
 import { writeSndh } from '../export/sndh';
-import { writeCHeader } from '../export/cheader';
-import { replayerHeader } from '../export/replayer';
+import { PLAYER_BLOB } from '../player68k/blob';
+import { gameKitFiles } from '../export/gamekit';
+import { hasDrums, type DrumTrack } from '../core/drums';
 import { renderYm } from '../export/ymemu';
 import { encodeWav } from '../export/wav';
 import { zip } from '../export/zip';
@@ -106,7 +107,7 @@ export function App() {
             setAuthor(t.author);
             preview().setSource('ay'); setSource('ay');
             preview().loadOriginal(null);
-            preview().setAy(renderYm(t.regs, t.nframes));
+            preview().setAy(renderYm(t.regs, t.nframes, 44100, 50, 4, t.drums));
           } catch (e) { setError(String((e as Error).message ?? e)); setTune(null); }
           setBusy('');
         }, 30);
@@ -126,7 +127,7 @@ export function App() {
     setTimeout(() => {
       try {
         const t = parseSndh(bytes, { subtune: sub, seconds: secs || undefined });
-        setTune(t); preview().setAy(renderYm(t.regs, t.nframes)); setPos(0);
+        setTune(t); preview().setAy(renderYm(t.regs, t.nframes, 44100, 50, 4, t.drums)); setPos(0);
       } catch (e) { setError(String((e as Error).message ?? e)); }
       setBusy('');
     }, 30);
@@ -147,7 +148,7 @@ export function App() {
         setRes(r);
         setBusy('Rendering the YM2149 preview…');
         setTimeout(() => {
-          preview().setAy(renderYm(r.regs, r.nframes));
+          preview().setAy(renderYm(r.regs, r.nframes, 44100, 50, 4, (r as { drums?: DrumTrack }).drums));
           setBusy('');
         }, 20);
       } catch (e) {
@@ -221,25 +222,25 @@ export function App() {
   };
 
   // ---- exports
-  const out: { regs: Uint8Array; nframes: number; loopFrame: number } | null = mod ? res : tune;
+  const out: { regs: Uint8Array; nframes: number; loopFrame: number; drums?: DrumTrack } | null = mod ? res : tune;
   const base = slug((mod ? mod.title : tune?.title) || fileName);
   const title = ((mod ? mod.title : tune?.title) || base).slice(0, 32);
-  const packed = useMemo(() => (out ? packStream(out.regs, out.nframes, out.loopFrame) : null), [out]);
+  const packed = useMemo(() => (out ? packStream(out.regs, out.nframes, out.loopFrame, out.drums) : null), [out]);
   const meta = { title, author: author || 'unknown' };
   const exp = {
-    sndh: () => out && download(`${base}.sndh`, writeSndh(out.regs, out.nframes, out.loopFrame, meta)),
-    ym: () => out && download(`${base}.ym`, writeYm5(out.regs, out.nframes, out.loopFrame, title, meta.author, `${mod ? 'converted' : 'imported'} from ${fileName}`)),
-    game: () => {
-      const res = out;
-      if (!res || !packed) return;
-      download(`${base}_gamekit.zip`, zip([
-        { name: `${base}.h`, data: writeCHeader(base, packed.data, res.nframes, res.loopFrame, packed.loopOffset) },
-        { name: 'ymplay.h', data: replayerHeader(base) },
-        { name: 'README.txt', data: `Packed YM2149 stream, ${res.nframes} frames @ 50 Hz, ${packed.data.length} bytes.\nSee the comment at the top of ymplay.h.\n` },
-      ]), 'application/zip');
+    sndh: () => out && download(`${base}.sndh`, writeSndh(out.regs, out.nframes, out.loopFrame, meta, out.drums)),
+    ym: () => {
+      if (!out) return;
+      const comment = `${mod ? 'converted' : 'imported'} from ${fileName}`;
+      if (hasDrums(out.drums)) {
+        const y = writeYm6(out.regs, out.nframes, out.loopFrame, out.drums, title, meta.author, comment);
+        if (y.warnings.length) setError(y.warnings.join('; '));
+        download(`${base}.ym`, y.data);
+      } else download(`${base}.ym`, writeYm5(out.regs, out.nframes, out.loopFrame, title, meta.author, comment));
     },
+    game: () => { if (out) download(`${base}_gamekit.zip`, zip(gameKitFiles(base, out.regs, out.nframes, out.loopFrame, out.drums)), 'application/zip'); },
     regs: () => out && download(`${base}.regs`, out.regs),
-    wav: () => out && download(`${base}_ym.wav`, encodeWav(renderYm(out.regs, out.nframes), 44100), 'audio/wav'),
+    wav: () => out && download(`${base}_ym.wav`, encodeWav(renderYm(out.regs, out.nframes, 44100, 50, 4, out.drums), 44100), 'audio/wav'),
     log: () => { const r = mod ? res?.report : tune && [`${tune.source.toUpperCase()} import: ${fileName}`, tune.title && `title: ${tune.title}`, tune.author && `author: ${tune.author}`, `${tune.nframes} frames, loop at ${tune.loopFrame}`, ...tune.warnings.map((w) => 'warning: ' + w)].filter(Boolean) as string[]; if (r) download(`${base}_report.txt`, r.join('\n') + '\n', 'text/plain'); },
   };
 
@@ -392,7 +393,7 @@ export function App() {
                 <button className="btn" disabled={!out} onClick={exp.log}>Report (.txt)</button>
               </div>
               {packed && out && (
-                <p className="note">Packed stream: <b>{packed.data.length.toLocaleString()}</b> bytes ({(packed.data.length / (out.nframes / 50)).toFixed(0)} B/s). SNDH adds a 220-byte player.</p>
+                <p className="note">Packed stream: <b>{packed.data.length.toLocaleString()}</b> bytes ({(packed.data.length / (out.nframes / 50)).toFixed(0)} B/s). SNDH adds a {PLAYER_BLOB.length}-byte player{hasDrums(out.drums) ? ' (with the digidrum engine)' : ''}.</p>
               )}
               <p className="note soft">Furnace · Arkos · Maxymiser export: coming next.</p>
             </section>
