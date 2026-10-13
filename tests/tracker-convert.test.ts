@@ -78,10 +78,10 @@ describe('module -> pattern song', () => {
 });
 
 describe('xm with tempo and many channels', () => {
-  it('converts OLGIENG.XM with the right length', () => {
-    const x = loadModule(fx('OLGIENG.XM'));
+  it('converts OMARSBAZAAR.xm with the right length', () => {
+    const x = loadModule(fx('OMARSBAZAAR.xm'));
     const r = moduleToSong(x, { arpFill: 3 });
-    expect(renderSong(r.song).nframes).toBe(9312);
+    expect(renderSong(r.song).nframes).toBe(10026);
     expect(r.song.patterns.length).toBeLessThan(256);
   });
 });

@@ -5,7 +5,7 @@ import { convert } from '../src/core/convert';
 import { moduleToSong } from '../src/tracker/fromModule';
 import { renderSong } from '../src/tracker/render';
 
-const mod = () => loadModule(new Uint8Array(readFileSync(new URL('../src/assets/back_in_town_again.mod', import.meta.url))));
+const mod = () => loadModule(new Uint8Array(readFileSync(new URL('../fixtures/back_in_town_again.mod', import.meta.url))));
 
 /** per voice: median tone frequency and number of noise frames, from a register dump */
 function stats(regs: Uint8Array, nf: number) {

@@ -86,7 +86,7 @@ import { encodeYmt, decodeYmt } from '../src/tracker/ymt';
 import { hasDrums } from '../src/core/drums';
 
 describe('module -> patterns with a digidrum channel', () => {
-  const m = loadModule(new Uint8Array(readFileSync(new URL('../fixtures/OLGIENG.XM', import.meta.url))));
+  const m = loadModule(new Uint8Array(readFileSync(new URL('../fixtures/OMARSBAZAAR.xm', import.meta.url))));
   const plain = moduleToSong(m, {});
   const r = moduleToSong(m, { digiDrums: true });
   it('adds a 4th column with drum notes and a bank instrument', () => {

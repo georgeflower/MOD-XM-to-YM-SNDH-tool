@@ -254,7 +254,7 @@ YM2149 with the 2 MHz Atari ST clock, three channels, tick rate = BPM × 0.4 Hz,
 
 ## Using it
 
-1. Open the page, **Load MOD / XM / SNDH / YM…** (or drop a file anywhere) — or press **Demo**.
+1. Open the page, **Load MOD / XM / SNDH / YM…** (or drop a file anywhere) — or press **Demo** (Omar's Bazaar).
 2. **Tab** flips between the original (libopenmpt) and the YM version, **Space** plays/stops.
 3. Tweak *Level / Drum priority / Voice stickiness / Arpeggio order*, per-instrument **AY role** (kick/snare/hat) and
    per-channel **priority**; the preview re-renders automatically.
@@ -273,7 +273,7 @@ npx tsx scripts/export-cli.ts song.mod out/   # same exporters from the command 
 
 ### Verification
 
-* `tests/convert.test.ts` — the TypeScript converter reproduces the original Python reference dump of `OLGIENG.XM`
+* `tests/convert.test.ts` — the demo song `OMARSBAZAAR.xm` (Omar's Bazaar, by Qumran) loads, converts to the expected length and gives a stable register dump
   **frame for frame** (`tools/reference/` holds the Python oracle).
 * `tools/verify/sndh_check.py` — runs an `.sndh` in [psgplay](https://github.com/frno7/psgplay)'s 68000 core and compares
   every YM register write against the `.regs` dump (`scripts/synth-loop.ts` builds a looping test song).

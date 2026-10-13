@@ -24,9 +24,9 @@ import { Tracker } from './Tracker';
 import { download } from './download';
 import { DEFAULT_OPTS, mappingToJson, parseMapping, type Opts } from '../core/mapping';
 import { AyRoll } from './AyRoll';
-import demoUrl from '../assets/back_in_town_again.mod?inline';
+import demoUrl from '../assets/OMARSBAZAAR.xm?inline';
 
-const DEMO = 'back_in_town_again.mod';
+const DEMO = 'OMARSBAZAAR.xm';
 
 const waveName = (w: string | undefined, on: boolean) =>
   !on ? 'square' : w === 'saw' || w === 'pulse' ? 'saw buzzer' : w === 'sawup' ? 'saw buzzer ↗' : w === 'smooth' ? 'triangle buzzer' : 'square';
@@ -277,7 +277,7 @@ export function App() {
           <label className="btn">Load MOD / XM / SNDH / YM / YMT…
             <input type="file" accept=".mod,.xm,.sndh,.snd,.ym,.ymt,.MOD,.XM,.SNDH,.SND,.YM,.YMT" hidden onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
           </label>
-          <button className="btn" onClick={loadDemo}>Demo: back_in_town_again</button>
+          <button className="btn" onClick={loadDemo}>Demo: Omar's Bazaar</button>
         </div>
       </header>
 

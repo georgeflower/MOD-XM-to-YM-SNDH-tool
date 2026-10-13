@@ -63,7 +63,7 @@ describe('instrument mapper', () => {
 });
 
 describe('arpeggio fill', () => {
-  const x = loadModule(fx('OLGIENG.XM'));
+  const x = loadModule(fx('OMARSBAZAAR.xm'));
   const off = convert(x);
   const on = convert(x, { arpFill: 3 });
   it('turns dropped notes into arpeggios', () => {

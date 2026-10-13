@@ -19,7 +19,7 @@ const classicScript = (): Plugin => ({
 export default defineConfig({
   base: './',
   plugins: [react(), classicScript()],
-  assetsInclude: ['**/*.mod'],
+  assetsInclude: ['**/*.mod', '**/*.xm'],
   build: {
     target: 'es2022',
     outDir: 'dist',

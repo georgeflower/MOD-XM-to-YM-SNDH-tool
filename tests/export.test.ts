@@ -6,7 +6,7 @@ import { packStream, unpackStream } from '../src/export/stream';
 import { writeYm5 } from '../src/export/ym';
 import { renderYm } from '../src/export/ymemu';
 
-const mod = loadModule(new Uint8Array(readFileSync('fixtures/OLGIENG.XM')));
+const mod = loadModule(new Uint8Array(readFileSync('fixtures/OMARSBAZAAR.xm')));
 const res = convert(mod, {});
 
 describe('exporters', () => {

@@ -66,7 +66,7 @@ import { trigDrum, trigVoice, TRIG_STOP, hasDrums } from '../src/core/drums';
 const fxb = (n: string) => new Uint8Array(readFileSync(new URL(`../fixtures/${n}`, import.meta.url)));
 
 describe('converter: percussion as digidrums', () => {
-  const m = loadModule(fxb('OLGIENG.XM'));
+  const m = loadModule(fxb('OMARSBAZAAR.xm'));
   const plain = convert(m);
   const r = convert(m, { digiDrums: true, digiRate: 8000 });
   it('produces a drum track and leaves non-drum results alone', () => {
