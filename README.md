@@ -28,6 +28,9 @@ voice (stickiness avoids voice jumping, one noise generator is shared, volumes m
 * A **macro** is a per-tick (20 ms) table: volume 0–15, pitch offset in semitones (fractional → vibrato), noise period,
   tone on/off, loop-from step, optional "follow note volume". Presets: pluck, organ, vibrato lead, bass thump, tom,
   hat, snare, major/minor arpeggio.
+* **Save / load mapping**: *Save mapping* writes the instrument table (role, transpose, waveform, custom macros), the channel priorities and the options to a
+  `<module>_mapping.json`; *Load mapping…* restores them (a mapping saved for a different module still loads, with a warning). The file is validated and
+  clamped on loading, so hand-edited files can't break the converter.
 * **Arp fill**: a module has more channels than the YM has voices. With fill on, notes that would be dropped are folded
   into a 2- or 3-note arpeggio on the voice with the closest pitch (alternating every frame). The strip under the roll
   shows dropped notes (red) and arpeggio notes (cyan); the channel table lists the shares.
@@ -255,7 +258,6 @@ public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of th
 
 ## Roadmap
 
-* Mapper follow-ups: saving a mapping with the project
 * More than one timer effect or drum at a time (needs a second timer / mixing engine); timer-driven arpeggio and other handler effects that are not drums or Q/S/U
 * Furnace `.fur` export
 * maxYMiser: the STe DMA track (sampled sound), sequence-switching effects, more than one timer effect on the voices at once

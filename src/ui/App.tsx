@@ -22,15 +22,14 @@ import { moduleToSong } from '../tracker/fromModule';
 import { decodeYmt, isYmt } from '../tracker/ymt';
 import { Tracker } from './Tracker';
 import { download } from './download';
+import { DEFAULT_OPTS, mappingToJson, parseMapping, type Opts } from '../core/mapping';
 import { AyRoll } from './AyRoll';
 import demoUrl from '../assets/back_in_town_again.mod?inline';
 
 const DEMO = 'back_in_town_again.mod';
 
-interface Opts { gainDb: number; drumBonus: number; sticky: number; arpOrder: 'xy' | 'yx'; arpFill: number; arpMinVol: number; digi: boolean; digiRate: number; digiMaxMs: number; middle: boolean; waveform: boolean }
 const waveName = (w: string | undefined, on: boolean) =>
   !on ? 'square' : w === 'saw' || w === 'pulse' ? 'saw buzzer' : w === 'sawup' ? 'saw buzzer ↗' : w === 'smooth' ? 'triangle buzzer' : 'square';
-const DEFAULT_OPTS: Opts = { gainDb: 0, drumBonus: 3, sticky: 1.5, arpOrder: 'xy', arpFill: 0, arpMinVol: 3, digi: false, digiRate: 8000, digiMaxMs: 500, middle: false, waveform: false };
 
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const slug = (s: string) => s.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'song';
@@ -197,6 +196,18 @@ export function App() {
       if (next[i].mode === 'auto' && !next[i].transpose && !next[i].wave) delete next[i];
       return next;
     });
+  const modInfo = () => (mod ? { title: mod.title, kind: mod.kind, channels: mod.nch, instruments: mod.instruments.filter(Boolean).length } : undefined);
+  const saveMapping = () => {
+    const info = modInfo();
+    if (info) download(`${slug(mod!.title || fileName)}_mapping.json`, mappingToJson({ opts, prio, inst: instMap }, info), 'application/json');
+  };
+  const loadMapping = async (f: File) => {
+    try {
+      const r = parseMapping(await f.text(), modInfo());
+      setOpts(r.opts); setPrio(r.prio); setInstMap(r.inst); setMacroSel(null);
+      setError(r.warnings.length ? 'Mapping loaded; ' + r.warnings.join('; ') : '');
+    } catch (e) { setError(String((e as Error).message ?? e)); }
+  };
   const setMode = (i: number, mode: InstMode) => {
     patchInst(i, mode === 'macro' ? { mode, macro: instMap[i]?.macro ?? cloneMacro(MACRO_PRESETS['Pluck']) } : { mode });
     if (mode === 'macro') setMacroSel(i); else if (macroSel === i) setMacroSel(null);
@@ -401,6 +412,8 @@ export function App() {
                   hint="Longest digidrum; longer samples are cut (with a short fade)" />
               </>}
               <button className="btn small" onClick={() => { setOpts(DEFAULT_OPTS); setPrio({}); setInstMap({}); setMacroSel(null); }}>Reset to auto</button>
+              <button className="btn small" onClick={saveMapping} title="Save the instrument mapping, channel priorities and these options as a .json file">Save mapping</button>
+              <label className="btn small" title="Load a mapping saved earlier (for this module or a similar one)">Load mapping…<input type="file" accept=".json,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadMapping(f); e.target.value = ''; }} /></label>
               <button className="btn small primary" disabled={!!busy} onClick={toPatterns} title="Turn the module into an editable pattern song for one YM2149 (uses the options above)">Edit as AY patterns →</button>
             </section>}
 
@@ -417,7 +430,7 @@ export function App() {
               {packed && out && (
                 <p className="note">Packed stream: <b>{packed.data.length.toLocaleString()}</b> bytes ({(packed.data.length / (out.nframes / 50)).toFixed(0)} B/s). SNDH adds a {PLAYER_BLOB.length}-byte player{hasDrums(out.drums) || hasFx(out.fx) ? ' (with the digidrum / timer-effect engine)' : ''}.</p>
               )}
-              <p className="note soft">Furnace · Arkos · Maxymiser export: coming next.</p>
+              <p className="note soft">Arkos Tracker and maxYMiser export: in the AY pattern editor ("Edit as AY patterns").</p>
             </section>
           </div>
 
