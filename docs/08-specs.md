@@ -175,6 +175,10 @@ Limits: 255 patterns, 255 instruments, 1–256 rows per pattern, up to 7 channel
 
 Details, tolerances and the known differences (first release tick, arpeggio-speed drift on odd row lengths, slide phasing) are listed in the README and as warnings in each export. The tools were checked as described in [Architecture → Verification](#architecture-verification).
 
+## XM frequency tables {#specs-xm-tables}
+
+The XM header flag *bit 0* chooses the frequency table. **Linear** (set): period = 7680 − 64·(note + relative note) − finetune/2, rate = 8363·2^((4608 − period)/768), slides move 4 × parameter units of 1/768 octave. **Amiga** (clear): periods follow `428·2^(−(note − 48 + finetune/128)/12)` (the four-times-larger FT2 scale divided by 4), rate = 8363·428/period, slides move 1 × parameter per tick, so the same parameter is a larger pitch step on a high note. Note pitches are identical in both tables. ProTracker `.mod` files use their own table (rate = 3 546 894.6/period, finetune −8…7).
+
 ## Limits at a glance {#specs-limits}
 
 | Item | Limit |

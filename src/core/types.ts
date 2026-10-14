@@ -57,6 +57,8 @@ export interface Module {
   bpm: number;
   /** MOD only: periods are Amiga periods (non-linear) */
   amiga: boolean;
+  /** XM saved with the Amiga frequency table: slides and vibrato work on periods (see pitch.ts), notes and samples as in a linear XM */
+  xmAmiga?: boolean;
 }
 
 export const emptyCell = (): Cell => ({ note: 0, inst: 0, vol: 0, eff: 0, par: 0 });

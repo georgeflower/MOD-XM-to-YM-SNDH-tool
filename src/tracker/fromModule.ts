@@ -20,7 +20,7 @@ import { DigiExtractor } from '../core/digi';
 import { drumFrames } from '../core/drums';
 import { analyseWave, waveOfClass, BUZZ_SHAPE, buzzable, type WaveChoice } from '../core/waveform';
 import { classifyDrum, drumMacro, pyRound, TONE_HZ, type DrumKind, type InstMap, type MacroStep } from '../core/convert';
-import { amigaPeriodOf, PT_NOTE_BASE } from '../core/pitch';
+import { amigaPeriodOf, xmAmigaPeriodOf, PT_NOTE_BASE } from '../core/pitch';
 import {
   type Song, type Cell, type Instrument, type Pattern,
   newSong, defaultInstrument, emptyCell, emptyPattern, noteToFreq, NOTE_OFF, parseEffectChar, FX,
@@ -422,6 +422,10 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
         const ratio = up ? p / Math.max(1, p - units) : (p + units) / p;
         return ratio;
       }
+      if (m.xmAmiga) {
+        const p = Math.max(1, xmAmigaPeriodOf((st?.note ?? 49) - 1 + (st?.smp.rel ?? 0), st?.smp.fine ?? 0));
+        return up ? p / Math.max(1, p - units) : (p + units) / p;
+      }
       const r = Math.pow(2, (units * 4) / 768);
       return r;
     };
@@ -467,6 +471,9 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
           if (m.amiga) {
             const p = Math.max(113, amigaPeriodOf((st?.note ?? 49) - PT_NOTE_BASE, st?.smp.modFine ?? 0));
             depth = 2 * P * (2 * vy / p);
+          } else if (m.xmAmiga) {
+            const p = Math.max(1, xmAmigaPeriodOf((st?.note ?? 49) - 1 + (st?.smp.rel ?? 0), st?.smp.fine ?? 0));
+            depth = 2 * P * (vy / p);
           } else depth = 2 * P * (Math.pow(2, vy / 192) - 1);
           set('4', (clamp(vx, 1, 15) << 4) | clamp(Math.round(depth), 1, 15));
         }

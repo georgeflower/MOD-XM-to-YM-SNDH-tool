@@ -1,6 +1,6 @@
 # MOD/XM → YM2149 · SNDH · game stream
 
-A browser tool that turns **ProTracker `.MOD`** and **FastTracker II `.XM`** modules into music for the
+A browser tool that turns **ProTracker `.MOD`** and **FastTracker II `.XM`** modules (linear or Amiga frequency table) into music for the
 **Atari ST's YM2149** (one chip: 3 tone voices + noise, 50 Hz). Everything runs client-side — static files, no server.
 
 **Status:** load → auto-convert → A/B listen → export, plus an FT2-style AY pattern editor.  

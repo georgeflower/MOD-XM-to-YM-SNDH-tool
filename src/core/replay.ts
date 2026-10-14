@@ -4,7 +4,7 @@
  * Only what is needed to reproduce *what you hear* is modelled (no stereo, no filters).
  */
 import type { Cell, Module, Sample } from './types';
-import { xmPeriodOf, xmRateOf, amigaPeriodOf, amigaRateOf, PT_NOTE_BASE } from './pitch';
+import { xmPeriodOf, xmRateOf, xmAmigaPeriodOf, xmAmigaRateOf, amigaPeriodOf, amigaRateOf, PT_NOTE_BASE } from './pitch';
 import { ended } from './samples';
 
 export const FPS = 50;
@@ -87,15 +87,16 @@ export function replay(m: Module, opts: ReplayOptions = {}): ReplayResult {
   const nch = m.nch;
   const ch: Ch[] = Array.from({ length: nch }, () => new Ch());
   const amiga = m.amiga;
+  const xa = !!m.xmAmiga && !amiga;               // XM, Amiga frequency table
   let speed = m.speed, bpm = m.bpm;
   const warn = new Map<string, number>();
   const w = (k: string) => warn.set(k, (warn.get(k) ?? 0) + 1);
 
-  const rateOf = (p: number) => (amiga ? amigaRateOf(p) : xmRateOf(p));
+  const rateOf = (p: number) => (amiga ? amigaRateOf(p) : xa ? xmAmigaRateOf(p) : xmRateOf(p));
   const notePeriod = (note: number, s: Sample): number =>
-    amiga ? amigaPeriodOf(note - PT_NOTE_BASE, s.modFine ?? 0) : xmPeriodOf(note - 1 + s.rel, s.fine);
-  const clampP = (p: number) => (amiga ? Math.min(856 * 1.0, Math.max(113, p)) : Math.max(0, p));
-  const slideUnit = amiga ? 1 : 4;
+    amiga ? amigaPeriodOf(note - PT_NOTE_BASE, s.modFine ?? 0) : xa ? xmAmigaPeriodOf(note - 1 + s.rel, s.fine) : xmPeriodOf(note - 1 + s.rel, s.fine);
+  const clampP = (p: number) => (amiga ? Math.min(856 * 1.0, Math.max(113, p)) : xa ? Math.min(7256, Math.max(1, p)) : Math.max(0, p));
+  const slideUnit = amiga || xa ? 1 : 4;
 
   const frames: (ChanState | null)[][] = [];
   const rowLog: RowLog[] = [];
@@ -149,14 +150,14 @@ export function replay(m: Module, opts: ReplayOptions = {}): ReplayResult {
       if (vt === 0) wave = Math.sin((2 * Math.PI * (c.avPos & 255)) / 256);
       else if (vt === 2) wave = 1 - 2 * ((c.avPos & 255) / 255);
       else if (vt === 3) wave = -1 + 2 * ((c.avPos & 255) / 255);
-      per = per - wave * c.avAmp * 4;
+      per = per - wave * c.avAmp * (xa ? 1 : 4);
     }
-    if (c.rowVib && c.vibDepth && c.vibSpeed) per = per + VIB_SINE[c.vibPos & 63] * c.vibDepth * (amiga ? 2 : 4);
+    if (c.rowVib && c.vibDepth && c.vibSpeed) per = per + VIB_SINE[c.vibPos & 63] * c.vibDepth * (amiga ? 2 : xa ? 1 : 4);
     let perEff = per;
     if (c.arp) {
       const x = (c.arp >> 4) & 15, y = c.arp & 15;
       const off = [0, x, y][arpSeq[t % 3]];
-      if (off) perEff = amiga ? amigaPeriodOf(c.note - PT_NOTE_BASE + off, c.smp.modFine ?? 0) : per - off * 64;
+      if (off) perEff = amiga ? amigaPeriodOf(c.note - PT_NOTE_BASE + off, c.smp.modFine ?? 0) : xa ? xmAmigaPeriodOf(c.note - 1 + c.smp.rel + off, c.smp.fine) : per - off * 64;
     }
     let v = c.vol / 64;
     v *= envValue(ins, c.envTick) / 64;

@@ -24,7 +24,6 @@ export function parseXm(buf: Uint8Array): Module {
   const hs = u32(d, 60);
   const songlen = u16(d, 64), restart = u16(d, 66), nch = u16(d, 68), npat = u16(d, 70),
     ninst = u16(d, 72), flags = u16(d, 74), speed = u16(d, 76), bpm = u16(d, 78);
-  if (!(flags & 1)) throw new Error('Amiga-frequency XM files are not supported yet (linear only)');
   const order = Array.from(buf.subarray(80, 80 + songlen));
   let off = 60 + hs;
   const patterns: Cell[][][] = [];
@@ -114,5 +113,5 @@ export function parseXm(buf: Uint8Array): Module {
     }
     instruments.push(ins);
   }
-  return { kind: 'xm', title, nch, order, restart, patterns, instruments, speed, bpm, amiga: false };
+  return { kind: 'xm', title, nch, order, restart, patterns, instruments, speed, bpm, amiga: false, xmAmiga: !(flags & 1) };
 }

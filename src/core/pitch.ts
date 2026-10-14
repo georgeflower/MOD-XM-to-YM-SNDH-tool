@@ -4,6 +4,13 @@
 export const xmPeriodOf = (noteIdx: number, fine: number) => 7680 - noteIdx * 64 - fine / 2.0;
 export const xmRateOf = (period: number) => 8363.0 * Math.pow(2.0, (4608.0 - period) / 768.0);
 
+// ---- XM with the Amiga frequency table (header flag bit 0 clear) ----
+// FastTracker 2 keeps these periods at four times the ProTracker scale and slides by 4 x the parameter, which is the same as
+// ProTracker-scale periods (XM C-4 = 428) with slides of 1 per tick. Pitch is the same equal temperament as the linear table.
+export const XMA_C4_PERIOD = 428;
+export const xmAmigaPeriodOf = (noteIdx: number, fine: number) => XMA_C4_PERIOD * Math.pow(2, -((noteIdx - 48) + fine / 128) / 12);
+export const xmAmigaRateOf = (period: number) => (8363 * XMA_C4_PERIOD) / Math.max(1e-3, period);
+
 // ---- Amiga ----
 // ProTracker finetune-0 table, notes C-1..B-3 (index 0..35)
 export const PT_PERIODS = [
