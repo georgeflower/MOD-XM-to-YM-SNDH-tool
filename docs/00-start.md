@@ -4,7 +4,7 @@
 
 A browser tool that turns ProTracker `.mod` and FastTracker II `.xm` modules into music for the **Atari ST's YM2149** sound chip (one chip: three square-wave voices, one noise generator, one envelope generator, updated 50 times a second). It also loads `.sndh`, `.ym`, `.ymt`, maxYMiser and Arkos files, has an FT2-style pattern editor for the chip, and exports to SNDH, YM, a C game kit, maxYMiser, Arkos Tracker 3, Furnace, WAV and raw registers.
 
-Everything runs in your browser. There is no server and nothing is uploaded.
+Everything runs in your browser. There is no server and none of your files are uploaded; the page only counts page views with GoatCounter (no cookies, no personal data).
 
 ## The two tabs
 

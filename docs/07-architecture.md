@@ -2,7 +2,7 @@
 
 ## Overview {#architecture-overview}
 
-The tool is a static single-page application (TypeScript, React, built with Vite). Everything — module parsing, conversion, 68000 emulation for SNDH import, audio rendering, file writing — runs in the browser. There is no server and no network traffic except loading the page itself and, for the "original" side of the A/B switch, the vendored libopenmpt worklet.
+The tool is a static single-page application (TypeScript, React, built with Vite). Everything — module parsing, conversion, 68000 emulation for SNDH import, audio rendering, file writing — runs in the browser. There is no server and no network traffic except loading the page itself, the GoatCounter page-view counter and, for the "original" side of the A/B switch, the vendored libopenmpt worklet.
 
 Everything revolves around **one intermediate representation: the register dump** — 14 bytes per 20 ms frame — plus two small "side tracks" for the things a 50 Hz dump cannot express (digidrums and timer effects).
 

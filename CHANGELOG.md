@@ -7,6 +7,7 @@
 - **STe DMA sound in SNDH files.** The 68000 emulator now presents an STe (cookie jar with `_MCH` / `_SND`, GEMDOS `Malloc` / `Mxalloc` / `Mfree`, microwire handshake), logs DMA sample starts and turns each distinct sample into a 4-bit digidrum hit on voice C. A *STe samples* checkbox in the *Loaded tune* panel turns it off. Regression fixture: maxYMiser's `TEST_STE.SND`.
 - **XM with the Amiga frequency table** (header flag bit 0 clear) loads and converts; slides, vibrato, arpeggio and the instrument auto-vibrato work on periods like FastTracker 2 does in that mode.
 - The SNDH importer reports the address where an init routine is stuck.
+- GoatCounter page-view counter (`qumran.goatcounter.com`) on the app and the Help page; the privacy notes in the docs say so.
 - Documentation: a *What's new in 0.4* section, XM frequency tables in the specifications, new troubleshooting entries.
 
 ### Changed

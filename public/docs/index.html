@@ -64,6 +64,7 @@ footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top
   a { color: inherit; }
 }
 </style>
+<script data-goatcounter="https://qumran.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
 <body>
 <header class="top">
@@ -80,7 +81,7 @@ footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top
 <section class="chapter" id="start-here"><h1>Start here<a class="anchor" href="#start-here" aria-label="link">#</a></h1>
 <div class="intro"><p><strong>MOD/XM → YM2149 · SNDH · game stream — version 0.4</strong></p>
 <p>A browser tool that turns ProTracker <code>.mod</code> and FastTracker II <code>.xm</code> modules into music for the <strong>Atari ST&#39;s YM2149</strong> sound chip (one chip: three square-wave voices, one noise generator, one envelope generator, updated 50 times a second). It also loads <code>.sndh</code>, <code>.ym</code>, <code>.ymt</code>, maxYMiser and Arkos files, has an FT2-style pattern editor for the chip, and exports to SNDH, YM, a C game kit, maxYMiser, Arkos Tracker 3, Furnace, WAV and raw registers.</p>
-<p>Everything runs in your browser. There is no server and nothing is uploaded.</p>
+<p>Everything runs in your browser. There is no server and none of your files are uploaded; the page only counts page views with GoatCounter (no cookies, no personal data).</p>
 </div>
 <section class="sec" id="the-two-tabs"><h2>The two tabs<a class="anchor" href="#the-two-tabs" aria-label="link">#</a></h2><table>
 <thead>
@@ -2816,7 +2817,7 @@ npx tsx scripts/import-cli.ts tune.sndh out.regs     # run an SNDH / read a YM i
 </section>
 <section class="chapter" id="architecture"><h1>Architecture<a class="anchor" href="#architecture" aria-label="link">#</a></h1>
 <div class="intro"></div>
-<section class="sec" id="architecture-overview"><h2>Overview<a class="anchor" href="#architecture-overview" aria-label="link">#</a></h2><p>The tool is a static single-page application (TypeScript, React, built with Vite). Everything — module parsing, conversion, 68000 emulation for SNDH import, audio rendering, file writing — runs in the browser. There is no server and no network traffic except loading the page itself and, for the &quot;original&quot; side of the A/B switch, the vendored libopenmpt worklet.</p>
+<section class="sec" id="architecture-overview"><h2>Overview<a class="anchor" href="#architecture-overview" aria-label="link">#</a></h2><p>The tool is a static single-page application (TypeScript, React, built with Vite). Everything — module parsing, conversion, 68000 emulation for SNDH import, audio rendering, file writing — runs in the browser. There is no server and no network traffic except loading the page itself, the GoatCounter page-view counter and, for the &quot;original&quot; side of the A/B switch, the vendored libopenmpt worklet.</p>
 <p>Everything revolves around <strong>one intermediate representation: the register dump</strong> — 14 bytes per 20 ms frame — plus two small &quot;side tracks&quot; for the things a 50 Hz dump cannot express (digidrums and timer effects).</p>
 <pre><code> MOD / XM ──► loaders ──► Module ──┬─► replay ──► channel states ──► convert ──► ┐
                                     │                                            │
@@ -3784,7 +3785,7 @@ then one data byte per set mask bit, in register order
 </tbody></table>
 </section>
 <section class="sec" id="troubleshooting-privacy"><h2>Files and privacy<a class="anchor" href="#troubleshooting-privacy" aria-label="link">#</a></h2><ul>
-<li>Nothing is uploaded. All conversion happens in the browser; the page makes no requests except loading itself (and, over http, the vendored libopenmpt files).</li>
+<li>Your files are never uploaded. All conversion happens in the browser; the page&#39;s only outside request is the page-view counter (GoatCounter, <code>qumran.goatcounter.com</code>: no cookies, no personal data, nothing from your files) besides loading itself and, over http, the vendored libopenmpt files.</li>
 <li>Settings are not stored between sessions (except the documentation&#39;s light/dark choice). Use <strong>Save mapping</strong> and <strong>Save .ymt</strong> to keep your work.</li>
 <li>There is no auto-save: closing the page discards the pattern editor song. The editor asks before replacing a song that has unsaved changes.</li>
 </ul>

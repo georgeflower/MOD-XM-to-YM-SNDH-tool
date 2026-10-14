@@ -68,7 +68,7 @@
 
 ## Files and privacy {#troubleshooting-privacy}
 
-* Nothing is uploaded. All conversion happens in the browser; the page makes no requests except loading itself (and, over http, the vendored libopenmpt files).
+* Your files are never uploaded. All conversion happens in the browser; the page's only outside request is the page-view counter (GoatCounter, `qumran.goatcounter.com`: no cookies, no personal data, nothing from your files) besides loading itself and, over http, the vendored libopenmpt files.
 * Settings are not stored between sessions (except the documentation's light/dark choice). Use **Save mapping** and **Save .ymt** to keep your work.
 * There is no auto-save: closing the page discards the pattern editor song. The editor asks before replacing a song that has unsaved changes.
 

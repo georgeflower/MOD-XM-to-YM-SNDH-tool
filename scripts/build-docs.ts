@@ -316,6 +316,7 @@ export function buildHtml(chapters: Chapter[], ver: string): string {
 <title>MOD/XM to YM2149 Help</title>
 <meta name="description" content="Manual, how-to guide, effects reference, architecture and technical specifications of the MOD/XM to YM2149 tool, version ${esc(ver)}.">
 <style>${CSS}</style>
+<script data-goatcounter="https://qumran.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
 <body>
 <header class="top">
