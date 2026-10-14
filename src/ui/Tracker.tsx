@@ -53,6 +53,19 @@ function CellText({ cell, curCol }: { cell: Cell; curCol: number }) {
   return <>{chars.map(([t, c, k], i) => <span key={i} className={`${c}${k === curCol ? ' at' : ''}`}>{t}</span>)}</>;
 }
 
+/** an element where typing enters text (so the note keys must not play) */
+function isTextEntry(t: HTMLElement | null): boolean {
+  if (!t) return false;
+  if (t.isContentEditable || t.tagName === 'TEXTAREA') return true;
+  if (t.tagName !== 'INPUT') return false;
+  const type = ((t as HTMLInputElement).type || 'text').toLowerCase();
+  return !['checkbox', 'radio', 'range', 'button', 'submit', 'reset', 'file', 'color', 'image'].includes(type);
+}
+/** a focused slider, checkbox or dropdown: only the note keys act (they audition), Space / Backspace / Insert keep their own meaning */
+function isControl(t: HTMLElement | null): boolean {
+  return !!t && (t.tagName === 'INPUT' || t.tagName === 'SELECT');
+}
+
 interface RowProps { r: number; cells: Cell[]; cur: number; col: number; editing: boolean; s1: number; s2: number; play: boolean; hl: boolean }
 const Row = memo(function Row({ r, cells, cur, col, editing, s1, s2, play, hl }: RowProps) {
   return (
@@ -108,9 +121,17 @@ export function Tracker({ ed, active, onError, onReport }: { ed: Editor; active:
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') return;
+      // a field that takes typed text keeps its keys; every other part of the page (instrument list and editor, sliders,
+      // checkboxes, buttons, dropdowns) lets the note keys play the selected instrument
+      if (isTextEntry(t)) return;
       if (dialogRef.current) { if (e.code === 'Escape') setDialog(null); return; }
       const mod = e.ctrlKey || e.metaKey;
+      if (isControl(t)) {
+        if (mod || e.altKey || e.repeat) return;
+        const n = ed.isDrumColumn(ed.channel) ? keyToDrum(e.code) : keyToNote(e.code, ed.octave);
+        if (n !== null) { e.preventDefault(); ed.jam(n); held.current.set(e.code, n); }
+        return;
+      }
       setHintAt(null); setMsg('');
 
       // undo / redo / save

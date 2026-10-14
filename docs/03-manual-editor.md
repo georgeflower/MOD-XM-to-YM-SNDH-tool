@@ -31,7 +31,7 @@ When you arrive from the Converter, or load an SNDH/YM here, a collapsed *Import
 | **BPM** | Tempo, 32–255. A tick lasts 2.5 / BPM seconds, so **125 BPM = exactly 50 Hz = one chip update per tick**. |
 | **Speed** | Ticks per row, 1–31. |
 | **▶ Song / ▶ Pattern / ▶ From cursor / ■ Stop** | Transport (Right Ctrl, Right Alt, –, Space). |
-| **○ Edit / ● Editing** | Edit mode on/off (Space when stopped). Note keys always audition; they are written into the pattern only in edit mode. |
+| **○ Edit / ● Editing** | Edit mode on/off (Space when stopped). Note keys always audition the selected instrument, wherever the focus is on the page (pattern, instrument list, instrument editor, sliders, checkboxes, dropdowns); only a field that takes typed text (name, number or hex fields) keeps its keys. They are written into the pattern only in edit mode and only when the pattern has the focus. |
 | **Octave** (F1–F8) | Base octave for note keys. |
 | **Add** | How many rows the cursor moves down after you enter a note (0–16, cycles around; `` ` `` or `§` cycles it). |
 | **Instrument** | The instrument used for notes you type. |
