@@ -12,10 +12,10 @@ const all = () => readdirSync(new URL('docs/', root)).filter((f) => f.endsWith('
 
 describe('documentation', () => {
   const built = buildDocs(false);
-  it('is version 0.3 and says so', () => {
-    expect(version()).toMatch(/^0\.3\./);
-    expect(built.html).toContain('v0.3');
-    expect(md('00-start.md')).toMatch(/version 0\.3/);
+  it('is version 0.4 and says so', () => {
+    expect(version()).toMatch(/^0\.4\./);
+    expect(built.html).toContain('v0.4');
+    expect(md('00-start.md')).toMatch(/version 0\.4/);
   });
   it('the generated tooltip chapter is up to date (run: npm run docs)', () => {
     expect(md('06-tooltips.md')).toBe(tooltipMarkdown());

@@ -1,6 +1,6 @@
 # Start here
 
-**MOD/XM → YM2149 · SNDH · game stream — version 0.3**
+**MOD/XM → YM2149 · SNDH · game stream — version 0.4**
 
 A browser tool that turns ProTracker `.mod` and FastTracker II `.xm` modules into music for the **Atari ST's YM2149** sound chip (one chip: three square-wave voices, one noise generator, one envelope generator, updated 50 times a second). It also loads `.sndh`, `.ym`, `.ymt`, maxYMiser and Arkos files, has an FT2-style pattern editor for the chip, and exports to SNDH, YM, a C game kit, maxYMiser, Arkos Tracker 3, Furnace, WAV and raw registers.
 
@@ -22,7 +22,15 @@ Everything runs in your browser. There is no server and nothing is uploaded.
 5. Choose an export: **SNDH** plays in any Atari ST player; **YM** plays in ST-Sound and similar players.
 6. To keep working on the song by hand, press **Edit as AY patterns →**. This works for a loaded `.sndh` or `.ym` as well: the tune is turned back into notes and instruments (see [Edit an existing SNDH or YM tune](#howto-edit-tune)).
 
-## What's new in 0.3
+## What's new in 0.4
+
+* **Edit `.sndh` and `.ym` files as AY patterns** — *Edit as AY patterns →* in the *Loaded tune* panel, or *Load .sndh/.ym…* in the pattern editor. The tempo and the notes are found, every sound becomes a step-table instrument, digidrums and `Q S U` timer effects come along, and the *Import report* says what was found ([Edit an existing SNDH or YM tune](#howto-edit-tune)).
+* **STe DMA samples in SNDH files** (maxYMiser's DMA track and other STe players): the SNDH emulator now behaves like an STe and the sample hits become digidrums on voice C; the *STe samples* checkbox turns this off.
+* **XM files with the Amiga frequency table** load and convert (they were refused before).
+* **Note keys play the selected instrument from anywhere** in the pattern editor, except in fields that take typed text.
+* The SNDH emulator reports where an init routine got stuck.
+
+## What was new in 0.3
 
 * **Manual import dialog** — per-channel priority (*Off / Low / Normal / High / Lead*), *▶ Solo* for each channel, *▶ Full preview* that updates while you change priorities, click-to-seek on every channel's activity graph, instrument renaming, and *Suggest*.
 * **Automatic drum channel** — *Edit as AY patterns* adds the drum column (digidrum samples) by itself when the module has percussion.

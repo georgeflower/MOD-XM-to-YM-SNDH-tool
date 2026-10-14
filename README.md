@@ -4,7 +4,7 @@ A browser tool that turns **ProTracker `.MOD`** and **FastTracker II `.XM`** mod
 **Atari ST's YM2149** (one chip: 3 tone voices + noise, 50 Hz). Everything runs client-side — static files, no server.
 
 **Status:** load → auto-convert → A/B listen → export, plus an FT2-style AY pattern editor.  
-**Version 0.3.** Documentation: open the **Help** link in the app header (`docs/index.html` in the built site — one self-contained page with a manual, how-to recipes, effects reference, tooltip list, architecture and technical specifications), or read the Markdown sources in [`docs/`](docs/).
+**Version 0.4.** Changes: see [`CHANGELOG.md`](CHANGELOG.md). Documentation: open the **Help** link in the app header (`docs/index.html` in the built site — one self-contained page with a manual, how-to recipes, effects reference, tooltip list, architecture and technical specifications), or read the Markdown sources in [`docs/`](docs/).
 
 ## What you get today
 
