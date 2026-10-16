@@ -4,7 +4,7 @@ Each recipe is self-contained. Words in **bold** are buttons or fields; the full
 
 ## Load a MOD or XM {#howto-load}
 
-1. Press **Load MOD / XM / SNDH / YM / YMT…** at the top, or drag the file anywhere onto the page. (To try it first, press **Demo: Omar's Bazaar**.)
+1. Press **Load MOD / XM / SNDH / YM / YMT / WAV…** at the top, or drag the file anywhere onto the page. (To try it first, press **Demo: Omar's Bazaar**.)
 2. The file type is detected from its contents. ProTracker `.mod` (M.K., 4CHN, 6CHN, 8CHN, FLT4/8, OCTA, nnCH and similar tags) and FastTracker II `.xm` are supported. The module is analysed and converted at once; a status text next to the buttons shows *Converting…* and *Rendering…*.
 3. Press **Space** to play the YM version. Press **Tab** to switch to the original and back. If **A · Original** is greyed out, you opened the page from disk — see [Troubleshooting](#troubleshooting).
 4. The **Conversion report** at the bottom lists what the converter did and any warnings.
@@ -160,7 +160,7 @@ Timer effects work in SNDH, YM6, game kit, WAV and maxYMiser exports. They need 
 
 An `.sndh` or `.ym` file is a recording of what the chip did, 50 times a second. It holds no notes, instruments or patterns, so the tool works them out again.
 
-1. Load the file (**Load MOD / XM / SNDH / YM / YMT…**, or drop it on the page). For an SNDH with several subtunes, choose the **Subtune** (and, if the length is wrong, **Seconds**) first.
+1. Load the file (**Load MOD / XM / SNDH / YM / YMT / WAV…**, or drop it on the page). For an SNDH with several subtunes, choose the **Subtune** (and, if the length is wrong, **Seconds**) first.
 2. Press **Edit as AY patterns →** in the *Loaded tune* panel. In the pattern editor you can also press **Load .sndh/.ym…**, which takes subtune 1.
 3. The *Import report* above the song bar says what was found, for example *YM import: 3840 frames -> 481 rows at 8 frames per row … 870 notes -> 255 step-table instruments*.
 4. Press **Space**, then **Right Ctrl** to play it, and compare with the original (Converter tab, preview).
@@ -183,6 +183,17 @@ What you get, and what to expect:
 * **SNDH** (`.sndh`, `.snd`, also ICE!-packed): the file is *run* in a built-in 68000 emulator and the chip writes are captured at 50 Hz. Use **Subtune** to pick one, **Seconds** to set the length (0 = use the TIME tag). The emulated machine is an STe (cookie jar with `_MCH`, `_SND`, GEMDOS memory allocation, microwire handshake), so players that check for an STe before they start the DMA sound chip do start it; see *STe DMA sound* below. Tunes whose player never returns or waits for other hardware that is not emulated report *did not return* and the address where they got stuck.
 * **YM** (`.ym`: YM2!, YM3!, YM3b!, YM5!, YM6!, LHA-packed): read as the register dump it is. YM5/YM6 digidrums and YM6 timer effects are imported with their samples.
 * You get the piano roll, the YM preview and the exports SNDH / YM5 / game kit / WAV / regs, and **Edit as AY patterns →** to turn the tune into patterns ([Edit an existing SNDH or YM tune](#howto-edit-tune)). SNDH timer-interrupt effects are recognised and classified (digidrum, Q, S, U); one drum and one effect at a time, so overlapping ones keep the first and the import says how many it dropped.
+
+## Convert a recording (WAV, MP3) {#howto-audio}
+
+1. Press **Load…** and pick a `.wav`, `.mp3`, `.ogg`, `.flac` or `.m4a` file (or drop it on the page). Decoding uses your browser, so the formats are the ones your browser plays; WAV always works.
+2. The *Transcribed recording* panel shows what was found. The first **120 seconds** are analysed; set **Start (s)** and **Seconds** to analyse another part (up to 600 s).
+3. Press **Space** to hear the YM2149 version. Change **Voices** (1 for a melody, 3 for chords), **Gate (dB)** (higher drops quiet notes and noise), **Gain (dB)**, **Snap to notes** and **Noise** and listen again; the analysis re-runs when you change a setting.
+4. Export (SNDH, YM, game kit, WAV, regs) or press **Edit as AY patterns →** to tidy the result by hand.
+
+How it works: every 20 ms frame is analysed with a 93 ms window; up to three harmonic series are found (strongest first, each taken out of the spectrum before the next is looked for), tracked so that every voice keeps its note, snapped to semitones when within a third of a semitone, and given the nearest of the chip's 16 volume steps. What is left in the high band becomes the noise generator on a free voice. A recording that is tuned away from A = 440 Hz is corrected (the *Voice use* line shows the offset).
+
+Limits: single instruments, bass lines, chords of up to three notes and chiptune-like music come out well. A full mix has far more than three notes at once, so you get a sketch of the strongest ones. Single-frame notes, very low notes (below about 32 Hz) and very high ones (above about 1.6 kHz) are not found. Vocals and noisy sounds give wobbly pitches; try 1 voice and a higher gate.
 
 ## Load maxYMiser, Arkos and `.ymt` files {#howto-load-other}
 

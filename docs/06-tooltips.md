@@ -7,7 +7,7 @@ Hover over any control for a tooltip. This chapter lists every one of them (gene
 
 | Control | Tooltip |
 |---|---|
-| Load MOD / XM / SNDH / YM / YMT… | Open a MOD, XM, SNDH, YM or YMT file (you can also drop a file anywhere on the page) |
+| Load MOD / XM / SNDH / YM / YMT / WAV… | Open a MOD, XM, SNDH, YM or YMT file, or a WAV / MP3 recording to transcribe (you can also drop a file anywhere on the page) |
 | Help | Manual, how-to guide, effects reference and technical specifications (opens in a new tab) |
 | Demo: Omar's Bazaar | Load the bundled demo song, Omar's Bazaar by Qumran |
 | Converter | Load, convert, listen and export a module |
@@ -15,6 +15,13 @@ Hover over any control for a tooltip. This chapter lists every one of them (gene
 | Subtune | Which subtune of the SNDH file to run |
 | Seconds | 0 = use the length from the file's TIME tag |
 | STe samples | This tune plays 8-bit samples through the STe DMA sound chip, which a YM2149 register dump cannot carry. On: each sample becomes a 4-bit digidrum hit on voice C at the same frames (voice C is silent while it plays). Off: the samples are left out. |
+| Start (s) | Where in the recording the analysis begins |
+| Seconds | How much of the recording is analysed (the chip dump is 50 frames per second; long recordings take a few seconds per minute) |
+| Voices | How many of the chip's three tone channels the analysis may use. Fewer voices = cleaner results for melodies and bass lines; the noise generator takes a free channel for percussion. |
+| Gate (dB) | Notes quieter than this, relative to the loudest passage, are dropped. Lower it to keep soft notes, raise it to get rid of background hiss and reverb tails. |
+| Gain (dB) | Extra gain before the 16 volume steps, in dB. Quiet recordings sound thin; loud ones saturate at volume 15. |
+| Snap to notes | Pull pitches that are within about a third of a semitone to the nearest note. Off keeps vibrato and slides as they were played (as period changes). |
+| Noise | Percussion, breath and cymbals (what is left in the high band after the notes are taken out) become the YM noise generator on a free channel. |
 | Edit as AY patterns → | Turn this register dump into an editable pattern song: the tempo and notes are found, every sound becomes a step-table instrument, digidrums and Q/S/U effects come along |
 | Level | Overall loudness mapped onto the 16 YM volume steps |
 | Drum priority | How strongly kicks/snares/hats win a voice against melody notes |
