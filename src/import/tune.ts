@@ -14,6 +14,6 @@ export interface AyTune {
   drums?: DrumTrack;
   /** timer effects: SID voice / sinus-SID / sync-buzzer (YM6 files) */
   fx?: FxTrack;
-  source: 'ym' | 'sndh';
+  source: 'ym' | 'sndh' | 'audio';
   warnings: string[];
 }
