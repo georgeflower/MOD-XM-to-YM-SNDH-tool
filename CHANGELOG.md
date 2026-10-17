@@ -1,10 +1,5 @@
 # Changelog
 
-## 0.5.0 — 2026-10-17
-
-### Added
-- **WAV / MP3 / Ogg / FLAC / M4A → YM tune.** Recordings load like modules and are transcribed into a YM2149 register dump: up to three notes per 20 ms frame, tracked per voice, tuned and snapped to semitones, with percussion and breath as the noise generator. Settings in the *Transcribed recording* panel: start, seconds, voices, gate, gain, snap, noise. Preview, every export and *Edit as AY patterns →* work on the result. Documented in *Convert a recording* and the troubleshooting table.
-
 ## 0.4.0 — 2026-10-14
 
 ### Added

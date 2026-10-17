@@ -15,7 +15,6 @@ import { encodeWav } from '../export/wav';
 import { zip } from '../export/zip';
 import { parseYm, isYm } from '../import/ym';
 import { parseSndh, isSndh, type SndhInfo } from '../import/sndh';
-import { audioToTune, decodeAudio, isAudioFile, type AudioOptions, type AudioStats, type Pcm } from '../import/audio';
 import type { AyTune } from '../import/tune';
 import { Preview, type Source } from './audio';
 import { Editor } from '../tracker/editor';
@@ -54,9 +53,7 @@ export function App() {
   const [fileName, setFileName] = useState('');
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
   const [mod, setMod] = useState<Module | null>(null);
-  const [tune, setTune] = useState<(AyTune & { info?: SndhInfo; stats?: AudioStats }) | null>(null);
-  const pcmRef = useRef<Pcm | null>(null);
-  const [aud, setAud] = useState<AudioOptions>({ voices: 3, gateDb: -40, snap: true, noise: true, gainDb: 0, startSeconds: 0, maxSeconds: 120 });
+  const [tune, setTune] = useState<(AyTune & { info?: SndhInfo }) | null>(null);
   const [subtune, setSubtune] = useState(1);
   const [secOverride, setSecOverride] = useState(0);   // SNDH: 0 = use the TIME tag
   const [dmaOn, setDmaOn] = useState(true);              // SNDH: play STe DMA samples as digidrums
@@ -126,28 +123,6 @@ export function App() {
         }, 30);
         return;
       }
-      if (isAudioFile(data)) {
-        setMod(null); setRes(null);
-        setBusy('Decoding the recording…');
-        preview().stop(); setPlaying(false); setPos(0);
-        const o: AudioOptions = { voices: 3, gateDb: -40, snap: true, noise: true, gainDb: 0, startSeconds: 0, maxSeconds: 120 };
-        setAud(o);
-        decodeAudio(data).then((pcm) => {
-          pcmRef.current = pcm;
-          setBusy('Transcribing the recording to YM2149 registers…');
-          setTimeout(() => {
-            try {
-              const t = audioToTune(pcm.data, pcm.rate, { ...o, title: name.replace(/\.[^.]+$/, '') });
-              setTune(t); setAuthor('');
-              preview().setSource('ay'); setSource('ay');
-              preview().loadOriginal(null);
-              preview().setAy(renderYm(t.regs, t.nframes, 44100, 50, 4, t.drums, t.fx));
-            } catch (e) { setError(String((e as Error).message ?? e)); setTune(null); }
-            setBusy('');
-          }, 30);
-        }).catch((e) => { setError(String((e as Error).message ?? e)); setTune(null); setBusy(''); });
-        return;
-      }
       const m = loadModule(data);
       setTune(null); setMod(m);
       preview().loadOriginal(data);
@@ -163,22 +138,6 @@ export function App() {
       try {
         const t = parseSndh(bytes, { subtune: sub, seconds: secs || undefined, dma });
         setTune(t); preview().setAy(renderYm(t.regs, t.nframes, 44100, 50, 4, t.drums, t.fx)); setPos(0);
-      } catch (e) { setError(String((e as Error).message ?? e)); }
-      setBusy('');
-    }, 30);
-  };
-  /** re-analyse the loaded recording with changed settings */
-  const rerunAudio = (patch: Partial<AudioOptions>) => {
-    const o = { ...aud, ...patch };
-    setAud(o);
-    const pcm = pcmRef.current;
-    if (!pcm) return;
-    setBusy('Transcribing the recording to YM2149 registers…');
-    setTimeout(() => {
-      try {
-        const t = audioToTune(pcm.data, pcm.rate, { ...o, title: fileName.replace(/\.[^.]+$/, '') });
-        setTune(t); preview().setAy(renderYm(t.regs, t.nframes, 44100, 50, 4, t.drums, t.fx)); setPos(0);
-        setError('');
       } catch (e) { setError(String((e as Error).message ?? e)); }
       setBusy('');
     }, 30);
@@ -345,8 +304,8 @@ export function App() {
       <header className="titlebar">
         <h1>MOD/XM <span>→</span> YM2149 <small>Atari ST · SNDH · game stream · v{__APP_VERSION__.replace(/\.0$/, '')}</small></h1>
         <div className="actions">
-          <label title="Open a MOD, XM, SNDH, YM or YMT file, or a WAV / MP3 recording to transcribe (you can also drop a file anywhere on the page)" className="btn">Load MOD / XM / SNDH / YM / YMT / WAV…
-            <input type="file" accept=".mod,.xm,.sndh,.snd,.ym,.ymt,.wav,.mp3,.ogg,.flac,.m4a,.MOD,.XM,.SNDH,.SND,.YM,.YMT,.WAV,.MP3,.OGG,.FLAC,.M4A" hidden onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
+          <label title="Open a MOD, XM, SNDH, YM or YMT file (you can also drop a file anywhere on the page)" className="btn">Load MOD / XM / SNDH / YM / YMT…
+            <input type="file" accept=".mod,.xm,.sndh,.snd,.ym,.ymt,.MOD,.XM,.SNDH,.SND,.YM,.YMT" hidden onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
           </label>
           <a className="btn" href="./docs/index.html" target="_blank" rel="noopener" title="Manual, how-to guide, effects reference and technical specifications (opens in a new tab)">Help</a>
           <button title="Load the bundled demo song, Omar's Bazaar by Qumran" className="btn" onClick={loadDemo}>Demo: Omar's Bazaar</button>
@@ -396,14 +355,14 @@ export function App() {
           <div className="grid3">
             {tune && (
               <section className="panel">
-                <h2>{tune.source === 'audio' ? 'Transcribed recording' : `Loaded ${tune.source === 'sndh' ? 'SNDH' : 'YM'} tune`}</h2>
+                <h2>Loaded {tune.source === 'sndh' ? 'SNDH' : 'YM'} tune</h2>
                 <dl className="kv">
                   <dt>File</dt><dd>{fileName}</dd>
                   <dt>Title</dt><dd>{tune.title || '—'}</dd>
                   <dt>Author</dt><dd>{tune.author || '—'}</dd>
                   {tune.comment && <><dt>Comment</dt><dd>{tune.comment}</dd></>}
                   <dt>Length</dt><dd>{fmtTime(seconds)} · {tune.nframes} frames @ 50 Hz</dd>
-                  <dt>Loop</dt><dd>{tune.loopFrame > 0 || tune.source === 'ym' || tune.source === 'audio' ? `from frame ${tune.loopFrame}` : 'none detected (plays once)'}</dd>
+                  <dt>Loop</dt><dd>{tune.loopFrame > 0 || tune.source === 'ym' ? `from frame ${tune.loopFrame}` : 'none detected (plays once)'}</dd>
                   {tune.info && <><dt>Timer</dt><dd>{tune.info.timer === 'vbl' ? 'VBL' : 'Timer ' + tune.info.timer} · {tune.info.rateHz} Hz{tune.info.rateHz !== 50 ? ' (resampled to 50 Hz)' : ''}</dd></>}
                 </dl>
                 {tune.info && tune.info.subtunes > 1 && (
@@ -430,50 +389,6 @@ export function App() {
                     <input type="checkbox" checked={dmaOn} onChange={(e) => { setDmaOn(e.target.checked); rerunSndh(subtune, secOverride, e.target.checked); }} />
                     <span className="note soft"> play the {tune.info.dmaHits} DMA sample hit{tune.info.dmaHits === 1 ? '' : 's'} as digidrums</span>
                   </label>
-                )}
-                {tune.source === 'audio' && tune.stats && (
-                  <>
-                    <label className="row" title="Where in the recording the analysis begins">
-                      <span className="lbl">Start (s)</span>
-                      <input type="number" className="txt" min={0} step={1} value={aud.startSeconds ?? 0}
-                        onChange={(e) => setAud({ ...aud, startSeconds: Math.max(0, +e.target.value || 0) })}
-                        onBlur={() => rerunAudio({})} onKeyDown={(e) => { if (e.key === 'Enter') rerunAudio({}); }} />
-                    </label>
-                    <label className="row" title="How much of the recording is analysed (the chip dump is 50 frames per second; long recordings take a few seconds per minute)">
-                      <span className="lbl">Seconds</span>
-                      <input type="number" className="txt" min={1} max={600} value={aud.maxSeconds ?? 120}
-                        onChange={(e) => setAud({ ...aud, maxSeconds: Math.max(1, Math.min(600, +e.target.value || 1)) })}
-                        onBlur={() => rerunAudio({})} onKeyDown={(e) => { if (e.key === 'Enter') rerunAudio({}); }} />
-                    </label>
-                    <label className="row" title="How many of the chip's three tone channels the analysis may use. Fewer voices = cleaner results for melodies and bass lines; the noise generator takes a free channel for percussion.">
-                      <span className="lbl">Voices</span>
-                      <select value={aud.voices ?? 3} onChange={(e) => rerunAudio({ voices: +e.target.value })}>
-                        <option value={1}>1 (melody)</option><option value={2}>2</option><option value={3}>3 (chords)</option>
-                      </select>
-                    </label>
-                    <label className="row" title="Notes quieter than this, relative to the loudest passage, are dropped. Lower it to keep soft notes, raise it to get rid of background hiss and reverb tails.">
-                      <span className="lbl">Gate (dB)</span>
-                      <input type="number" className="txt" min={-60} max={-10} step={2} value={aud.gateDb ?? -40}
-                        onChange={(e) => setAud({ ...aud, gateDb: Math.max(-60, Math.min(-10, +e.target.value || -40)) })}
-                        onBlur={() => rerunAudio({})} onKeyDown={(e) => { if (e.key === 'Enter') rerunAudio({}); }} />
-                    </label>
-                    <label className="row" title="Extra gain before the 16 volume steps, in dB. Quiet recordings sound thin; loud ones saturate at volume 15.">
-                      <span className="lbl">Gain (dB)</span>
-                      <input type="number" className="txt" min={-24} max={24} step={1} value={aud.gainDb ?? 0}
-                        onChange={(e) => setAud({ ...aud, gainDb: Math.max(-24, Math.min(24, +e.target.value || 0)) })}
-                        onBlur={() => rerunAudio({})} onKeyDown={(e) => { if (e.key === 'Enter') rerunAudio({}); }} />
-                    </label>
-                    <label className="row" title="Pull pitches that are within about a third of a semitone to the nearest note. Off keeps vibrato and slides as they were played (as period changes).">
-                      <span className="lbl">Snap to notes</span>
-                      <input type="checkbox" checked={aud.snap !== false} onChange={(e) => rerunAudio({ snap: e.target.checked })} />
-                    </label>
-                    <label className="row" title="Percussion, breath and cymbals (what is left in the high band after the notes are taken out) become the YM noise generator on a free channel.">
-                      <span className="lbl">Noise</span>
-                      <input type="checkbox" checked={aud.noise !== false} onChange={(e) => rerunAudio({ noise: e.target.checked })} />
-                      <span className="note soft"> {tune.stats.noiseFrames} noise frame{tune.stats.noiseFrames === 1 ? '' : 's'}</span>
-                    </label>
-                    <p className="note soft">Voice use: A {tune.stats.voiced[0]} · B {tune.stats.voiced[1]} · C {tune.stats.voiced[2]} frames{tune.stats.tuningCents ? ` · recording is ${tune.stats.tuningCents > 0 ? '+' : ''}${tune.stats.tuningCents} cents off concert pitch (corrected)` : ''}</p>
-                  </>
                 )}
                 <label className="row"><span className="lbl">Composer</span>
                   <input type="text" className="txt" value={author} maxLength={40} onChange={(e) => setAuthor(e.target.value)} />

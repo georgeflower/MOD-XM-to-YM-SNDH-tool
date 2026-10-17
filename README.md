@@ -4,7 +4,7 @@ A browser tool that turns **ProTracker `.MOD`** and **FastTracker II `.XM`** mod
 **Atari ST's YM2149** (one chip: 3 tone voices + noise, 50 Hz). Everything runs client-side — static files, no server.
 
 **Status:** load → auto-convert → A/B listen → export, plus an FT2-style AY pattern editor.  
-**Version 0.5.** Changes: see [`CHANGELOG.md`](CHANGELOG.md). Documentation: open the **Help** link in the app header (`docs/index.html` in the built site — one self-contained page with a manual, how-to recipes, effects reference, tooltip list, architecture and technical specifications), or read the Markdown sources in [`docs/`](docs/).
+**Version 0.4.** Changes: see [`CHANGELOG.md`](CHANGELOG.md). Documentation: open the **Help** link in the app header (`docs/index.html` in the built site — one self-contained page with a manual, how-to recipes, effects reference, tooltip list, architecture and technical specifications), or read the Markdown sources in [`docs/`](docs/).
 
 ## What you get today
 
@@ -47,15 +47,6 @@ voice (stickiness avoids voice jumping, one noise generator is shared, volumes m
   below 200 Hz (median) is the bass; it and the synthetic drums prefer voice B, melody and arpeggios voices A and C, so the three
   voices live in different frequency ranges. A melody note on B makes room when a bass or drum needs it and an outer voice is
   free. Digidrums stay on voice C. Works in the frame converter and in the pattern-editor conversion.
-
-## Loading recordings (WAV, MP3)
-
-`.wav`, `.mp3`, `.ogg`, `.flac` and `.m4a` files are transcribed to a YM2149 register dump (`src/import/audio.ts`): per 20 ms frame (93 ms Hann window,
-4096-point FFT at 22.05 kHz) up to three harmonic series are searched (salience over the first 14 partials, octave check, partials that are louder than the
-fundamental are left for the next voice, skirts of the Hann window subtracted), tracked frame to frame by permutation cost, tuned (median offset), snapped to semitones
-(< 35 cents) and mapped through the YM DAC table to the 16 volume steps. The flat residual in the 2.8–9.5 kHz band becomes the noise generator. Decoding uses
-the browser (`OfflineAudioContext.decodeAudioData`); WAV also has a pure-JS fallback. The result is an `AyTune` (`source: 'audio'`), so preview, exports and
-*Edit as AY patterns* work on it. It is an approximation: a full mix has more than three notes.
 
 ## Loading .sndh and .ym
 
