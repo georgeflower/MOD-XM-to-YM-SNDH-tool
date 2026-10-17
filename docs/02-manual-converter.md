@@ -6,7 +6,7 @@ The **Converter** tab is where a module (or an existing SNDH/YM tune) is loaded,
 
 | Control | What it does |
 |---|---|
-| **Load MOD / XM / SNDH / YM / YMT / WAV…** | Opens a file. Accepted: `.mod`, `.xm`, `.sndh` / `.snd` (also ICE!-packed), `.ym` (YM2!, YM3!, YM3b!, YM5!, YM6!, also LHA-packed), `.ymt`, and recordings `.wav`, `.mp3`, `.ogg`, `.flac`, `.m4a` (transcribed to a YM tune, see [Convert a recording](#howto-audio)). The type is detected from the file contents, not the extension. |
+| **Load MOD / XM / SNDH / YM / YMT…** | Opens a file. Accepted: `.mod`, `.xm`, `.sndh` / `.snd` (also ICE!-packed), `.ym` (YM2!, YM3!, YM3b!, YM5!, YM6!, also LHA-packed) and `.ymt`. The type is detected from the file contents, not the extension. |
 | **Drop a file** | Dropping a file anywhere on the page does the same. |
 | **Demo: Omar's Bazaar** | Loads the bundled XM song *Omar's Bazaar* by Qumran. |
 | **Converter / AY pattern editor** tabs | Switch between the two halves of the tool. The loaded module stays in memory when you switch. |
@@ -14,7 +14,6 @@ The **Converter** tab is where a module (or an existing SNDH/YM tune) is loaded,
 What happens after loading depends on the file type:
 
 * **MOD / XM** — converted automatically with default settings. The *Module*, *Conversion*, *Export*, *Preview*, *Instruments*, *Source channels* and *Report* panels appear.
-* **WAV / MP3** — transcribed: up to three notes per 20 ms frame plus noise are found in the recording and written as a YM register dump. The *Transcribed recording* panel has **Start**, **Seconds**, **Voices**, **Gate**, **Gain**, **Snap to notes** and **Noise**. See [Convert a recording](#howto-audio).
 * **SNDH / YM** — not converted, only *played*: a `.ym` is read as the register dump it is, a `.sndh` is run in a built-in 68000 emulator. You get the *Loaded tune* panel, the preview and the exports. To change the music, press **Edit as AY patterns →** in the *Loaded tune* panel. See [Loading SNDH and YM](#howto-load-sndh) and [Edit an existing SNDH or YM tune](#howto-edit-tune).
 * **YMT** — opens in the AY pattern editor.
 

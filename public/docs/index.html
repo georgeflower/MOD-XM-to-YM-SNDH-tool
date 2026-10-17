@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MOD/XM to YM2149 Help</title>
-<meta name="description" content="Manual, how-to guide, effects reference, architecture and technical specifications of the MOD/XM to YM2149 tool, version 0.5.0.">
+<meta name="description" content="Manual, how-to guide, effects reference, architecture and technical specifications of the MOD/XM to YM2149 tool, version 0.4.0.">
 <style>
 :root { --bg:#fbfbfd; --ink:#1b1f2a; --dim:#5a6074; --line:#d9dce6; --accent:#2c5fd4; --side:#f0f2f8; --code:#eef0f6; --mark:#fff3b0; --head:#1d2342; --headink:#fff; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#10131f; --ink:#dfe3f1; --dim:#9aa2bd; --line:#2a3050; --accent:#7ea8ff; --side:#161a2c; --code:#1b2037; --mark:#5b4c00; --head:#0a0d1e; } }
@@ -69,18 +69,18 @@ footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top
 <body>
 <header class="top">
   <button id="menu" aria-label="Contents">☰</button>
-  <h1>MOD/XM → YM2149 <small>Help · v0.5.0</small></h1>
+  <h1>MOD/XM → YM2149 <small>Help · v0.4.0</small></h1>
   <input id="q" type="search" placeholder="Search the documentation  ( / )" aria-label="Search the documentation">
   <span class="sp"></span>
   <button id="theme" title="Switch between light and dark">◐</button>
   <a href="../index.html" title="Back to the tool">Open the tool</a>
 </header>
 <div class="layout">
-<nav class="toc" aria-label="Contents"><ol><li class="ch"><a href="#start-here">Start here</a></li><li class="sec"><a href="#the-two-tabs">The two tabs</a></li><li class="sec"><a href="#ten-minute-quick-start">Ten-minute quick start</a></li><li class="sec"><a href="#what-s-new-in-0-5">What's new in 0.5</a></li><li class="sec"><a href="#what-was-new-in-0-4">What was new in 0.4</a></li><li class="sec"><a href="#what-was-new-in-0-3">What was new in 0.3</a></li><li class="sec"><a href="#how-to-read-this-documentation">How to read this documentation</a></li><li class="sec"><a href="#glossary">Glossary</a></li><li class="ch"><a href="#concepts">Concepts</a></li><li class="sec"><a href="#concepts-chip">The YM2149 in one page</a></li><li class="sec"><a href="#concepts-convert">How the automatic conversion works</a></li><li class="sec"><a href="#concepts-ways">Two ways to get to a result</a></li><li class="sec"><a href="#concepts-instruments">Instruments in the editor</a></li><li class="sec"><a href="#concepts-digidrums">Digidrums</a></li><li class="sec"><a href="#concepts-timer">Timer effects: Q, S, U</a></li><li class="sec"><a href="#concepts-matrix">What survives in which export</a></li><li class="ch"><a href="#manual-converter">Manual: Converter</a></li><li class="sec"><a href="#manual-loading">Header and loading</a></li><li class="sec"><a href="#manual-module">Module panel</a></li><li class="sec"><a href="#manual-conversion">Conversion panel</a></li><li class="sec"><a href="#manual-roles">Instruments → AY role</a></li><li class="sec"><a href="#manual-channels">Source channels → 3 voices</a></li><li class="sec"><a href="#manual-import">Manual import dialog</a></li><li class="sec"><a href="#manual-export">Export panel</a></li><li class="sec"><a href="#manual-preview">Preview panel</a></li><li class="sec"><a href="#manual-tune">Loaded SNDH / YM panel</a></li><li class="sec"><a href="#manual-report">Conversion report</a></li><li class="ch"><a href="#manual-editor">Manual: Pattern editor</a></li><li class="sec"><a href="#manual-editor-layout">Layout</a></li><li class="sec"><a href="#manual-editor-bar">Song bar</a></li><li class="sec"><a href="#manual-editor-grid">The pattern grid</a></li><li class="sec"><a href="#manual-editor-drumcol">Drum channel</a></li><li class="ch"><a href="#manual-instruments">Manual: Instrument editor</a></li><li class="sec"><a href="#manual-instruments-common">Common fields</a></li><li class="sec"><a href="#manual-instruments-classic">Classic instruments</a></li><li class="sec"><a href="#manual-instruments-both">Fields for both types</a></li><li class="sec"><a href="#manual-instruments-step">Step-table instruments</a></li><li class="sec"><a href="#manual-presets">Presets</a></li><li class="ch"><a href="#manual-drums">Manual: Digidrum editor</a></li><li class="ch"><a href="#howto">How-to recipes</a></li><li class="sec"><a href="#howto-load">Load a MOD or XM</a></li><li class="sec"><a href="#howto-auto">Import automatically, then adjust the priority</a></li><li class="sec"><a href="#howto-manual-import">Manual import with channel priorities</a></li><li class="sec"><a href="#howto-instruments-convert">Change how a module instrument is played</a></li><li class="sec"><a href="#howto-rename">Rename instruments</a></li><li class="sec"><a href="#howto-drums-convert">Make drums sound right</a></li><li class="sec"><a href="#howto-mapping">Save and reuse a conversion</a></li><li class="sec"><a href="#howto-edit">Continue in the pattern editor</a></li><li class="sec"><a href="#howto-change-inst">Change an instrument in the editor</a></li><li class="sec"><a href="#howto-new-inst">Create a new instrument</a></li><li class="sec"><a href="#howto-digidrum">Add and use digidrums</a></li><li class="sec"><a href="#howto-timer">Use the timer effects Q, S and U</a></li><li class="sec"><a href="#howto-scratch">Write a tune from scratch</a></li><li class="sec"><a href="#howto-edit-tune">Edit an existing SNDH or YM tune</a></li><li class="sec"><a href="#howto-load-sndh">Load SNDH and YM files</a></li><li class="sec"><a href="#howto-audio">Convert a recording (WAV, MP3)</a></li><li class="sec"><a href="#howto-load-other">Load maxYMiser, Arkos and `.ymt` files</a></li><li class="sec"><a href="#howto-export">Export</a></li><li class="sec"><a href="#howto-cli">Use the command line</a></li><li class="ch"><a href="#effects">Effects reference</a></li><li class="sec"><a href="#effects-timing">Timing: rows, ticks and frames</a></li><li class="sec"><a href="#effects-lifetime">How long an effect lasts</a></li><li class="sec"><a href="#effects-pitch">Pitch effects</a></li><li class="sec"><a href="#effects-volume">Volume effects</a></li><li class="sec"><a href="#effects-envelope">Hardware envelope (buzzer) effects</a></li><li class="sec"><a href="#effects-flow">Flow effects</a></li><li class="sec"><a href="#effects-timer">Timer and sample effects</a></li><li class="sec"><a href="#effects-matrix">Which effects survive in which export</a></li><li class="ch"><a href="#tooltips">Tooltips and keys</a></li><li class="sec"><a href="#tooltips-converter">Converter</a></li><li class="sec"><a href="#tooltips-manual-import-dialog">Manual import dialog</a></li><li class="sec"><a href="#tooltips-pattern-editor">Pattern editor</a></li><li class="sec"><a href="#tooltips-instrument-editor">Instrument editor</a></li><li class="sec"><a href="#tooltips-digidrum-editor">Digidrum editor</a></li><li class="sec"><a href="#tooltips-status">Status line explanations (effects)</a></li><li class="sec"><a href="#tooltips-keys">Keyboard reference</a></li><li class="ch"><a href="#architecture">Architecture</a></li><li class="sec"><a href="#architecture-overview">Overview</a></li><li class="sec"><a href="#architecture-data">Data model</a></li><li class="sec"><a href="#architecture-layout">Source layout</a></li><li class="sec"><a href="#architecture-converter">The converter pipeline in detail</a></li><li class="sec"><a href="#architecture-renderer">The pattern renderer</a></li><li class="sec"><a href="#architecture-editor">The editor store</a></li><li class="sec"><a href="#architecture-audio">Audio</a></li><li class="sec"><a href="#architecture-sndh-import">SNDH import</a></li><li class="sec"><a href="#architecture-fromregs">Register dump to patterns</a></li><li class="sec"><a href="#architecture-exporters">Exporters</a></li><li class="sec"><a href="#architecture-68000">The 68000 engine</a></li><li class="sec"><a href="#architecture-build">Build and delivery</a></li><li class="sec"><a href="#architecture-verification">Verification strategy</a></li><li class="ch"><a href="#specs">Technical specifications</a></li><li class="sec"><a href="#specs-time">Time base and registers</a></li><li class="sec"><a href="#specs-regs">Register dump (`.regs`, internal)</a></li><li class="sec"><a href="#specs-stream">Packed stream (SNDH and game kit)</a></li><li class="sec"><a href="#specs-sndh">SNDH file</a></li><li class="sec"><a href="#specs-ym">YM5! and YM6! files</a></li><li class="sec"><a href="#specs-drums">Digidrum table and engine</a></li><li class="sec"><a href="#specs-fx">Timer-effect engine</a></li><li class="sec"><a href="#specs-gamekit">Game kit</a></li><li class="sec"><a href="#specs-ymt">`.ymt` song file</a></li><li class="sec"><a href="#specs-mapping">Mapping file (`.json`)</a></li><li class="sec"><a href="#specs-trackers">Exports to other trackers</a></li><li class="sec"><a href="#specs-xm-tables">XM frequency tables</a></li><li class="sec"><a href="#specs-limits">Limits at a glance</a></li><li class="sec"><a href="#specs-scenarios">Scenarios</a></li><li class="ch"><a href="#troubleshooting">Troubleshooting</a></li><li class="sec"><a href="#troubleshooting-load">Loading and playback</a></li><li class="sec"><a href="#troubleshooting-sound">The conversion sounds wrong</a></li><li class="sec"><a href="#troubleshooting-fromregs">Edit as AY patterns from an SNDH or YM</a></li><li class="sec"><a href="#troubleshooting-editor">Pattern editor</a></li><li class="sec"><a href="#troubleshooting-export">Export</a></li><li class="sec"><a href="#troubleshooting-privacy">Files and privacy</a></li><li class="sec"><a href="#troubleshooting-help">Getting help</a></li></ol></nav>
+<nav class="toc" aria-label="Contents"><ol><li class="ch"><a href="#start-here">Start here</a></li><li class="sec"><a href="#the-two-tabs">The two tabs</a></li><li class="sec"><a href="#ten-minute-quick-start">Ten-minute quick start</a></li><li class="sec"><a href="#what-s-new-in-0-4">What's new in 0.4</a></li><li class="sec"><a href="#what-was-new-in-0-3">What was new in 0.3</a></li><li class="sec"><a href="#how-to-read-this-documentation">How to read this documentation</a></li><li class="sec"><a href="#glossary">Glossary</a></li><li class="ch"><a href="#concepts">Concepts</a></li><li class="sec"><a href="#concepts-chip">The YM2149 in one page</a></li><li class="sec"><a href="#concepts-convert">How the automatic conversion works</a></li><li class="sec"><a href="#concepts-ways">Two ways to get to a result</a></li><li class="sec"><a href="#concepts-instruments">Instruments in the editor</a></li><li class="sec"><a href="#concepts-digidrums">Digidrums</a></li><li class="sec"><a href="#concepts-timer">Timer effects: Q, S, U</a></li><li class="sec"><a href="#concepts-matrix">What survives in which export</a></li><li class="ch"><a href="#manual-converter">Manual: Converter</a></li><li class="sec"><a href="#manual-loading">Header and loading</a></li><li class="sec"><a href="#manual-module">Module panel</a></li><li class="sec"><a href="#manual-conversion">Conversion panel</a></li><li class="sec"><a href="#manual-roles">Instruments → AY role</a></li><li class="sec"><a href="#manual-channels">Source channels → 3 voices</a></li><li class="sec"><a href="#manual-import">Manual import dialog</a></li><li class="sec"><a href="#manual-export">Export panel</a></li><li class="sec"><a href="#manual-preview">Preview panel</a></li><li class="sec"><a href="#manual-tune">Loaded SNDH / YM panel</a></li><li class="sec"><a href="#manual-report">Conversion report</a></li><li class="ch"><a href="#manual-editor">Manual: Pattern editor</a></li><li class="sec"><a href="#manual-editor-layout">Layout</a></li><li class="sec"><a href="#manual-editor-bar">Song bar</a></li><li class="sec"><a href="#manual-editor-grid">The pattern grid</a></li><li class="sec"><a href="#manual-editor-drumcol">Drum channel</a></li><li class="ch"><a href="#manual-instruments">Manual: Instrument editor</a></li><li class="sec"><a href="#manual-instruments-common">Common fields</a></li><li class="sec"><a href="#manual-instruments-classic">Classic instruments</a></li><li class="sec"><a href="#manual-instruments-both">Fields for both types</a></li><li class="sec"><a href="#manual-instruments-step">Step-table instruments</a></li><li class="sec"><a href="#manual-presets">Presets</a></li><li class="ch"><a href="#manual-drums">Manual: Digidrum editor</a></li><li class="ch"><a href="#howto">How-to recipes</a></li><li class="sec"><a href="#howto-load">Load a MOD or XM</a></li><li class="sec"><a href="#howto-auto">Import automatically, then adjust the priority</a></li><li class="sec"><a href="#howto-manual-import">Manual import with channel priorities</a></li><li class="sec"><a href="#howto-instruments-convert">Change how a module instrument is played</a></li><li class="sec"><a href="#howto-rename">Rename instruments</a></li><li class="sec"><a href="#howto-drums-convert">Make drums sound right</a></li><li class="sec"><a href="#howto-mapping">Save and reuse a conversion</a></li><li class="sec"><a href="#howto-edit">Continue in the pattern editor</a></li><li class="sec"><a href="#howto-change-inst">Change an instrument in the editor</a></li><li class="sec"><a href="#howto-new-inst">Create a new instrument</a></li><li class="sec"><a href="#howto-digidrum">Add and use digidrums</a></li><li class="sec"><a href="#howto-timer">Use the timer effects Q, S and U</a></li><li class="sec"><a href="#howto-scratch">Write a tune from scratch</a></li><li class="sec"><a href="#howto-edit-tune">Edit an existing SNDH or YM tune</a></li><li class="sec"><a href="#howto-load-sndh">Load SNDH and YM files</a></li><li class="sec"><a href="#howto-load-other">Load maxYMiser, Arkos and `.ymt` files</a></li><li class="sec"><a href="#howto-export">Export</a></li><li class="sec"><a href="#howto-cli">Use the command line</a></li><li class="ch"><a href="#effects">Effects reference</a></li><li class="sec"><a href="#effects-timing">Timing: rows, ticks and frames</a></li><li class="sec"><a href="#effects-lifetime">How long an effect lasts</a></li><li class="sec"><a href="#effects-pitch">Pitch effects</a></li><li class="sec"><a href="#effects-volume">Volume effects</a></li><li class="sec"><a href="#effects-envelope">Hardware envelope (buzzer) effects</a></li><li class="sec"><a href="#effects-flow">Flow effects</a></li><li class="sec"><a href="#effects-timer">Timer and sample effects</a></li><li class="sec"><a href="#effects-matrix">Which effects survive in which export</a></li><li class="ch"><a href="#tooltips">Tooltips and keys</a></li><li class="sec"><a href="#tooltips-converter">Converter</a></li><li class="sec"><a href="#tooltips-manual-import-dialog">Manual import dialog</a></li><li class="sec"><a href="#tooltips-pattern-editor">Pattern editor</a></li><li class="sec"><a href="#tooltips-instrument-editor">Instrument editor</a></li><li class="sec"><a href="#tooltips-digidrum-editor">Digidrum editor</a></li><li class="sec"><a href="#tooltips-status">Status line explanations (effects)</a></li><li class="sec"><a href="#tooltips-keys">Keyboard reference</a></li><li class="ch"><a href="#architecture">Architecture</a></li><li class="sec"><a href="#architecture-overview">Overview</a></li><li class="sec"><a href="#architecture-data">Data model</a></li><li class="sec"><a href="#architecture-layout">Source layout</a></li><li class="sec"><a href="#architecture-converter">The converter pipeline in detail</a></li><li class="sec"><a href="#architecture-renderer">The pattern renderer</a></li><li class="sec"><a href="#architecture-editor">The editor store</a></li><li class="sec"><a href="#architecture-audio">Audio</a></li><li class="sec"><a href="#architecture-sndh-import">SNDH import</a></li><li class="sec"><a href="#architecture-fromregs">Register dump to patterns</a></li><li class="sec"><a href="#architecture-exporters">Exporters</a></li><li class="sec"><a href="#architecture-68000">The 68000 engine</a></li><li class="sec"><a href="#architecture-build">Build and delivery</a></li><li class="sec"><a href="#architecture-verification">Verification strategy</a></li><li class="ch"><a href="#specs">Technical specifications</a></li><li class="sec"><a href="#specs-time">Time base and registers</a></li><li class="sec"><a href="#specs-regs">Register dump (`.regs`, internal)</a></li><li class="sec"><a href="#specs-stream">Packed stream (SNDH and game kit)</a></li><li class="sec"><a href="#specs-sndh">SNDH file</a></li><li class="sec"><a href="#specs-ym">YM5! and YM6! files</a></li><li class="sec"><a href="#specs-drums">Digidrum table and engine</a></li><li class="sec"><a href="#specs-fx">Timer-effect engine</a></li><li class="sec"><a href="#specs-gamekit">Game kit</a></li><li class="sec"><a href="#specs-ymt">`.ymt` song file</a></li><li class="sec"><a href="#specs-mapping">Mapping file (`.json`)</a></li><li class="sec"><a href="#specs-trackers">Exports to other trackers</a></li><li class="sec"><a href="#specs-xm-tables">XM frequency tables</a></li><li class="sec"><a href="#specs-limits">Limits at a glance</a></li><li class="sec"><a href="#specs-scenarios">Scenarios</a></li><li class="ch"><a href="#troubleshooting">Troubleshooting</a></li><li class="sec"><a href="#troubleshooting-load">Loading and playback</a></li><li class="sec"><a href="#troubleshooting-sound">The conversion sounds wrong</a></li><li class="sec"><a href="#troubleshooting-fromregs">Edit as AY patterns from an SNDH or YM</a></li><li class="sec"><a href="#troubleshooting-editor">Pattern editor</a></li><li class="sec"><a href="#troubleshooting-export">Export</a></li><li class="sec"><a href="#troubleshooting-privacy">Files and privacy</a></li><li class="sec"><a href="#troubleshooting-help">Getting help</a></li></ol></nav>
 <main>
 <section class="chapter" id="start-here"><h1>Start here<a class="anchor" href="#start-here" aria-label="link">#</a></h1>
-<div class="intro"><p><strong>MOD/XM → YM2149 · SNDH · game stream — version 0.5</strong></p>
-<p>A browser tool that turns ProTracker <code>.mod</code> and FastTracker II <code>.xm</code> modules into music for the <strong>Atari ST&#39;s YM2149</strong> sound chip (one chip: three square-wave voices, one noise generator, one envelope generator, updated 50 times a second). It also loads <code>.sndh</code>, <code>.ym</code>, <code>.ymt</code>, maxYMiser and Arkos files, turns <code>.wav</code> / <code>.mp3</code> recordings into YM tunes, has an FT2-style pattern editor for the chip, and exports to SNDH, YM, a C game kit, maxYMiser, Arkos Tracker 3, Furnace, WAV and raw registers.</p>
+<div class="intro"><p><strong>MOD/XM → YM2149 · SNDH · game stream — version 0.4</strong></p>
+<p>A browser tool that turns ProTracker <code>.mod</code> and FastTracker II <code>.xm</code> modules into music for the <strong>Atari ST&#39;s YM2149</strong> sound chip (one chip: three square-wave voices, one noise generator, one envelope generator, updated 50 times a second). It also loads <code>.sndh</code>, <code>.ym</code>, <code>.ymt</code>, maxYMiser and Arkos files, has an FT2-style pattern editor for the chip, and exports to SNDH, YM, a C game kit, maxYMiser, Arkos Tracker 3, Furnace, WAV and raw registers.</p>
 <p>Everything runs in your browser. There is no server and none of your files are uploaded; the page only counts page views with GoatCounter (no cookies, no personal data).</p>
 </div>
 <section class="sec" id="the-two-tabs"><h2>The two tabs<a class="anchor" href="#the-two-tabs" aria-label="link">#</a></h2><table>
@@ -101,7 +101,7 @@ footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top
 </tbody></table>
 </section>
 <section class="sec" id="ten-minute-quick-start"><h2>Ten-minute quick start<a class="anchor" href="#ten-minute-quick-start" aria-label="link">#</a></h2><ol>
-<li>Press <strong>Demo: Omar&#39;s Bazaar</strong> (or <strong>Load MOD / XM / SNDH / YM / YMT / WAV…</strong>, or drop a file anywhere on the page).</li>
+<li>Press <strong>Demo: Omar&#39;s Bazaar</strong> (or <strong>Load MOD / XM / SNDH / YM / YMT…</strong>, or drop a file anywhere on the page).</li>
 <li>Press <strong>Space</strong> to play. Press <strong>Tab</strong> to flip between the <em>original</em> (played by libopenmpt) and the <em>YM version</em>. The difference is the conversion.</li>
 <li>If the melody gets lost, open <strong>Manual import…</strong>, give the melody channel the priority <strong>Lead</strong>, press <strong>▶ Full preview</strong>, and listen. See <a href="#howto-manual-import">Manual import</a>.</li>
 <li>If a drum sounds thin, set the instrument&#39;s <strong>AY role</strong> to <em>digidrum (sample)</em> (or tick <em>Percussion as digidrums</em>).</li>
@@ -109,11 +109,7 @@ footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top
 <li>To keep working on the song by hand, press <strong>Edit as AY patterns →</strong>. This works for a loaded <code>.sndh</code> or <code>.ym</code> as well: the tune is turned back into notes and instruments (see <a href="#howto-edit-tune">Edit an existing SNDH or YM tune</a>).</li>
 </ol>
 </section>
-<section class="sec" id="what-s-new-in-0-5"><h2>What's new in 0.5<a class="anchor" href="#what-s-new-in-0-5" aria-label="link">#</a></h2><ul>
-<li><strong>WAV and MP3 (also Ogg, FLAC, M4A) → YM tune.</strong> Load a recording like a module: each 20 ms frame is searched for up to three notes, tracked from frame to frame, and written as tone periods and volume steps; percussion and breath become the noise generator. The result is an ordinary tune: preview, all exports and <em>Edit as AY patterns →</em> work on it. It is an approximation by nature (see <a href="#howto-audio">Convert a recording</a>).</li>
-</ul>
-</section>
-<section class="sec" id="what-was-new-in-0-4"><h2>What was new in 0.4<a class="anchor" href="#what-was-new-in-0-4" aria-label="link">#</a></h2><ul>
+<section class="sec" id="what-s-new-in-0-4"><h2>What's new in 0.4<a class="anchor" href="#what-s-new-in-0-4" aria-label="link">#</a></h2><ul>
 <li><strong>Edit <code>.sndh</code> and <code>.ym</code> files as AY patterns</strong> — <em>Edit as AY patterns →</em> in the <em>Loaded tune</em> panel, or <em>Load .sndh/.ym…</em> in the pattern editor. The tempo and the notes are found, every sound becomes a step-table instrument, digidrums and <code>Q S U</code> timer effects come along, and the <em>Import report</em> says what was found (<a href="#howto-edit-tune">Edit an existing SNDH or YM tune</a>).</li>
 <li><strong>STe DMA samples in SNDH files</strong> (maxYMiser&#39;s DMA track and other STe players): the SNDH emulator now behaves like an STe and the sample hits become digidrums on voice C; the <em>STe samples</em> checkbox turns this off.</li>
 <li><strong>XM files with the Amiga frequency table</strong> load and convert (they were refused before).</li>
@@ -463,8 +459,8 @@ footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>Load MOD / XM / SNDH / YM / YMT / WAV…</strong></td>
-<td>Opens a file. Accepted: <code>.mod</code>, <code>.xm</code>, <code>.sndh</code> / <code>.snd</code> (also ICE!-packed), <code>.ym</code> (YM2!, YM3!, YM3b!, YM5!, YM6!, also LHA-packed), <code>.ymt</code>, and recordings <code>.wav</code>, <code>.mp3</code>, <code>.ogg</code>, <code>.flac</code>, <code>.m4a</code> (transcribed to a YM tune, see <a href="#howto-audio">Convert a recording</a>). The type is detected from the file contents, not the extension.</td>
+<td><strong>Load MOD / XM / SNDH / YM / YMT…</strong></td>
+<td>Opens a file. Accepted: <code>.mod</code>, <code>.xm</code>, <code>.sndh</code> / <code>.snd</code> (also ICE!-packed), <code>.ym</code> (YM2!, YM3!, YM3b!, YM5!, YM6!, also LHA-packed) and <code>.ymt</code>. The type is detected from the file contents, not the extension.</td>
 </tr>
 <tr>
 <td><strong>Drop a file</strong></td>
@@ -482,7 +478,6 @@ footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top
 <p>What happens after loading depends on the file type:</p>
 <ul>
 <li><strong>MOD / XM</strong> — converted automatically with default settings. The <em>Module</em>, <em>Conversion</em>, <em>Export</em>, <em>Preview</em>, <em>Instruments</em>, <em>Source channels</em> and <em>Report</em> panels appear.</li>
-<li><strong>WAV / MP3</strong> — transcribed: up to three notes per 20 ms frame plus noise are found in the recording and written as a YM register dump. The <em>Transcribed recording</em> panel has <strong>Start</strong>, <strong>Seconds</strong>, <strong>Voices</strong>, <strong>Gate</strong>, <strong>Gain</strong>, <strong>Snap to notes</strong> and <strong>Noise</strong>. See <a href="#howto-audio">Convert a recording</a>.</li>
 <li><strong>SNDH / YM</strong> — not converted, only <em>played</em>: a <code>.ym</code> is read as the register dump it is, a <code>.sndh</code> is run in a built-in 68000 emulator. You get the <em>Loaded tune</em> panel, the preview and the exports. To change the music, press <strong>Edit as AY patterns →</strong> in the <em>Loaded tune</em> panel. See <a href="#howto-load-sndh">Loading SNDH and YM</a> and <a href="#howto-edit-tune">Edit an existing SNDH or YM tune</a>.</li>
 <li><strong>YMT</strong> — opens in the AY pattern editor.</li>
 </ul>
@@ -1337,7 +1332,7 @@ lower row:   S   D       G   H   J       L
 <div class="intro"><p>Each recipe is self-contained. Words in <strong>bold</strong> are buttons or fields; the full description of each is in the manuals.</p>
 </div>
 <section class="sec" id="howto-load"><h2>Load a MOD or XM<a class="anchor" href="#howto-load" aria-label="link">#</a></h2><ol>
-<li>Press <strong>Load MOD / XM / SNDH / YM / YMT / WAV…</strong> at the top, or drag the file anywhere onto the page. (To try it first, press <strong>Demo: Omar&#39;s Bazaar</strong>.)</li>
+<li>Press <strong>Load MOD / XM / SNDH / YM / YMT…</strong> at the top, or drag the file anywhere onto the page. (To try it first, press <strong>Demo: Omar&#39;s Bazaar</strong>.)</li>
 <li>The file type is detected from its contents. ProTracker <code>.mod</code> (M.K., 4CHN, 6CHN, 8CHN, FLT4/8, OCTA, nnCH and similar tags) and FastTracker II <code>.xm</code> are supported. The module is analysed and converted at once; a status text next to the buttons shows <em>Converting…</em> and <em>Rendering…</em>.</li>
 <li>Press <strong>Space</strong> to play the YM version. Press <strong>Tab</strong> to switch to the original and back. If <strong>A · Original</strong> is greyed out, you opened the page from disk — see <a href="#troubleshooting">Troubleshooting</a>.</li>
 <li>The <strong>Conversion report</strong> at the bottom lists what the converter did and any warnings.</li>
@@ -1482,7 +1477,7 @@ lower row:   S   D       G   H   J       L
 </section>
 <section class="sec" id="howto-edit-tune"><h2>Edit an existing SNDH or YM tune<a class="anchor" href="#howto-edit-tune" aria-label="link">#</a></h2><p>An <code>.sndh</code> or <code>.ym</code> file is a recording of what the chip did, 50 times a second. It holds no notes, instruments or patterns, so the tool works them out again.</p>
 <ol>
-<li>Load the file (<strong>Load MOD / XM / SNDH / YM / YMT / WAV…</strong>, or drop it on the page). For an SNDH with several subtunes, choose the <strong>Subtune</strong> (and, if the length is wrong, <strong>Seconds</strong>) first.</li>
+<li>Load the file (<strong>Load MOD / XM / SNDH / YM / YMT…</strong>, or drop it on the page). For an SNDH with several subtunes, choose the <strong>Subtune</strong> (and, if the length is wrong, <strong>Seconds</strong>) first.</li>
 <li>Press <strong>Edit as AY patterns →</strong> in the <em>Loaded tune</em> panel. In the pattern editor you can also press <strong>Load .sndh/.ym…</strong>, which takes subtune 1.</li>
 <li>The <em>Import report</em> above the song bar says what was found, for example <em>YM import: 3840 frames -&gt; 481 rows at 8 frames per row … 870 notes -&gt; 255 step-table instruments</em>.</li>
 <li>Press <strong>Space</strong>, then <strong>Right Ctrl</strong> to play it, and compare with the original (Converter tab, preview).</li>
@@ -1506,15 +1501,6 @@ lower row:   S   D       G   H   J       L
 <li><strong>YM</strong> (<code>.ym</code>: YM2!, YM3!, YM3b!, YM5!, YM6!, LHA-packed): read as the register dump it is. YM5/YM6 digidrums and YM6 timer effects are imported with their samples.</li>
 <li>You get the piano roll, the YM preview and the exports SNDH / YM5 / game kit / WAV / regs, and <strong>Edit as AY patterns →</strong> to turn the tune into patterns (<a href="#howto-edit-tune">Edit an existing SNDH or YM tune</a>). SNDH timer-interrupt effects are recognised and classified (digidrum, Q, S, U); one drum and one effect at a time, so overlapping ones keep the first and the import says how many it dropped.</li>
 </ul>
-</section>
-<section class="sec" id="howto-audio"><h2>Convert a recording (WAV, MP3)<a class="anchor" href="#howto-audio" aria-label="link">#</a></h2><ol>
-<li>Press <strong>Load…</strong> and pick a <code>.wav</code>, <code>.mp3</code>, <code>.ogg</code>, <code>.flac</code> or <code>.m4a</code> file (or drop it on the page). Decoding uses your browser, so the formats are the ones your browser plays; WAV always works.</li>
-<li>The <em>Transcribed recording</em> panel shows what was found. The first <strong>120 seconds</strong> are analysed; set <strong>Start (s)</strong> and <strong>Seconds</strong> to analyse another part (up to 600 s).</li>
-<li>Press <strong>Space</strong> to hear the YM2149 version. Change <strong>Voices</strong> (1 for a melody, 3 for chords), <strong>Gate (dB)</strong> (higher drops quiet notes and noise), <strong>Gain (dB)</strong>, <strong>Snap to notes</strong> and <strong>Noise</strong> and listen again; the analysis re-runs when you change a setting.</li>
-<li>Export (SNDH, YM, game kit, WAV, regs) or press <strong>Edit as AY patterns →</strong> to tidy the result by hand.</li>
-</ol>
-<p>How it works: every 20 ms frame is analysed with a 93 ms window; up to three harmonic series are found (strongest first, each taken out of the spectrum before the next is looked for), tracked so that every voice keeps its note, snapped to semitones when within a third of a semitone, and given the nearest of the chip&#39;s 16 volume steps. What is left in the high band becomes the noise generator on a free voice. A recording that is tuned away from A = 440 Hz is corrected (the <em>Voice use</em> line shows the offset).</p>
-<p>Limits: single instruments, bass lines, chords of up to three notes and chiptune-like music come out well. A full mix has far more than three notes at once, so you get a sketch of the strongest ones. Single-frame notes, very low notes (below about 32 Hz) and very high ones (above about 1.6 kHz) are not found. Vocals and noisy sounds give wobbly pitches; try 1 voice and a higher gate.</p>
 </section>
 <section class="sec" id="howto-load-other"><h2>Load maxYMiser, Arkos and `.ymt` files<a class="anchor" href="#howto-load-other" aria-label="link">#</a></h2><p>All three are in the <strong>AY pattern editor</strong> tab:</p>
 <ul>
@@ -2060,8 +2046,8 @@ npx tsx scripts/import-cli.ts tune.sndh out.regs     # run an SNDH / read a YM i
 </tr>
 </thead>
 <tbody><tr>
-<td>Load MOD / XM / SNDH / YM / YMT / WAV…</td>
-<td>Open a MOD, XM, SNDH, YM or YMT file, or a WAV / MP3 recording to transcribe (you can also drop a file anywhere on the page)</td>
+<td>Load MOD / XM / SNDH / YM / YMT…</td>
+<td>Open a MOD, XM, SNDH, YM or YMT file (you can also drop a file anywhere on the page)</td>
 </tr>
 <tr>
 <td>Help</td>
@@ -2090,34 +2076,6 @@ npx tsx scripts/import-cli.ts tune.sndh out.regs     # run an SNDH / read a YM i
 <tr>
 <td>STe samples</td>
 <td>This tune plays 8-bit samples through the STe DMA sound chip, which a YM2149 register dump cannot carry. On: each sample becomes a 4-bit digidrum hit on voice C at the same frames (voice C is silent while it plays). Off: the samples are left out.</td>
-</tr>
-<tr>
-<td>Start (s)</td>
-<td>Where in the recording the analysis begins</td>
-</tr>
-<tr>
-<td>Seconds</td>
-<td>How much of the recording is analysed (the chip dump is 50 frames per second; long recordings take a few seconds per minute)</td>
-</tr>
-<tr>
-<td>Voices</td>
-<td>How many of the chip&#39;s three tone channels the analysis may use. Fewer voices = cleaner results for melodies and bass lines; the noise generator takes a free channel for percussion.</td>
-</tr>
-<tr>
-<td>Gate (dB)</td>
-<td>Notes quieter than this, relative to the loudest passage, are dropped. Lower it to keep soft notes, raise it to get rid of background hiss and reverb tails.</td>
-</tr>
-<tr>
-<td>Gain (dB)</td>
-<td>Extra gain before the 16 volume steps, in dB. Quiet recordings sound thin; loud ones saturate at volume 15.</td>
-</tr>
-<tr>
-<td>Snap to notes</td>
-<td>Pull pitches that are within about a third of a semitone to the nearest note. Off keeps vibrato and slides as they were played (as period changes).</td>
-</tr>
-<tr>
-<td>Noise</td>
-<td>Percussion, breath and cymbals (what is left in the high band after the notes are taken out) become the YM noise generator on a free channel.</td>
 </tr>
 <tr>
 <td>Edit as AY patterns →</td>
@@ -3641,18 +3599,6 @@ then one data byte per set mask bit, in register order
 <td>An XM saved with FastTracker 2&#39;s <strong>Amiga</strong> frequency table (Instrument/Options: not <em>Linear</em>) is now loaded. Notes, samples and tempo are the same as in a linear XM; slides (<code>1xx 2xx 3xx 5xy E1x E2x X1x X2x</code>), vibrato and the instrument auto-vibrato act on periods the way FT2 does in that mode, so the same parameter slides high notes faster than low ones. The one remaining difference is that this tool uses exact periods, where FT2 rounds them to its period table (a fraction of a cent to a few cents on very high notes).</td>
 </tr>
 <tr>
-<td>A WAV or MP3 says <em>this browser cannot decode</em></td>
-<td>Decoding is done by the browser. WAV is always read; for MP3, Ogg, FLAC or M4A use a current Chrome, Edge, Firefox or Safari, or convert the file to WAV.</td>
-</tr>
-<tr>
-<td>A recording gives wrong or jumping notes</td>
-<td>Three voices cannot hold a full mix. Set <strong>Voices</strong> to 1 for a melody, raise <strong>Gate (dB)</strong> to drop quiet notes and noise, analyse a short part with <strong>Start</strong> / <strong>Seconds</strong>, and keep <strong>Snap to notes</strong> on. Octave errors are common on bass notes with weak fundamentals (small speakers).</td>
-</tr>
-<tr>
-<td>A recording is silent or has no noise</td>
-<td><em>the recording is silent</em> means the file has no signal; <em>nothing was loud enough</em> means the gate is too high for the material: lower it. Percussion needs <strong>Noise</strong> on.</td>
-</tr>
-<tr>
 <td>&quot;not a MOD or XM file&quot;</td>
 <td>The contents were not recognised. Packed or Impulse Tracker / S3M files are not supported. Check the file is not a renamed archive.</td>
 </tr>
@@ -3850,7 +3796,7 @@ then one data byte per set mask bit, in register order
 <p id="none" class="none hidden">Nothing found.</p>
 </main>
 </div>
-<footer>MOD/XM → YM2149 · SNDH · game stream — version 0.5.0. Runs entirely in your browser; this page is a single file and works offline.</footer>
+<footer>MOD/XM → YM2149 · SNDH · game stream — version 0.4.0. Runs entirely in your browser; this page is a single file and works offline.</footer>
 <script>
 (function () {
   var q = document.getElementById('q'), secs = [].slice.call(document.querySelectorAll('section.sec, section.chapter > .intro')), none = document.getElementById('none');
