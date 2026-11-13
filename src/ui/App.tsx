@@ -16,7 +16,7 @@ import { zip } from '../export/zip';
 import { parseYm, isYm } from '../import/ym';
 import { parseSndh, isSndh, type SndhInfo } from '../import/sndh';
 import { isSpc } from '../import/spc';
-import { spcToModule, type SpcInfo, type SpcOptions } from '../import/spcModule';
+import { spcToModule, type SpcInfo, type SpcOptions, type SpcRows } from '../import/spcModule';
 import type { AyTune } from '../import/tune';
 import { Preview, type Source } from './audio';
 import { Editor } from '../tracker/editor';
@@ -147,9 +147,9 @@ export function App() {
         const r = spcToModule(data, o);
         setMod(r.module); setAuthor(r.info.artist);
         setSpc({ info: r.info, opts: o });
-        preview().setOriginalPcm(r.pcm, 32000);
+        preview().setOriginalPcm(r.pcm, 32000, r.pcmLoop);
         preview().setSource('ay'); setSource('ay');
-        setPrio({}); setInstMap({}); setMacroSel(null); setPos(0);
+        setPrio(r.prio); setInstMap({}); setMacroSel(null); setPos(0);
         setError('');
       } catch (e) { setError(String((e as Error).message ?? e)); setMod(null); setSpc(null); }
       setBusy('');
@@ -184,7 +184,8 @@ export function App() {
         setRes(r);
         setBusy('Rendering the YM2149 preview…');
         setTimeout(() => {
-          preview().setAy(renderYm(r.regs, r.nframes, 44100, 50, 4, r.drums));
+          // an SPC with a found loop jumps back to the loop start, like the YM export does
+          preview().setAy(renderYm(r.regs, r.nframes, 44100, 50, 4, r.drums), 44100, mod.kind === 'spc' && r.loopFrame > 0 ? r.loopFrame / 50 : 0);
           setBusy('');
         }, 20);
       } catch (e) {
@@ -433,6 +434,8 @@ export function App() {
                 {spc.info.comment && <><dt>Comment</dt><dd>{spc.info.comment}</dd></>}
                 <dt>Tag length</dt><dd>{spc.info.tagSeconds ? fmtTime(spc.info.tagSeconds) : 'not given'}</dd>
                 <dt>Read</dt><dd>{fmtTime(spc.info.seconds)} · {spc.info.instruments} sample{spc.info.instruments === 1 ? '' : 's'} used · notes per voice {spc.info.notes.join(' / ')}</dd>
+                <dt>Loop</dt><dd>{spc.info.loop ? `${fmtTime(spc.info.loop.start)} – ${fmtTime(spc.info.loop.end)} (${(spc.info.loop.end - spc.info.loop.start).toFixed(1)} s), the song restarts there` : spc.opts.loop === false ? 'not searched' : 'none found'}</dd>
+                <dt>Note grid</dt><dd>{spc.info.stepMs ? `${spc.info.stepMs.toFixed(1)} ms per step` : 'no steady grid'}</dd>
               </dl>
               <label className="row" title="Where in the song the reading starts (the emulator runs up to this point first)">
                 <span className="lbl">Start (s)</span>
@@ -440,17 +443,39 @@ export function App() {
                   onChange={(e) => setSpc({ ...spc, opts: { ...spc.opts, startSeconds: Math.max(0, Math.min(1200, +e.target.value || 0)) } })}
                   onBlur={() => runSpc(bytes, spc.opts)} onKeyDown={(e) => { if (e.key === 'Enter') runSpc(bytes, spc.opts); }} />
               </label>
-              <label className="row" title="How much of the song is read, 1–300 s. Empty = the length from the file's tags (at most 4 minutes), or 2 minutes when the file has none. Songs loop forever, so a short section is often all you need.">
+              <label className="row" title="Look for the point where the song starts over: the music is played until it has repeated itself (up to 5 minutes), the module ends at the loop end and jumps back to the loop start, like the game does. Off: Seconds sets the length and the song restarts from the beginning.">
+                <span className="lbl">Loop</span>
+                <span className="opt"><input type="checkbox" checked={spc.opts.loop !== false} onChange={(e) => { const o = { ...spc.opts, loop: e.target.checked }; setSpc({ ...spc, opts: o }); runSpc(bytes, o); }} /><span className="note soft">find the loop point</span></span>
+              </label>
+              <label className="row" title="How much of the song is read, 1–300 s, when no loop is used. Empty = the length from the file's tags (at most 4 minutes), or 2 minutes when the file has none.">
                 <span className="lbl">Seconds</span>
-                <input type="number" className="txt" min={1} max={300} value={spc.opts.seconds ?? ''} placeholder={String(Math.round(spc.info.seconds))}
+                <input type="number" className="txt" min={1} max={300} disabled={!!spc.info.loop} value={spc.opts.seconds ?? ''} placeholder={String(Math.round(spc.info.seconds))}
                   onChange={(e) => setSpc({ ...spc, opts: { ...spc.opts, seconds: e.target.value ? Math.max(1, Math.min(300, +e.target.value || 1)) : undefined } })}
                   onBlur={() => runSpc(bytes, spc.opts)} onKeyDown={(e) => { if (e.key === 'Enter') runSpc(bytes, spc.opts); }} />
               </label>
               <label className="row" title="The SNES adds reverb (echo) to most music. It is part of the original sound but a YM2149 has no echo. Off: the original preview is played without it, which is closer to what the conversion can reach.">
                 <span className="lbl">Echo</span>
-                <input type="checkbox" checked={spc.opts.echo !== false} onChange={(e) => { const o = { ...spc.opts, echo: e.target.checked }; setSpc({ ...spc, opts: o }); runSpc(bytes, o); }} />
-                <span className="note soft"> reverb in the original</span>
+                <span className="opt"><input type="checkbox" checked={spc.opts.echo !== false} onChange={(e) => { const o = { ...spc.opts, echo: e.target.checked }; setSpc({ ...spc, opts: o }); runSpc(bytes, o); }} /><span className="note soft">reverb in the original</span></span>
               </label>
+              <label className="row" title="Play the SNES echo in the YM version too: every echoed voice gets an echo channel (a delayed, quieter copy, at the echo delay and level of the song). The echo channels have the priority Low, so they only get the YM voices the other channels leave free.">
+                <span className="lbl">Echo notes</span>
+                <span className="opt"><input type="checkbox" disabled={spc.opts.echo === false} checked={spc.opts.echo !== false && spc.opts.echoNotes !== false} onChange={(e) => { const o = { ...spc.opts, echoNotes: e.target.checked }; setSpc({ ...spc, opts: o }); runSpc(bytes, o); }} /><span className="note soft">{spc.info.echoVoices.length ? `${spc.info.echoVoices.length} echo channel${spc.info.echoVoices.length === 1 ? '' : 's'}` : 'echo channels in the YM version'}</span></span>
+              </label>
+              <label className="row" title="How the notes are laid out in the patterns. Per frame: one row every 20 ms, exact (pitch and volume change on every row). Per step: one row per step of the song's note grid, with the SNES envelopes as instrument envelopes, note delays for notes off the grid and slides inside a row; readable in the pattern editor, a little less exact.">
+                <span className="lbl">Rows</span>
+                <select value={spc.opts.rows ?? 'frame'} onChange={(e) => { const o = { ...spc.opts, rows: e.target.value as SpcRows }; setSpc({ ...spc, opts: o }); runSpc(bytes, o); }}>
+                  <option value="frame">one per frame (exact)</option>
+                  <option value="step" disabled={!spc.info.stepMs}>one per step{spc.info.stepMs ? ` (${Math.round(spc.info.stepMs)} ms)` : ''} (readable)</option>
+                </select>
+              </label>
+              <div className="row" title="Mute SNES voices: a muted voice is left out of the conversion and of the original preview. Voices that never play a note are greyed out.">
+                <span className="lbl">Voices</span>
+                <span className="opt">{Array.from({ length: 8 }, (_, n) => (
+                  <label key={n} className="chk" title={`Voice ${n + 1}: ${spc.info.voicesUsed[n] ? `${spc.info.notes[n]} notes` : 'not used'}. Untick to mute it.`}>
+                    <input type="checkbox" disabled={!spc.info.voicesUsed[n]} checked={!spc.opts.voiceOff?.[n]} onChange={(e) => { const off = [...(spc.opts.voiceOff ?? Array(8).fill(false))]; off[n] = !e.target.checked; const o = { ...spc.opts, voiceOff: off }; setSpc({ ...spc, opts: o }); runSpc(bytes, o); }} />{n + 1}
+                  </label>
+                ))}</span>
+              </div>
               {spc.info.warnings.length > 0 && <pre className="log">{spc.info.warnings.map((w) => 'note: ' + w).join('\n')}</pre>}
             </section>}
             {mod && <section className="panel">

@@ -6,7 +6,7 @@ A browser tool that turns **ProTracker `.MOD`**, **FastTracker II `.XM`** module
 **Atari ST's YM2149** (one chip: 3 tone voices + noise, 50 Hz). Everything runs client-side — static files, no server.
 
 **Status:** load → auto-convert → A/B listen → export, plus an FT2-style AY pattern editor.  
-**Version 0.5.** Changes: see [`CHANGELOG.md`](CHANGELOG.md). Documentation: open the **Help** link in the app header (`docs/index.html` in the built site — one self-contained page with a manual, how-to recipes, effects reference, tooltip list, architecture and technical specifications), or read the Markdown sources in [`docs/`](docs/).
+**Version 0.6.** Changes: see [`CHANGELOG.md`](CHANGELOG.md). Documentation: open the **Help** link in the app header (`docs/index.html` in the built site — one self-contained page with a manual, how-to recipes, effects reference, tooltip list, architecture and technical specifications), or read the Markdown sources in [`docs/`](docs/).
 
 ## What you get today
 
@@ -52,7 +52,7 @@ voice (stickiness avoids voice jumping, one noise generator is shared, volumes m
 
 ## Loading SNES music (.spc)
 
-A `.spc` file (SPC700 state snapshot, ripped from a SNES game) loads like a module: a built-in SPC700 + S-DSP emulator replays it, the 8 voices become channels and the normal converter, *Manual import…*, A/B preview (the original side is the emulator's own render), exports and *Edit as AY patterns →* apply. The SNES echo and pitch modulation are not reproduced; `.sfc` / `.smc` ROMs are not supported. See the *Convert an SNES SPC* how-to in the docs.
+A `.spc` file (SPC700 state snapshot, ripped from a SNES game) loads like a module: a built-in SPC700 + S-DSP emulator replays it, the 8 voices become channels and the normal converter, *Manual import…*, A/B preview (the original side is the emulator's own render), exports and *Edit as AY patterns →* apply. The loop point is found (the module restarts there), the echo becomes Low-priority *echo channels*, rows can follow the song's note grid (*Rows: one per step*, with the SNES envelopes as instrument envelopes) and voices can be muted. Pitch modulation and the reverb tail are not reproduced; `.sfc` / `.smc` ROMs are not supported. See the *Convert an SNES SPC* how-to in the docs.
 
 ## Loading .sndh and .ym
 
@@ -318,10 +318,10 @@ public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of th
 
 ## Roadmap
 
-Done in 0.5: SNES `.spc` import.
+Done in 0.5: SNES `.spc` import. Done in 0.6: SPC loop point, echo channels, rows per step, voice mute.
 
 * More than one timer effect or drum at a time (needs a second timer / mixing engine); timer-driven arpeggio and other handler effects that are not drums or Q/S/U
-* SNES SPC: detect the loop point (the converted song restarts at 0), echo-aware reduction (fold the reverb tail into the YM version), tempo-aligned rows instead of one row per frame, per-voice mute in the SNES SPC panel, best-effort `.sfc` ROM support
+* SNES SPC: the echo feedback tail, tempo changes in *rows per step* (one grid per section), sustain points in the envelopes, best-effort `.sfc` ROM support
 * maxYMiser: the STe DMA track (sampled sound), sequence-switching effects, more than one timer effect on the voices at once
 
 Note: SNDH files made here play in any SNDH player but cannot be opened *in* maxYMiser (it only loads its own songs) — use the maxYMiser export for that.

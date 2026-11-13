@@ -73,6 +73,7 @@ const NAMES: [RegExp, string][] = [
   [/^Show or hide the instrument editor/, 'Edit… / Hide editor'],
   [/^Play the whole conversion with the priorities/, '▶ Full preview (YM2149)'],
   [/^Play this channel alone on the chip/, 'Solo ▶ (channel table)'],
+  [/^Mute SNES voices/, 'Voices (SNES SPC panel)'],
 ];
 
 export function extractTips(): Tip[] {
@@ -109,6 +110,7 @@ const EXTRA_TIPS: Tip[] = [
   { panel: 'Manual import dialog', control: 'Instrument name field', text: 'Rename instrument NN: the name is used in the pattern editor and saved with the mapping' },
   { panel: 'Manual import dialog', control: 'Activity graph', text: 'Click to listen to this channel from that point of the song (silent channels: "This channel is silent")' },
   { panel: 'Manual import dialog', control: 'Priority levels', text: 'Off: leave this channel out of the import · Low: gives way to the others when voices run short · Normal: no preference · High: wins over normal channels · Lead: the melody: keeps its voice almost always' },
+  { panel: 'Converter', control: 'Voice 1–8 checkboxes (SNES SPC panel)', text: 'Voice N: how many notes it plays, or "not used". Untick to mute it.' },
   { panel: 'Pattern editor', control: 'Status line', text: 'Explains the cell under the cursor: arpeggio notes, slide size, speed / tempo, effect meaning, drum name (see the effect list below)' },
 ];
 

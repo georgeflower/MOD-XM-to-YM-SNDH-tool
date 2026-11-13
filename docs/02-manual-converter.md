@@ -14,7 +14,16 @@ The **Converter** tab is where a module (or an existing SNDH/YM tune) is loaded,
 What happens after loading depends on the file type:
 
 * **MOD / XM** — converted automatically with default settings. The *Module*, *Conversion*, *Export*, *Preview*, *Instruments*, *Source channels* and *Report* panels appear.
-* **SNES SPC** (`.spc`) — converted like a module. The emulator replays the tune and the 8 SNES voices become channels. The **SNES SPC** panel has **Start** (seconds to skip), **Seconds** (length to convert; default the tune's own length, else 120, maximum 300) and **Echo** (include the SNES reverb in the *original* preview; the YM version never has it). See [Convert an SNES SPC](#howto-spc).
+* **SNES SPC** (`.spc`) — converted like a module. The emulator replays the tune and the 8 SNES voices become channels. The **SNES SPC** panel shows the tags, the loop it found and the note grid, and has:
+  * **Start** — seconds to skip before reading.
+  * **Loop** — find the loop point (on by default): the tune is played until it has repeated itself (at most 5 minutes); the module ends at the loop end and restarts at the loop start. A jingle that ends (20 s without a new note) takes the **Seconds** length.
+  * **Seconds** — the length when no loop is used (default the tune's tag length, else 120, maximum 300). Greyed out while a loop is in use.
+  * **Echo** — the SNES reverb in the *original* preview.
+  * **Echo notes** — the echo in the YM version as *echo channels*: channels 9 and up are delayed, quieter copies of the echoed voices (the song's own echo delay and level), with the priority *Low*.
+  * **Rows** — *one per frame (exact)*: a row every 20 ms, every pitch and volume change on its own row. *One per step (readable)*: a row per step of the song's note grid (shown as *Note grid*), notes off the grid get a note delay `EDx`, the SNES envelopes become instrument volume envelopes, and changes inside a row become slides. Much shorter patterns, a little less exact (fast vibrato is smoothed away).
+  * **Voices** — untick a voice to mute it in the conversion and in the original preview.
+
+  See [Convert an SNES SPC](#howto-spc).
 * **SNDH / YM** — not converted, only *played*: a `.ym` is read as the register dump it is, a `.sndh` is run in a built-in 68000 emulator. You get the *Loaded tune* panel, the preview and the exports. To change the music, press **Edit as AY patterns →** in the *Loaded tune* panel. See [Loading SNDH and YM](#howto-load-sndh) and [Edit an existing SNDH or YM tune](#howto-edit-tune).
 * **YMT** — opens in the AY pattern editor.
 

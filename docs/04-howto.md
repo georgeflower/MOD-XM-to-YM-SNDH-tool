@@ -159,13 +159,15 @@ Timer effects work in SNDH, YM6, game kit, WAV and maxYMiser exports. They need 
 ## Convert an SNES SPC {#howto-spc}
 
 1. Load a `.spc` file (**Load MOD / XM / SNDH / YM / YMT / SPC…**, or drop it on the page). A `.spc` is a snapshot of the SNES sound CPU, ripped from a game; `.sfc` / `.smc` ROMs cannot be loaded.
-2. The tune is replayed in a built-in SPC700 + DSP emulator. In the **SNES SPC** panel set **Start** and **Seconds** to pick the part you want (a loop of a few bars is often enough); the default is the length in the file's tag.
+2. The tune is replayed in a built-in SPC700 + DSP emulator until it repeats itself: the *Loop* line shows where the loop starts and ends, and the converted song loops there like the game does. Untick **Loop** and use **Start** and **Seconds** to take another part instead.
 3. **A · Original** plays the emulator's own render of the SNES tune (with reverb if **Echo** is ticked); **Y · YM** plays the conversion. Press **Tab** to compare.
 4. Use **Manual import…** exactly as for a module: the 8 SNES voices are channels, and priorities decide which three survive in each 20 ms frame. Give the melody **Lead**.
 5. Kick and snare samples are detected as drums; set the instrument's **AY role** to *digidrum (sample)* for a fuller drum sound.
-6. Export, or press **Edit as AY patterns →**.
+6. Too busy? Untick voices under **Voices** (you hear the result on both sides of the A/B switch), or untick **Echo notes** to drop the echo channels.
+7. To edit the song afterwards, set **Rows** to *one per step*: the patterns follow the song's note grid instead of 50 rows a second.
+8. Export, or press **Edit as AY patterns →**.
 
-Not carried over: the SNES echo / reverb and pitch modulation (the panel lists them as warnings), and the SPC's loop point (the converted song restarts at the beginning).
+The echo comes along as echo channels (**Echo notes**): delayed, quieter copies of the echoed voices with the priority *Low*. They only sound when a YM voice is free, so a busy song keeps its melody and a sparse one gets its echo. The reverb tail itself (the feedback) and pitch modulation are not carried over.
 
 ## Edit an existing SNDH or YM tune {#howto-edit-tune}
 

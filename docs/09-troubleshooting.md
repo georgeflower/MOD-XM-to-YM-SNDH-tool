@@ -11,9 +11,13 @@
 | "not a MOD or XM file" | The contents were not recognised. Packed or Impulse Tracker / S3M files are not supported. Check the file is not a renamed archive. |
 | A `.sndh` says *did not return* | The tune's init or play routine waits for hardware that is not emulated (for example a busy-wait on a timer data register). Try another subtune or a shorter *Seconds* value. |
 | A `.sfc` or `.smc` ROM is refused | ROMs need a full SNES emulator and the game's own sound driver. Load a `.spc` ripped from the game instead (zophar.net and similar archives have them). |
-| SPC: the YM version sounds dry / thin compared with the original | The SNES echo (reverb) and pitch modulation are not reproduced. Untick **Echo** to hear the original without reverb, which is closer to what the YM can do. |
+| SPC: the YM version sounds dry / thin compared with the original | Only the first repeat of the SNES echo is played (as *echo channels*, when a YM voice is free); the reverb tail and pitch modulation are not reproduced. Untick **Echo** to hear the original without reverb, which is closer to what the YM can do. |
+| SPC: the echo notes take the melody's voice | They have the priority *Low*. Give the melody **Lead** in **Manual import…**, set an echo channel (9 and up) to **Off**, or untick **Echo notes**. |
+| SPC: *no loop was found* | The music did not repeat exactly within 5 minutes: random sound effects in the file (a "No SFX" rip helps), or a loop longer than 2½ minutes. **Seconds** sets the length then. |
+| SPC: the loop point is wrong | Untick **Loop** and set **Start** / **Seconds** by hand. |
+| SPC: *Rows: one per step* is greyed out, or notes are missing in it | The song has no steady note grid (tempo changes, free timing), or notes closer together than one step; use *one per frame*. |
 | SPC: 8 voices become 3 | The YM2149 has three tone voices. Use **Manual import…** to set the melody to **Lead** and unimportant channels to **Off** or **Low**. |
-| SPC: the conversion stops before the tune loops | **Seconds** defaults to the length in the file's tag (120 s if there is none, maximum 300). Raise **Seconds** or set **Start**. |
+| SPC: the conversion is too short or too long | With **Loop** on, the song ends at the loop end. With **Loop** off, **Seconds** defaults to the length in the file's tag (120 s if there is none, maximum 300). |
 | An `.ym` has the wrong length or no loop | YM files carry their own loop frame; if none is stored the tune plays once. For SNDH the loop is detected; *Seconds* overrides the length. |
 | The demo does not start | Press **Demo: Omar's Bazaar** after the page has fully loaded; the demo is embedded in the page, so no network is needed. |
 

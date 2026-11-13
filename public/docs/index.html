@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MOD/XM to YM2149 Help</title>
-<meta name="description" content="Manual, how-to guide, effects reference, architecture and technical specifications of the MOD/XM to YM2149 tool, version 0.5.0.">
+<meta name="description" content="Manual, how-to guide, effects reference, architecture and technical specifications of the MOD/XM to YM2149 tool, version 0.6.0.">
 <style>
 :root { --bg:#fbfbfd; --ink:#1b1f2a; --dim:#5a6074; --line:#d9dce6; --accent:#2c5fd4; --side:#f0f2f8; --code:#eef0f6; --mark:#fff3b0; --head:#1d2342; --headink:#fff; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#10131f; --ink:#dfe3f1; --dim:#9aa2bd; --line:#2a3050; --accent:#7ea8ff; --side:#161a2c; --code:#1b2037; --mark:#5b4c00; --head:#0a0d1e; } }
@@ -69,17 +69,17 @@ footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top
 <body>
 <header class="top">
   <button id="menu" aria-label="Contents">☰</button>
-  <h1>MOD/XM → YM2149 <small>Help · v0.5.0</small></h1>
+  <h1>MOD/XM → YM2149 <small>Help · v0.6.0</small></h1>
   <input id="q" type="search" placeholder="Search the documentation  ( / )" aria-label="Search the documentation">
   <span class="sp"></span>
   <button id="theme" title="Switch between light and dark">◐</button>
   <a href="../index.html" title="Back to the tool">Open the tool</a>
 </header>
 <div class="layout">
-<nav class="toc" aria-label="Contents"><ol><li class="ch"><a href="#start-here">Start here</a></li><li class="sec"><a href="#the-two-tabs">The two tabs</a></li><li class="sec"><a href="#ten-minute-quick-start">Ten-minute quick start</a></li><li class="sec"><a href="#what-s-new-in-0-5">What's new in 0.5</a></li><li class="sec"><a href="#what-was-new-in-0-4">What was new in 0.4</a></li><li class="sec"><a href="#what-was-new-in-0-3">What was new in 0.3</a></li><li class="sec"><a href="#how-to-read-this-documentation">How to read this documentation</a></li><li class="sec"><a href="#glossary">Glossary</a></li><li class="ch"><a href="#concepts">Concepts</a></li><li class="sec"><a href="#concepts-chip">The YM2149 in one page</a></li><li class="sec"><a href="#concepts-convert">How the automatic conversion works</a></li><li class="sec"><a href="#concepts-ways">Two ways to get to a result</a></li><li class="sec"><a href="#concepts-instruments">Instruments in the editor</a></li><li class="sec"><a href="#concepts-digidrums">Digidrums</a></li><li class="sec"><a href="#concepts-timer">Timer effects: Q, S, U</a></li><li class="sec"><a href="#concepts-matrix">What survives in which export</a></li><li class="ch"><a href="#manual-converter">Manual: Converter</a></li><li class="sec"><a href="#manual-loading">Header and loading</a></li><li class="sec"><a href="#manual-module">Module panel</a></li><li class="sec"><a href="#manual-conversion">Conversion panel</a></li><li class="sec"><a href="#manual-roles">Instruments → AY role</a></li><li class="sec"><a href="#manual-channels">Source channels → 3 voices</a></li><li class="sec"><a href="#manual-import">Manual import dialog</a></li><li class="sec"><a href="#manual-export">Export panel</a></li><li class="sec"><a href="#manual-preview">Preview panel</a></li><li class="sec"><a href="#manual-tune">Loaded SNDH / YM panel</a></li><li class="sec"><a href="#manual-report">Conversion report</a></li><li class="ch"><a href="#manual-editor">Manual: Pattern editor</a></li><li class="sec"><a href="#manual-editor-layout">Layout</a></li><li class="sec"><a href="#manual-editor-bar">Song bar</a></li><li class="sec"><a href="#manual-editor-grid">The pattern grid</a></li><li class="sec"><a href="#manual-editor-drumcol">Drum channel</a></li><li class="ch"><a href="#manual-instruments">Manual: Instrument editor</a></li><li class="sec"><a href="#manual-instruments-common">Common fields</a></li><li class="sec"><a href="#manual-instruments-classic">Classic instruments</a></li><li class="sec"><a href="#manual-instruments-both">Fields for both types</a></li><li class="sec"><a href="#manual-instruments-step">Step-table instruments</a></li><li class="sec"><a href="#manual-presets">Presets</a></li><li class="ch"><a href="#manual-drums">Manual: Digidrum editor</a></li><li class="ch"><a href="#howto">How-to recipes</a></li><li class="sec"><a href="#howto-load">Load a MOD or XM</a></li><li class="sec"><a href="#howto-auto">Import automatically, then adjust the priority</a></li><li class="sec"><a href="#howto-manual-import">Manual import with channel priorities</a></li><li class="sec"><a href="#howto-instruments-convert">Change how a module instrument is played</a></li><li class="sec"><a href="#howto-rename">Rename instruments</a></li><li class="sec"><a href="#howto-drums-convert">Make drums sound right</a></li><li class="sec"><a href="#howto-mapping">Save and reuse a conversion</a></li><li class="sec"><a href="#howto-edit">Continue in the pattern editor</a></li><li class="sec"><a href="#howto-change-inst">Change an instrument in the editor</a></li><li class="sec"><a href="#howto-new-inst">Create a new instrument</a></li><li class="sec"><a href="#howto-digidrum">Add and use digidrums</a></li><li class="sec"><a href="#howto-timer">Use the timer effects Q, S and U</a></li><li class="sec"><a href="#howto-scratch">Write a tune from scratch</a></li><li class="sec"><a href="#howto-spc">Convert an SNES SPC</a></li><li class="sec"><a href="#howto-edit-tune">Edit an existing SNDH or YM tune</a></li><li class="sec"><a href="#howto-load-sndh">Load SNDH and YM files</a></li><li class="sec"><a href="#howto-load-other">Load maxYMiser, Arkos and `.ymt` files</a></li><li class="sec"><a href="#howto-export">Export</a></li><li class="sec"><a href="#howto-cli">Use the command line</a></li><li class="ch"><a href="#effects">Effects reference</a></li><li class="sec"><a href="#effects-timing">Timing: rows, ticks and frames</a></li><li class="sec"><a href="#effects-lifetime">How long an effect lasts</a></li><li class="sec"><a href="#effects-pitch">Pitch effects</a></li><li class="sec"><a href="#effects-volume">Volume effects</a></li><li class="sec"><a href="#effects-envelope">Hardware envelope (buzzer) effects</a></li><li class="sec"><a href="#effects-flow">Flow effects</a></li><li class="sec"><a href="#effects-timer">Timer and sample effects</a></li><li class="sec"><a href="#effects-matrix">Which effects survive in which export</a></li><li class="ch"><a href="#tooltips">Tooltips and keys</a></li><li class="sec"><a href="#tooltips-converter">Converter</a></li><li class="sec"><a href="#tooltips-manual-import-dialog">Manual import dialog</a></li><li class="sec"><a href="#tooltips-pattern-editor">Pattern editor</a></li><li class="sec"><a href="#tooltips-instrument-editor">Instrument editor</a></li><li class="sec"><a href="#tooltips-digidrum-editor">Digidrum editor</a></li><li class="sec"><a href="#tooltips-status">Status line explanations (effects)</a></li><li class="sec"><a href="#tooltips-keys">Keyboard reference</a></li><li class="ch"><a href="#architecture">Architecture</a></li><li class="sec"><a href="#architecture-overview">Overview</a></li><li class="sec"><a href="#architecture-data">Data model</a></li><li class="sec"><a href="#architecture-layout">Source layout</a></li><li class="sec"><a href="#architecture-converter">The converter pipeline in detail</a></li><li class="sec"><a href="#architecture-renderer">The pattern renderer</a></li><li class="sec"><a href="#architecture-editor">The editor store</a></li><li class="sec"><a href="#architecture-audio">Audio</a></li><li class="sec"><a href="#architecture-sndh-import">SNDH import</a></li><li class="sec"><a href="#architecture-fromregs">Register dump to patterns</a></li><li class="sec"><a href="#architecture-exporters">Exporters</a></li><li class="sec"><a href="#architecture-68000">The 68000 engine</a></li><li class="sec"><a href="#architecture-build">Build and delivery</a></li><li class="sec"><a href="#architecture-verification">Verification strategy</a></li><li class="ch"><a href="#specs">Technical specifications</a></li><li class="sec"><a href="#specs-time">Time base and registers</a></li><li class="sec"><a href="#specs-regs">Register dump (`.regs`, internal)</a></li><li class="sec"><a href="#specs-stream">Packed stream (SNDH and game kit)</a></li><li class="sec"><a href="#specs-sndh">SNDH file</a></li><li class="sec"><a href="#specs-ym">YM5! and YM6! files</a></li><li class="sec"><a href="#specs-drums">Digidrum table and engine</a></li><li class="sec"><a href="#specs-fx">Timer-effect engine</a></li><li class="sec"><a href="#specs-gamekit">Game kit</a></li><li class="sec"><a href="#specs-ymt">`.ymt` song file</a></li><li class="sec"><a href="#specs-mapping">Mapping file (`.json`)</a></li><li class="sec"><a href="#specs-trackers">Exports to other trackers</a></li><li class="sec"><a href="#specs-xm-tables">XM frequency tables</a></li><li class="sec"><a href="#specs-limits">Limits at a glance</a></li><li class="sec"><a href="#specs-scenarios">Scenarios</a></li><li class="ch"><a href="#troubleshooting">Troubleshooting</a></li><li class="sec"><a href="#troubleshooting-load">Loading and playback</a></li><li class="sec"><a href="#troubleshooting-sound">The conversion sounds wrong</a></li><li class="sec"><a href="#troubleshooting-fromregs">Edit as AY patterns from an SNDH or YM</a></li><li class="sec"><a href="#troubleshooting-editor">Pattern editor</a></li><li class="sec"><a href="#troubleshooting-export">Export</a></li><li class="sec"><a href="#troubleshooting-privacy">Files and privacy</a></li><li class="sec"><a href="#troubleshooting-help">Getting help</a></li></ol></nav>
+<nav class="toc" aria-label="Contents"><ol><li class="ch"><a href="#start-here">Start here</a></li><li class="sec"><a href="#the-two-tabs">The two tabs</a></li><li class="sec"><a href="#ten-minute-quick-start">Ten-minute quick start</a></li><li class="sec"><a href="#what-s-new-in-0-6">What's new in 0.6</a></li><li class="sec"><a href="#what-was-new-in-0-5">What was new in 0.5</a></li><li class="sec"><a href="#what-was-new-in-0-4">What was new in 0.4</a></li><li class="sec"><a href="#what-was-new-in-0-3">What was new in 0.3</a></li><li class="sec"><a href="#how-to-read-this-documentation">How to read this documentation</a></li><li class="sec"><a href="#glossary">Glossary</a></li><li class="ch"><a href="#concepts">Concepts</a></li><li class="sec"><a href="#concepts-chip">The YM2149 in one page</a></li><li class="sec"><a href="#concepts-convert">How the automatic conversion works</a></li><li class="sec"><a href="#concepts-ways">Two ways to get to a result</a></li><li class="sec"><a href="#concepts-instruments">Instruments in the editor</a></li><li class="sec"><a href="#concepts-digidrums">Digidrums</a></li><li class="sec"><a href="#concepts-timer">Timer effects: Q, S, U</a></li><li class="sec"><a href="#concepts-matrix">What survives in which export</a></li><li class="ch"><a href="#manual-converter">Manual: Converter</a></li><li class="sec"><a href="#manual-loading">Header and loading</a></li><li class="sec"><a href="#manual-module">Module panel</a></li><li class="sec"><a href="#manual-conversion">Conversion panel</a></li><li class="sec"><a href="#manual-roles">Instruments → AY role</a></li><li class="sec"><a href="#manual-channels">Source channels → 3 voices</a></li><li class="sec"><a href="#manual-import">Manual import dialog</a></li><li class="sec"><a href="#manual-export">Export panel</a></li><li class="sec"><a href="#manual-preview">Preview panel</a></li><li class="sec"><a href="#manual-tune">Loaded SNDH / YM panel</a></li><li class="sec"><a href="#manual-report">Conversion report</a></li><li class="ch"><a href="#manual-editor">Manual: Pattern editor</a></li><li class="sec"><a href="#manual-editor-layout">Layout</a></li><li class="sec"><a href="#manual-editor-bar">Song bar</a></li><li class="sec"><a href="#manual-editor-grid">The pattern grid</a></li><li class="sec"><a href="#manual-editor-drumcol">Drum channel</a></li><li class="ch"><a href="#manual-instruments">Manual: Instrument editor</a></li><li class="sec"><a href="#manual-instruments-common">Common fields</a></li><li class="sec"><a href="#manual-instruments-classic">Classic instruments</a></li><li class="sec"><a href="#manual-instruments-both">Fields for both types</a></li><li class="sec"><a href="#manual-instruments-step">Step-table instruments</a></li><li class="sec"><a href="#manual-presets">Presets</a></li><li class="ch"><a href="#manual-drums">Manual: Digidrum editor</a></li><li class="ch"><a href="#howto">How-to recipes</a></li><li class="sec"><a href="#howto-load">Load a MOD or XM</a></li><li class="sec"><a href="#howto-auto">Import automatically, then adjust the priority</a></li><li class="sec"><a href="#howto-manual-import">Manual import with channel priorities</a></li><li class="sec"><a href="#howto-instruments-convert">Change how a module instrument is played</a></li><li class="sec"><a href="#howto-rename">Rename instruments</a></li><li class="sec"><a href="#howto-drums-convert">Make drums sound right</a></li><li class="sec"><a href="#howto-mapping">Save and reuse a conversion</a></li><li class="sec"><a href="#howto-edit">Continue in the pattern editor</a></li><li class="sec"><a href="#howto-change-inst">Change an instrument in the editor</a></li><li class="sec"><a href="#howto-new-inst">Create a new instrument</a></li><li class="sec"><a href="#howto-digidrum">Add and use digidrums</a></li><li class="sec"><a href="#howto-timer">Use the timer effects Q, S and U</a></li><li class="sec"><a href="#howto-scratch">Write a tune from scratch</a></li><li class="sec"><a href="#howto-spc">Convert an SNES SPC</a></li><li class="sec"><a href="#howto-edit-tune">Edit an existing SNDH or YM tune</a></li><li class="sec"><a href="#howto-load-sndh">Load SNDH and YM files</a></li><li class="sec"><a href="#howto-load-other">Load maxYMiser, Arkos and `.ymt` files</a></li><li class="sec"><a href="#howto-export">Export</a></li><li class="sec"><a href="#howto-cli">Use the command line</a></li><li class="ch"><a href="#effects">Effects reference</a></li><li class="sec"><a href="#effects-timing">Timing: rows, ticks and frames</a></li><li class="sec"><a href="#effects-lifetime">How long an effect lasts</a></li><li class="sec"><a href="#effects-pitch">Pitch effects</a></li><li class="sec"><a href="#effects-volume">Volume effects</a></li><li class="sec"><a href="#effects-envelope">Hardware envelope (buzzer) effects</a></li><li class="sec"><a href="#effects-flow">Flow effects</a></li><li class="sec"><a href="#effects-timer">Timer and sample effects</a></li><li class="sec"><a href="#effects-matrix">Which effects survive in which export</a></li><li class="ch"><a href="#tooltips">Tooltips and keys</a></li><li class="sec"><a href="#tooltips-converter">Converter</a></li><li class="sec"><a href="#tooltips-manual-import-dialog">Manual import dialog</a></li><li class="sec"><a href="#tooltips-pattern-editor">Pattern editor</a></li><li class="sec"><a href="#tooltips-instrument-editor">Instrument editor</a></li><li class="sec"><a href="#tooltips-digidrum-editor">Digidrum editor</a></li><li class="sec"><a href="#tooltips-status">Status line explanations (effects)</a></li><li class="sec"><a href="#tooltips-keys">Keyboard reference</a></li><li class="ch"><a href="#architecture">Architecture</a></li><li class="sec"><a href="#architecture-overview">Overview</a></li><li class="sec"><a href="#architecture-data">Data model</a></li><li class="sec"><a href="#architecture-layout">Source layout</a></li><li class="sec"><a href="#architecture-converter">The converter pipeline in detail</a></li><li class="sec"><a href="#architecture-renderer">The pattern renderer</a></li><li class="sec"><a href="#architecture-editor">The editor store</a></li><li class="sec"><a href="#architecture-audio">Audio</a></li><li class="sec"><a href="#architecture-sndh-import">SNDH import</a></li><li class="sec"><a href="#architecture-fromregs">Register dump to patterns</a></li><li class="sec"><a href="#architecture-exporters">Exporters</a></li><li class="sec"><a href="#architecture-68000">The 68000 engine</a></li><li class="sec"><a href="#architecture-build">Build and delivery</a></li><li class="sec"><a href="#architecture-verification">Verification strategy</a></li><li class="ch"><a href="#specs">Technical specifications</a></li><li class="sec"><a href="#specs-time">Time base and registers</a></li><li class="sec"><a href="#specs-regs">Register dump (`.regs`, internal)</a></li><li class="sec"><a href="#specs-stream">Packed stream (SNDH and game kit)</a></li><li class="sec"><a href="#specs-sndh">SNDH file</a></li><li class="sec"><a href="#specs-ym">YM5! and YM6! files</a></li><li class="sec"><a href="#specs-drums">Digidrum table and engine</a></li><li class="sec"><a href="#specs-fx">Timer-effect engine</a></li><li class="sec"><a href="#specs-gamekit">Game kit</a></li><li class="sec"><a href="#specs-ymt">`.ymt` song file</a></li><li class="sec"><a href="#specs-mapping">Mapping file (`.json`)</a></li><li class="sec"><a href="#specs-trackers">Exports to other trackers</a></li><li class="sec"><a href="#specs-xm-tables">XM frequency tables</a></li><li class="sec"><a href="#specs-limits">Limits at a glance</a></li><li class="sec"><a href="#specs-scenarios">Scenarios</a></li><li class="ch"><a href="#troubleshooting">Troubleshooting</a></li><li class="sec"><a href="#troubleshooting-load">Loading and playback</a></li><li class="sec"><a href="#troubleshooting-sound">The conversion sounds wrong</a></li><li class="sec"><a href="#troubleshooting-fromregs">Edit as AY patterns from an SNDH or YM</a></li><li class="sec"><a href="#troubleshooting-editor">Pattern editor</a></li><li class="sec"><a href="#troubleshooting-export">Export</a></li><li class="sec"><a href="#troubleshooting-privacy">Files and privacy</a></li><li class="sec"><a href="#troubleshooting-help">Getting help</a></li></ol></nav>
 <main>
 <section class="chapter" id="start-here"><h1>Start here<a class="anchor" href="#start-here" aria-label="link">#</a></h1>
-<div class="intro"><p><strong>MOD/XM → YM2149 · SNDH · game stream — version 0.5</strong></p>
+<div class="intro"><p><strong>MOD/XM → YM2149 · SNDH · game stream — version 0.6</strong></p>
 <p>A browser tool that turns ProTracker <code>.mod</code> and FastTracker II <code>.xm</code> modules into music for the <strong>Atari ST&#39;s YM2149</strong> sound chip (one chip: three square-wave voices, one noise generator, one envelope generator, updated 50 times a second). It also loads SNES <code>.spc</code> music files, <code>.sndh</code>, <code>.ym</code>, <code>.ymt</code>, maxYMiser and Arkos files, has an FT2-style pattern editor for the chip, and exports to SNDH, YM, a C game kit, maxYMiser, Arkos Tracker 3, Furnace, WAV and raw registers.</p>
 <p>Everything runs in your browser. There is no server and none of your files are uploaded; the page only counts page views with GoatCounter (no cookies, no personal data).</p>
 </div>
@@ -109,9 +109,17 @@ footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top
 <li>To keep working on the song by hand, press <strong>Edit as AY patterns →</strong>. This works for a loaded <code>.sndh</code> or <code>.ym</code> as well: the tune is turned back into notes and instruments (see <a href="#howto-edit-tune">Edit an existing SNDH or YM tune</a>).</li>
 </ol>
 </section>
-<section class="sec" id="what-s-new-in-0-5"><h2>What's new in 0.5<a class="anchor" href="#what-s-new-in-0-5" aria-label="link">#</a></h2><ul>
+<section class="sec" id="what-s-new-in-0-6"><h2>What's new in 0.6<a class="anchor" href="#what-s-new-in-0-6" aria-label="link">#</a></h2><ul>
+<li><strong>SPC loop point</strong> — the song is played until it repeats itself; the converted song ends at the loop end and jumps back to the loop start (YM, SNDH and game-kit exports loop there too, and so does the preview).</li>
+<li><strong>Echo notes</strong> — the SNES echo becomes extra <em>echo channels</em> (a delayed, quieter copy of each echoed voice) with the priority <em>Low</em>, so they fill YM voices the other channels leave free.</li>
+<li><strong>Rows per step</strong> — the <em>Rows</em> choice lays the SPC out on the song&#39;s own note grid (one row per step, the SNES envelopes as instrument envelopes) instead of one row per 50 Hz frame: much shorter, readable patterns for the editor.</li>
+<li><strong>Mute SNES voices</strong> — eight voice checkboxes in the <em>SNES SPC</em> panel; a muted voice leaves both the conversion and the original preview.</li>
+<li>A note delay (<code>EDx</code>) now takes its volume-column volume on the delayed tick, as in FastTracker 2.</li>
+</ul>
+</section>
+<section class="sec" id="what-was-new-in-0-5"><h2>What was new in 0.5<a class="anchor" href="#what-was-new-in-0-5" aria-label="link">#</a></h2><ul>
 <li><strong>SNES music (<code>.spc</code>)</strong> — load an SPC700 state snapshot like a module. A built-in SPC700 + S-DSP emulator plays it, the 8 SNES voices become channels, and the usual converter, original-vs-YM preview, <em>Manual import…</em>, exports and <em>Edit as AY patterns →</em> work on them (<a href="#howto-spc">Convert an SNES SPC</a>).</li>
-<li>The SNES <em>Echo</em> (reverb) and pitch modulation are not reproduced in the YM version; the panel warns when a tune uses them.</li>
+<li>The SNES <em>Echo</em> (reverb) and pitch modulation are not reproduced in the YM version; the panel warns when a tune uses them. (0.6: the echo can be played as echo channels.)</li>
 <li><code>.sfc</code> / <code>.smc</code> ROMs are not supported: they need a full SNES emulator and the game&#39;s own sound driver. Use a ripped <code>.spc</code> instead.</li>
 </ul>
 </section>
@@ -483,10 +491,24 @@ footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top
 </tbody></table>
 <p>What happens after loading depends on the file type:</p>
 <ul>
-<li><strong>MOD / XM</strong> — converted automatically with default settings. The <em>Module</em>, <em>Conversion</em>, <em>Export</em>, <em>Preview</em>, <em>Instruments</em>, <em>Source channels</em> and <em>Report</em> panels appear.</li>
-<li><strong>SNES SPC</strong> (<code>.spc</code>) — converted like a module. The emulator replays the tune and the 8 SNES voices become channels. The <strong>SNES SPC</strong> panel has <strong>Start</strong> (seconds to skip), <strong>Seconds</strong> (length to convert; default the tune&#39;s own length, else 120, maximum 300) and <strong>Echo</strong> (include the SNES reverb in the <em>original</em> preview; the YM version never has it). See <a href="#howto-spc">Convert an SNES SPC</a>.</li>
-<li><strong>SNDH / YM</strong> — not converted, only <em>played</em>: a <code>.ym</code> is read as the register dump it is, a <code>.sndh</code> is run in a built-in 68000 emulator. You get the <em>Loaded tune</em> panel, the preview and the exports. To change the music, press <strong>Edit as AY patterns →</strong> in the <em>Loaded tune</em> panel. See <a href="#howto-load-sndh">Loading SNDH and YM</a> and <a href="#howto-edit-tune">Edit an existing SNDH or YM tune</a>.</li>
-<li><strong>YMT</strong> — opens in the AY pattern editor.</li>
+<li><p><strong>MOD / XM</strong> — converted automatically with default settings. The <em>Module</em>, <em>Conversion</em>, <em>Export</em>, <em>Preview</em>, <em>Instruments</em>, <em>Source channels</em> and <em>Report</em> panels appear.</p>
+</li>
+<li><p><strong>SNES SPC</strong> (<code>.spc</code>) — converted like a module. The emulator replays the tune and the 8 SNES voices become channels. The <strong>SNES SPC</strong> panel shows the tags, the loop it found and the note grid, and has:</p>
+<ul>
+<li><strong>Start</strong> — seconds to skip before reading.</li>
+<li><strong>Loop</strong> — find the loop point (on by default): the tune is played until it has repeated itself (at most 5 minutes); the module ends at the loop end and restarts at the loop start. A jingle that ends (20 s without a new note) takes the <strong>Seconds</strong> length.</li>
+<li><strong>Seconds</strong> — the length when no loop is used (default the tune&#39;s tag length, else 120, maximum 300). Greyed out while a loop is in use.</li>
+<li><strong>Echo</strong> — the SNES reverb in the <em>original</em> preview.</li>
+<li><strong>Echo notes</strong> — the echo in the YM version as <em>echo channels</em>: channels 9 and up are delayed, quieter copies of the echoed voices (the song&#39;s own echo delay and level), with the priority <em>Low</em>.</li>
+<li><strong>Rows</strong> — <em>one per frame (exact)</em>: a row every 20 ms, every pitch and volume change on its own row. <em>One per step (readable)</em>: a row per step of the song&#39;s note grid (shown as <em>Note grid</em>), notes off the grid get a note delay <code>EDx</code>, the SNES envelopes become instrument volume envelopes, and changes inside a row become slides. Much shorter patterns, a little less exact (fast vibrato is smoothed away).</li>
+<li><strong>Voices</strong> — untick a voice to mute it in the conversion and in the original preview.</li>
+</ul>
+<p>See <a href="#howto-spc">Convert an SNES SPC</a>.</p>
+</li>
+<li><p><strong>SNDH / YM</strong> — not converted, only <em>played</em>: a <code>.ym</code> is read as the register dump it is, a <code>.sndh</code> is run in a built-in 68000 emulator. You get the <em>Loaded tune</em> panel, the preview and the exports. To change the music, press <strong>Edit as AY patterns →</strong> in the <em>Loaded tune</em> panel. See <a href="#howto-load-sndh">Loading SNDH and YM</a> and <a href="#howto-edit-tune">Edit an existing SNDH or YM tune</a>.</p>
+</li>
+<li><p><strong>YMT</strong> — opens in the AY pattern editor.</p>
+</li>
 </ul>
 </section>
 <section class="sec" id="manual-module"><h2>Module panel<a class="anchor" href="#manual-module" aria-label="link">#</a></h2><p>Read-only facts about the module: file name, title, type (MOD or XM) and channel count, patterns and orders, initial speed/BPM and the length of the YM version. <strong>Composer</strong> is a text field whose content is written into the SNDH <code>COMM</code> tag and the YM author field.</p>
@@ -1484,13 +1506,15 @@ lower row:   S   D       G   H   J       L
 </section>
 <section class="sec" id="howto-spc"><h2>Convert an SNES SPC<a class="anchor" href="#howto-spc" aria-label="link">#</a></h2><ol>
 <li>Load a <code>.spc</code> file (<strong>Load MOD / XM / SNDH / YM / YMT / SPC…</strong>, or drop it on the page). A <code>.spc</code> is a snapshot of the SNES sound CPU, ripped from a game; <code>.sfc</code> / <code>.smc</code> ROMs cannot be loaded.</li>
-<li>The tune is replayed in a built-in SPC700 + DSP emulator. In the <strong>SNES SPC</strong> panel set <strong>Start</strong> and <strong>Seconds</strong> to pick the part you want (a loop of a few bars is often enough); the default is the length in the file&#39;s tag.</li>
+<li>The tune is replayed in a built-in SPC700 + DSP emulator until it repeats itself: the <em>Loop</em> line shows where the loop starts and ends, and the converted song loops there like the game does. Untick <strong>Loop</strong> and use <strong>Start</strong> and <strong>Seconds</strong> to take another part instead.</li>
 <li><strong>A · Original</strong> plays the emulator&#39;s own render of the SNES tune (with reverb if <strong>Echo</strong> is ticked); <strong>Y · YM</strong> plays the conversion. Press <strong>Tab</strong> to compare.</li>
 <li>Use <strong>Manual import…</strong> exactly as for a module: the 8 SNES voices are channels, and priorities decide which three survive in each 20 ms frame. Give the melody <strong>Lead</strong>.</li>
 <li>Kick and snare samples are detected as drums; set the instrument&#39;s <strong>AY role</strong> to <em>digidrum (sample)</em> for a fuller drum sound.</li>
+<li>Too busy? Untick voices under <strong>Voices</strong> (you hear the result on both sides of the A/B switch), or untick <strong>Echo notes</strong> to drop the echo channels.</li>
+<li>To edit the song afterwards, set <strong>Rows</strong> to <em>one per step</em>: the patterns follow the song&#39;s note grid instead of 50 rows a second.</li>
 <li>Export, or press <strong>Edit as AY patterns →</strong>.</li>
 </ol>
-<p>Not carried over: the SNES echo / reverb and pitch modulation (the panel lists them as warnings), and the SPC&#39;s loop point (the converted song restarts at the beginning).</p>
+<p>The echo comes along as echo channels (<strong>Echo notes</strong>): delayed, quieter copies of the echoed voices with the priority <em>Low</em>. They only sound when a YM voice is free, so a busy song keeps its melody and a sparse one gets its echo. The reverb tail itself (the feedback) and pitch modulation are not carried over.</p>
 </section>
 <section class="sec" id="howto-edit-tune"><h2>Edit an existing SNDH or YM tune<a class="anchor" href="#howto-edit-tune" aria-label="link">#</a></h2><p>An <code>.sndh</code> or <code>.ym</code> file is a recording of what the chip did, 50 times a second. It holds no notes, instruments or patterns, so the tool works them out again.</p>
 <ol>
@@ -2103,12 +2127,28 @@ npx tsx scripts/import-cli.ts tune.sndh out.regs     # run an SNDH / read a YM i
 <td>Where in the song the reading starts (the emulator runs up to this point first)</td>
 </tr>
 <tr>
+<td>Loop</td>
+<td>Look for the point where the song starts over: the music is played until it has repeated itself (up to 5 minutes), the module ends at the loop end and jumps back to the loop start, like the game does. Off: Seconds sets the length and the song restarts from the beginning.</td>
+</tr>
+<tr>
 <td>Seconds</td>
-<td>How much of the song is read, 1–300 s. Empty = the length from the file&#39;s tags (at most 4 minutes), or 2 minutes when the file has none. Songs loop forever, so a short section is often all you need.</td>
+<td>How much of the song is read, 1–300 s, when no loop is used. Empty = the length from the file&#39;s tags (at most 4 minutes), or 2 minutes when the file has none.</td>
 </tr>
 <tr>
 <td>Echo</td>
 <td>The SNES adds reverb (echo) to most music. It is part of the original sound but a YM2149 has no echo. Off: the original preview is played without it, which is closer to what the conversion can reach.</td>
+</tr>
+<tr>
+<td>Echo notes</td>
+<td>Play the SNES echo in the YM version too: every echoed voice gets an echo channel (a delayed, quieter copy, at the echo delay and level of the song). The echo channels have the priority Low, so they only get the YM voices the other channels leave free.</td>
+</tr>
+<tr>
+<td>Rows</td>
+<td>How the notes are laid out in the patterns. Per frame: one row every 20 ms, exact (pitch and volume change on every row). Per step: one row per step of the song&#39;s note grid, with the SNES envelopes as instrument envelopes, note delays for notes off the grid and slides inside a row; readable in the pattern editor, a little less exact.</td>
+</tr>
+<tr>
+<td>Voices (SNES SPC panel)</td>
+<td>Mute SNES voices: a muted voice is left out of the conversion and of the original preview. Voices that never play a note are greyed out.</td>
 </tr>
 <tr>
 <td>Level</td>
@@ -2257,6 +2297,10 @@ npx tsx scripts/import-cli.ts tune.sndh out.regs     # run an SNDH / read a YM i
 <tr>
 <td>Instrument name field</td>
 <td>Rename instrument NN (module name: …). The name is used in the pattern editor and saved with the mapping; empty = module name.</td>
+</tr>
+<tr>
+<td>Voice 1–8 checkboxes (SNES SPC panel)</td>
+<td>Voice N: how many notes it plays, or &quot;not used&quot;. Untick to mute it.</td>
 </tr>
 </tbody></table>
 </section>
@@ -3642,15 +3686,31 @@ then one data byte per set mask bit, in register order
 </tr>
 <tr>
 <td>SPC: the YM version sounds dry / thin compared with the original</td>
-<td>The SNES echo (reverb) and pitch modulation are not reproduced. Untick <strong>Echo</strong> to hear the original without reverb, which is closer to what the YM can do.</td>
+<td>Only the first repeat of the SNES echo is played (as <em>echo channels</em>, when a YM voice is free); the reverb tail and pitch modulation are not reproduced. Untick <strong>Echo</strong> to hear the original without reverb, which is closer to what the YM can do.</td>
+</tr>
+<tr>
+<td>SPC: the echo notes take the melody&#39;s voice</td>
+<td>They have the priority <em>Low</em>. Give the melody <strong>Lead</strong> in <strong>Manual import…</strong>, set an echo channel (9 and up) to <strong>Off</strong>, or untick <strong>Echo notes</strong>.</td>
+</tr>
+<tr>
+<td>SPC: <em>no loop was found</em></td>
+<td>The music did not repeat exactly within 5 minutes: random sound effects in the file (a &quot;No SFX&quot; rip helps), or a loop longer than 2½ minutes. <strong>Seconds</strong> sets the length then.</td>
+</tr>
+<tr>
+<td>SPC: the loop point is wrong</td>
+<td>Untick <strong>Loop</strong> and set <strong>Start</strong> / <strong>Seconds</strong> by hand.</td>
+</tr>
+<tr>
+<td>SPC: <em>Rows: one per step</em> is greyed out, or notes are missing in it</td>
+<td>The song has no steady note grid (tempo changes, free timing), or notes closer together than one step; use <em>one per frame</em>.</td>
 </tr>
 <tr>
 <td>SPC: 8 voices become 3</td>
 <td>The YM2149 has three tone voices. Use <strong>Manual import…</strong> to set the melody to <strong>Lead</strong> and unimportant channels to <strong>Off</strong> or <strong>Low</strong>.</td>
 </tr>
 <tr>
-<td>SPC: the conversion stops before the tune loops</td>
-<td><strong>Seconds</strong> defaults to the length in the file&#39;s tag (120 s if there is none, maximum 300). Raise <strong>Seconds</strong> or set <strong>Start</strong>.</td>
+<td>SPC: the conversion is too short or too long</td>
+<td>With <strong>Loop</strong> on, the song ends at the loop end. With <strong>Loop</strong> off, <strong>Seconds</strong> defaults to the length in the file&#39;s tag (120 s if there is none, maximum 300).</td>
 </tr>
 <tr>
 <td>An <code>.ym</code> has the wrong length or no loop</td>
@@ -3842,7 +3902,7 @@ then one data byte per set mask bit, in register order
 <p id="none" class="none hidden">Nothing found.</p>
 </main>
 </div>
-<footer>MOD/XM → YM2149 · SNDH · game stream — version 0.5.0. Runs entirely in your browser; this page is a single file and works offline.</footer>
+<footer>MOD/XM → YM2149 · SNDH · game stream — version 0.6.0. Runs entirely in your browser; this page is a single file and works offline.</footer>
 <script>
 (function () {
   var q = document.getElementById('q'), secs = [].slice.call(document.querySelectorAll('section.sec, section.chapter > .intro')), none = document.getElementById('none');

@@ -29,6 +29,9 @@ export class Preview {
   /** the original as rendered audio (SPC files): played in sync with the YM version instead of the libopenmpt player */
   private origBuf: AudioBuffer | null = null;
   private origNode: AudioBufferSourceNode | null = null;
+  /** where each side loops back to, seconds (0 = the beginning) */
+  private origLoop = 0;
+  private ayLoop = 0;
   private t0 = 0; // context time at which position 0 would have started
   private offset = 0;
   playing = false;
@@ -64,10 +67,11 @@ export class Preview {
   }
 
   /** the original as interleaved stereo int16 (e.g. an SPC rendered by the emulator) */
-  setOriginalPcm(pcm: Int16Array | null, sr: number) {
+  setOriginalPcm(pcm: Int16Array | null, sr: number, loopStart = 0) {
     this.stop();
     this.modBytes = null;
     if (!pcm) { this.origBuf = null; return; }
+    this.origLoop = loopStart;
     const n = pcm.length >> 1;
     const b = this.ctx.createBuffer(2, n, sr);
     const l = new Float32Array(n), r = new Float32Array(n);
@@ -76,20 +80,23 @@ export class Preview {
     this.origBuf = b;
   }
 
-  setAy(pcm: Float32Array, sr = 44100) {
+  setAy(pcm: Float32Array, sr = 44100, loopStart = 0) {
     const wasPlaying = this.playing, pos = this.position();
     this.stop();
     const b = this.ctx.createBuffer(1, pcm.length, sr);
     b.copyToChannel(pcm as Float32Array<ArrayBuffer>, 0);
     this.ayBuf = b;
     this.duration = b.duration;
+    this.ayLoop = loopStart < b.duration - 0.05 ? loopStart : 0;
     if (wasPlaying) this.play(pos);
   }
 
   position(): number {
     if (!this.playing) return this.offset;
-    const d = this.duration || 1;
-    return (this.ctx.currentTime - this.t0) % d;
+    const d = this.duration || 1, t = this.ctx.currentTime - this.t0;
+    if (t < d) return t;
+    const l = this.ayLoop;
+    return l + ((t - d) % (d - l));
   }
 
   async play(from = 0) {
@@ -101,12 +108,14 @@ export class Preview {
     this.ayNode = this.ctx.createBufferSource();
     this.ayNode.buffer = this.ayBuf;
     this.ayNode.loop = true;
+    if (this.ayLoop) { this.ayNode.loopStart = this.ayLoop; this.ayNode.loopEnd = this.ayBuf.duration; }
     this.ayNode.connect(this.ayGain);
     this.ayNode.start(0, from);
     if (this.origBuf) {
       this.origNode = this.ctx.createBufferSource();
       this.origNode.buffer = this.origBuf;
       this.origNode.loop = true;
+      if (this.origLoop && this.origLoop < this.origBuf.duration - 0.05) { this.origNode.loopStart = this.origLoop; this.origNode.loopEnd = this.origBuf.duration; }
       this.origNode.connect(this.origGain);
       this.origNode.start(0, from % this.origBuf.duration);
     }

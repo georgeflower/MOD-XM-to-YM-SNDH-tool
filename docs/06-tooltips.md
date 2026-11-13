@@ -17,8 +17,12 @@ Hover over any control for a tooltip. This chapter lists every one of them (gene
 | STe samples | This tune plays 8-bit samples through the STe DMA sound chip, which a YM2149 register dump cannot carry. On: each sample becomes a 4-bit digidrum hit on voice C at the same frames (voice C is silent while it plays). Off: the samples are left out. |
 | Edit as AY patterns → | Turn this register dump into an editable pattern song: the tempo and notes are found, every sound becomes a step-table instrument, digidrums and Q/S/U effects come along |
 | Start (s) | Where in the song the reading starts (the emulator runs up to this point first) |
-| Seconds | How much of the song is read, 1–300 s. Empty = the length from the file's tags (at most 4 minutes), or 2 minutes when the file has none. Songs loop forever, so a short section is often all you need. |
+| Loop | Look for the point where the song starts over: the music is played until it has repeated itself (up to 5 minutes), the module ends at the loop end and jumps back to the loop start, like the game does. Off: Seconds sets the length and the song restarts from the beginning. |
+| Seconds | How much of the song is read, 1–300 s, when no loop is used. Empty = the length from the file's tags (at most 4 minutes), or 2 minutes when the file has none. |
 | Echo | The SNES adds reverb (echo) to most music. It is part of the original sound but a YM2149 has no echo. Off: the original preview is played without it, which is closer to what the conversion can reach. |
+| Echo notes | Play the SNES echo in the YM version too: every echoed voice gets an echo channel (a delayed, quieter copy, at the echo delay and level of the song). The echo channels have the priority Low, so they only get the YM voices the other channels leave free. |
+| Rows | How the notes are laid out in the patterns. Per frame: one row every 20 ms, exact (pitch and volume change on every row). Per step: one row per step of the song's note grid, with the SNES envelopes as instrument envelopes, note delays for notes off the grid and slides inside a row; readable in the pattern editor, a little less exact. |
+| Voices (SNES SPC panel) | Mute SNES voices: a muted voice is left out of the conversion and of the original preview. Voices that never play a note are greyed out. |
 | Level | Overall loudness mapped onto the 16 YM volume steps |
 | Drum priority | How strongly kicks/snares/hats win a voice against melody notes |
 | Voice stickiness | Higher = a note stays on the same YM voice (less jumping, fewer clicks) |
@@ -56,6 +60,7 @@ Hover over any control for a tooltip. This chapter lists every one of them (gene
 | + step | Append a copy of the last step |
 | − step | Remove the last step |
 | Instrument name field | Rename instrument NN (module name: …). The name is used in the pattern editor and saved with the mapping; empty = module name. |
+| Voice 1–8 checkboxes (SNES SPC panel) | Voice N: how many notes it plays, or "not used". Untick to mute it. |
 
 ## Manual import dialog {#tooltips-manual-import-dialog}
 

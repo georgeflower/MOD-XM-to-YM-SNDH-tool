@@ -245,7 +245,12 @@ export function replay(m: Module, opts: ReplayOptions = {}): ReplayResult {
           c.rowVib = vib;
         } else {
           const e = c.rowEff;
-          if (c.delay && tick === c.delay && c.delayCell) trigger(c, c.delayCell, false);
+          if (c.delay && tick === c.delay && c.delayCell) {
+            trigger(c, c.delayCell, false);
+            // FT2 applies the volume column of a delayed note at the delayed tick
+            const vc = c.delayCell.vol;
+            if (vc >= 0x10 && vc <= 0x50) c.vol = vc - 0x10;
+          }
           if (e === 1) c.period = clampP(c.period - c.porta * slideUnit);
           else if (e === 2) c.period = clampP(c.period + c.porta * slideUnit);
           if (e === 3 || e === 5 || (e === 0 && false)) tonePortaStep(c);

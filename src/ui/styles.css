@@ -54,6 +54,8 @@ kbd { background: var(--well); color: var(--ink); padding: 0 5px; border: 1px so
 .row { display: grid; grid-template-columns: 100px 1fr 62px; align-items: center; gap: 8px; margin: 4px 0; }
 .row .lbl { color: #10153a; } .row .val { background: var(--well); color: var(--ink); text-align: right; padding: 0 4px; }
 .row select, .row .txt { grid-column: 2 / 4; }
+.row .opt { grid-column: 2 / 4; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.row .opt .chk { margin-right: 0; }
 input[type=range] { width: 100%; accent-color: var(--accent); }
 select, .txt { font: inherit; background: var(--well); color: var(--ink); border: 2px solid; border-color: var(--face-lo) var(--face-hi) var(--face-hi) var(--face-lo); padding: 1px 4px; }
 

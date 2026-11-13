@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0 — 2026-11-13
+
+### Added
+- **SPC loop point.** The key-on events are searched for a period (same voice, sample and pitch, within a timer tick); once the music has repeated for a whole loop and at least 30 s, the recording stops. The module ends at the loop end and restarts at the loop start (a new pattern starts there), so the YM, SNDH and game-kit exports loop like the game. The preview loops both sides there. A jingle that ends (20 s without a new note) stops the search early and takes the *Seconds* length. *Loop* checkbox in the SNES SPC panel.
+- **Echo channels.** The DSP echo (EDL delay, EVOL x FIR level, EON voices) becomes one extra channel per echoed voice: a delayed copy at the level of the first repeat, priority *Low* by default. *Echo notes* checkbox.
+- **Rows per step.** The note grid is measured from the key-on times (least-squares fit, 64–250 ms steps); one row per step at 125 BPM, the speed of each row follows the grid (Fxx where it changes), notes off the grid get `EDx`, the DSP envelope of each instrument becomes an XM volume envelope, and level and pitch changes inside a row become volume-column slides, `Axy` and `1xx`/`2xx`. *Rows* choice (default: one per frame).
+- **Voice mute** in the SNES SPC panel (also mutes the voice in the original preview).
+
+### Fixed
+- A note delay (`EDx`) applies the volume column on the delayed tick (FastTracker 2 behaviour); it was overwritten by the sample volume.
+
 ## 0.5.0 — 2026-11-13
 
 ### Added

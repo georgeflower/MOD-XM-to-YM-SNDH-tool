@@ -76,8 +76,13 @@ export class Dsp {
   sample = 0;
   /** called when a voice starts a new note (key-on takes effect) */
   onKon: ((e: KonEvent) => void) | null = null;
-  outL = 0; outR = 0;
+  /** voices left out of the mix (bit n = voice n); they still run, so pitch modulation and the driver see them */
+  mixMute = 0;
+  /** voices forced into key-off (snes_spc's mute mask) */
   mute = 0;
+  /** leave the echo out of the output (the echo buffer still runs, so turning it back on later is seamless) */
+  echoOff = false;
+  outL = 0; outR = 0;
 
   constructor(public ram: Uint8Array) { for (let i = 0; i < 8; i++) this.voices.push(new Voice(1 << i)); }
 
@@ -234,9 +239,11 @@ export class Dsp {
       v.interpPos = (v.interpPos & 0x3fff) + pitch;
       if (v.interpPos > 0x7fff) v.interpPos = 0x7fff;
       // outputs
-      const al = (tOutput * s8(r[b])) >> 7, ar = (tOutput * s8(r[b + 1])) >> 7;
-      mainL = clamp16(mainL + al); mainR = clamp16(mainR + ar);
-      if (tEon & v.vbit) { echoL = clamp16(echoL + al); echoR = clamp16(echoR + ar); }
+      if (!(this.mixMute & v.vbit)) {
+        const al = (tOutput * s8(r[b])) >> 7, ar = (tOutput * s8(r[b + 1])) >> 7;
+        mainL = clamp16(mainL + al); mainR = clamp16(mainR + ar);
+        if (tEon & v.vbit) { echoL = clamp16(echoL + al); echoR = clamp16(echoR + ar); }
+      }
       let endx = r[0x7c] | looped;
       if (v.konDelay === 5) endx &= ~v.vbit;
       r[0x7c] = endx;
@@ -261,8 +268,8 @@ export class Dsp {
     }
     fl = clamp16(fl) & ~1; fr = clamp16(fr) & ~1;
     this.echoInL = fl; this.echoInR = fr;
-    let outL = clamp16(s16((mainL * s8(r[0x0c])) >> 7) + s16((fl * s8(r[0x2c])) >> 7));
-    let outR = clamp16(s16((mainR * s8(r[0x1c])) >> 7) + s16((fr * s8(r[0x3c])) >> 7));
+    let outL = clamp16(s16((mainL * s8(r[0x0c])) >> 7) + s16((fl * (this.echoOff ? 0 : s8(r[0x2c]))) >> 7));
+    let outR = clamp16(s16((mainR * s8(r[0x1c])) >> 7) + s16((fr * (this.echoOff ? 0 : s8(r[0x3c]))) >> 7));
     const efb = s8(r[0x0d]);
     const nl = clamp16(echoL + s16((fl * efb) >> 7)) & ~1;
     const nr = clamp16(echoR + s16((fr * efb) >> 7)) & ~1;

@@ -1,6 +1,6 @@
 # Start here
 
-**MOD/XM → YM2149 · SNDH · game stream — version 0.5**
+**MOD/XM → YM2149 · SNDH · game stream — version 0.6**
 
 A browser tool that turns ProTracker `.mod` and FastTracker II `.xm` modules into music for the **Atari ST's YM2149** sound chip (one chip: three square-wave voices, one noise generator, one envelope generator, updated 50 times a second). It also loads SNES `.spc` music files, `.sndh`, `.ym`, `.ymt`, maxYMiser and Arkos files, has an FT2-style pattern editor for the chip, and exports to SNDH, YM, a C game kit, maxYMiser, Arkos Tracker 3, Furnace, WAV and raw registers.
 
@@ -22,10 +22,18 @@ Everything runs in your browser. There is no server and none of your files are u
 5. Choose an export: **SNDH** plays in any Atari ST player; **YM** plays in ST-Sound and similar players.
 6. To keep working on the song by hand, press **Edit as AY patterns →**. This works for a loaded `.sndh` or `.ym` as well: the tune is turned back into notes and instruments (see [Edit an existing SNDH or YM tune](#howto-edit-tune)).
 
-## What's new in 0.5
+## What's new in 0.6
+
+* **SPC loop point** — the song is played until it repeats itself; the converted song ends at the loop end and jumps back to the loop start (YM, SNDH and game-kit exports loop there too, and so does the preview).
+* **Echo notes** — the SNES echo becomes extra *echo channels* (a delayed, quieter copy of each echoed voice) with the priority *Low*, so they fill YM voices the other channels leave free.
+* **Rows per step** — the *Rows* choice lays the SPC out on the song's own note grid (one row per step, the SNES envelopes as instrument envelopes) instead of one row per 50 Hz frame: much shorter, readable patterns for the editor.
+* **Mute SNES voices** — eight voice checkboxes in the *SNES SPC* panel; a muted voice leaves both the conversion and the original preview.
+* A note delay (`EDx`) now takes its volume-column volume on the delayed tick, as in FastTracker 2.
+
+## What was new in 0.5
 
 * **SNES music (`.spc`)** — load an SPC700 state snapshot like a module. A built-in SPC700 + S-DSP emulator plays it, the 8 SNES voices become channels, and the usual converter, original-vs-YM preview, *Manual import…*, exports and *Edit as AY patterns →* work on them ([Convert an SNES SPC](#howto-spc)).
-* The SNES *Echo* (reverb) and pitch modulation are not reproduced in the YM version; the panel warns when a tune uses them.
+* The SNES *Echo* (reverb) and pitch modulation are not reproduced in the YM version; the panel warns when a tune uses them. (0.6: the echo can be played as echo channels.)
 * `.sfc` / `.smc` ROMs are not supported: they need a full SNES emulator and the game's own sound driver. Use a ripped `.spc` instead.
 
 ## What was new in 0.4
