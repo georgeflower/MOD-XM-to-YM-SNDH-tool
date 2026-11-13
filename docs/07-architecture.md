@@ -54,6 +54,7 @@ src/arkos       song ↔ Arkos Tracker 3 (.aks)
 src/furnace     song → Furnace (.fur)
 src/import      SNDH import: 68000 emulator (m68k.ts), MFP timers (mfp.ts), timer-effect classifier (sndhfx.ts),
                 ICE / LHA depackers, YM reader, ZIP reader
+                SNES SPC import: SPC700 + S-DSP emulator (spc.ts), SPC → module (spcModule.ts)
 src/tracker     pattern-song model, renderer (render.ts), module → patterns (fromModule.ts), register dump → patterns
                 (fromRegs.ts), editor store (editor.ts),
                 .ymt reader/writer, presets, key map, status-line hints

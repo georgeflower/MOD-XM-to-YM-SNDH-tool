@@ -308,6 +308,7 @@ src/export      stream packer, YM5/YM6, SNDH, game kit, C header + replayer, YM 
 src/player68k   68000 SNDH player + digidrum / timer-effect engine (player.s, drumeng.s, gamedrum.s → blob.ts)
 src/maxymiser   maxYMiser .MYS/.MYV/.MYI codec and the song -> maxYMiser converter
 src/arkos       song -> Arkos Tracker 3 (.aks)      src/furnace   song -> Furnace (.fur)      src/export/bake.ts  instrument baking shared by both
+src/import      SNDH (68000 + MFP emulator), YM, and SNES SPC import (spc.ts: SPC700 + S-DSP emulator; spcModule.ts: SPC -> module for the converter)
 src/tracker     pattern song model, renderer (tick player), module -> patterns, register dump -> patterns (fromRegs), editor store, .ymt IO
 src/ui          React UI (FT2-flavoured skin), converter tab, pattern editor tab, A/B audio
 docs            documentation sources (Markdown; docs/06-tooltips.md is generated from the UI by scripts/build-docs.ts)
@@ -317,7 +318,10 @@ public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of th
 
 ## Roadmap
 
+Done in 0.5: SNES `.spc` import.
+
 * More than one timer effect or drum at a time (needs a second timer / mixing engine); timer-driven arpeggio and other handler effects that are not drums or Q/S/U
+* SNES SPC: detect the loop point (the converted song restarts at 0), echo-aware reduction (fold the reverb tail into the YM version), tempo-aligned rows instead of one row per frame, per-voice mute in the SNES SPC panel, best-effort `.sfc` ROM support
 * maxYMiser: the STe DMA track (sampled sound), sequence-switching effects, more than one timer effect on the voices at once
 
 Note: SNDH files made here play in any SNDH player but cannot be opened *in* maxYMiser (it only loads its own songs) — use the maxYMiser export for that.
