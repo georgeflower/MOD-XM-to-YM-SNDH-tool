@@ -1,6 +1,6 @@
 {
   "name": "mod-xm-to-ym-sndh-tool",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "description": "Browser tool: MOD/XM -> Atari ST YM2149 register dump, YM, SNDH and game streams",

@@ -15,6 +15,8 @@ import { encodeWav } from '../export/wav';
 import { zip } from '../export/zip';
 import { parseYm, isYm } from '../import/ym';
 import { parseSndh, isSndh, type SndhInfo } from '../import/sndh';
+import { isSpc } from '../import/spc';
+import { spcToModule, type SpcInfo, type SpcOptions } from '../import/spcModule';
 import type { AyTune } from '../import/tune';
 import { Preview, type Source } from './audio';
 import { Editor } from '../tracker/editor';
@@ -57,6 +59,7 @@ export function App() {
   const [subtune, setSubtune] = useState(1);
   const [secOverride, setSecOverride] = useState(0);   // SNDH: 0 = use the TIME tag
   const [dmaOn, setDmaOn] = useState(true);              // SNDH: play STe DMA samples as digidrums
+  const [spc, setSpc] = useState<{ info: SpcInfo; opts: SpcOptions } | null>(null);   // SNES SPC: what the emulator found + how it was read
   const [error, setError] = useState('');
   const [opts, setOpts] = useState<Opts>(DEFAULT_OPTS);
   const [prio, setPrio] = useState<Record<number, number>>({});
@@ -70,7 +73,7 @@ export function App() {
   const [importOpen, setImportOpen] = useState(false);
   const [source, setSource] = useState<Source>('ay');
   const [playing, setPlaying] = useState(false);
-  const origOk = location.protocol !== 'file:';
+  const origOk = location.protocol !== 'file:' || !!spc;
   const [pos, setPos] = useState(0);
   const [author, setAuthor] = useState('');
   const previewRef = useRef<Preview | null>(null);
@@ -107,7 +110,7 @@ export function App() {
       setError(''); setFileName(name); setBytes(data);
       setPrio({}); setInstMap({}); setMacroSel(null); setOpts(DEFAULT_OPTS); setSubtune(1); setSecOverride(0); setDmaOn(true);
       if (isSndh(data) || isYm(data)) {
-        setMod(null); setRes(null);
+        setMod(null); setRes(null); setSpc(null);
         setBusy(isSndh(data) ? 'Running the SNDH in the 68000 emulator…' : 'Reading the YM file…');
         preview().stop(); setPlaying(false); setPos(0);
         setTimeout(() => {
@@ -123,13 +126,35 @@ export function App() {
         }, 30);
         return;
       }
+      if (isSpc(data)) {
+        setTune(null); setRes(null); setSpc(null); setMod(null);
+        preview().stop(); setPlaying(false); setPos(0);
+        runSpc(data, {});
+        return;
+      }
       const m = loadModule(data);
-      setTune(null); setMod(m);
+      setTune(null); setSpc(null); setMod(m);
       preview().loadOriginal(data);
     } catch (e) {
       setError(String((e as Error).message ?? e));
     }
   }, []);
+  /** play an SNES SPC file in the emulator and turn its voices into a module (the usual conversion takes over from there) */
+  const runSpc = (data: Uint8Array, o: SpcOptions) => {
+    setBusy('Playing the SPC in the SPC700 / DSP emulator…');
+    setTimeout(() => {
+      try {
+        const r = spcToModule(data, o);
+        setMod(r.module); setAuthor(r.info.artist);
+        setSpc({ info: r.info, opts: o });
+        preview().setOriginalPcm(r.pcm, 32000);
+        preview().setSource('ay'); setSource('ay');
+        setPrio({}); setInstMap({}); setMacroSel(null); setPos(0);
+        setError('');
+      } catch (e) { setError(String((e as Error).message ?? e)); setMod(null); setSpc(null); }
+      setBusy('');
+    }, 30);
+  };
   /** re-run an SNDH with another subtune / length */
   const rerunSndh = (sub: number, secs: number, dma = dmaOn) => {
     if (!bytes) return;
@@ -304,8 +329,8 @@ export function App() {
       <header className="titlebar">
         <h1>MOD/XM <span>→</span> YM2149 <small>Atari ST · SNDH · game stream · v{__APP_VERSION__.replace(/\.0$/, '')}</small></h1>
         <div className="actions">
-          <label title="Open a MOD, XM, SNDH, YM or YMT file (you can also drop a file anywhere on the page)" className="btn">Load MOD / XM / SNDH / YM / YMT…
-            <input type="file" accept=".mod,.xm,.sndh,.snd,.ym,.ymt,.MOD,.XM,.SNDH,.SND,.YM,.YMT" hidden onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
+          <label title="Open a MOD, XM, SNDH, YM, YMT or SNES SPC file (you can also drop a file anywhere on the page)" className="btn">Load MOD / XM / SNDH / YM / YMT / SPC…
+            <input type="file" accept=".mod,.xm,.sndh,.snd,.ym,.ymt,.spc,.MOD,.XM,.SNDH,.SND,.YM,.YMT,.SPC" hidden onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
           </label>
           <a className="btn" href="./docs/index.html" target="_blank" rel="noopener" title="Manual, how-to guide, effects reference and technical specifications (opens in a new tab)">Help</a>
           <button title="Load the bundled demo song, Omar's Bazaar by Qumran" className="btn" onClick={loadDemo}>Demo: Omar's Bazaar</button>
@@ -397,6 +422,37 @@ export function App() {
                 <button className="btn small primary" disabled={!!busy} onClick={tuneToPatterns} title="Turn this register dump into an editable pattern song: the tempo and notes are found, every sound becomes a step-table instrument, digidrums and Q/S/U effects come along">Edit as AY patterns →</button>
               </section>
             )}
+            {mod && spc && bytes && <section className="panel">
+              <h2>SNES SPC</h2>
+              <dl className="kv">
+                <dt>File</dt><dd>{fileName}</dd>
+                <dt>Title</dt><dd>{spc.info.title || '—'}</dd>
+                {spc.info.game && <><dt>Game</dt><dd>{spc.info.game}</dd></>}
+                <dt>Artist</dt><dd>{spc.info.artist || '—'}</dd>
+                {spc.info.dumper && <><dt>Ripped by</dt><dd>{spc.info.dumper}</dd></>}
+                {spc.info.comment && <><dt>Comment</dt><dd>{spc.info.comment}</dd></>}
+                <dt>Tag length</dt><dd>{spc.info.tagSeconds ? fmtTime(spc.info.tagSeconds) : 'not given'}</dd>
+                <dt>Read</dt><dd>{fmtTime(spc.info.seconds)} · {spc.info.instruments} sample{spc.info.instruments === 1 ? '' : 's'} used · notes per voice {spc.info.notes.join(' / ')}</dd>
+              </dl>
+              <label className="row" title="Where in the song the reading starts (the emulator runs up to this point first)">
+                <span className="lbl">Start (s)</span>
+                <input type="number" className="txt" min={0} max={1200} value={spc.opts.startSeconds ?? 0}
+                  onChange={(e) => setSpc({ ...spc, opts: { ...spc.opts, startSeconds: Math.max(0, Math.min(1200, +e.target.value || 0)) } })}
+                  onBlur={() => runSpc(bytes, spc.opts)} onKeyDown={(e) => { if (e.key === 'Enter') runSpc(bytes, spc.opts); }} />
+              </label>
+              <label className="row" title="How much of the song is read, 1–300 s. Empty = the length from the file's tags (at most 4 minutes), or 2 minutes when the file has none. Songs loop forever, so a short section is often all you need.">
+                <span className="lbl">Seconds</span>
+                <input type="number" className="txt" min={1} max={300} value={spc.opts.seconds ?? ''} placeholder={String(Math.round(spc.info.seconds))}
+                  onChange={(e) => setSpc({ ...spc, opts: { ...spc.opts, seconds: e.target.value ? Math.max(1, Math.min(300, +e.target.value || 1)) : undefined } })}
+                  onBlur={() => runSpc(bytes, spc.opts)} onKeyDown={(e) => { if (e.key === 'Enter') runSpc(bytes, spc.opts); }} />
+              </label>
+              <label className="row" title="The SNES adds reverb (echo) to most music. It is part of the original sound but a YM2149 has no echo. Off: the original preview is played without it, which is closer to what the conversion can reach.">
+                <span className="lbl">Echo</span>
+                <input type="checkbox" checked={spc.opts.echo !== false} onChange={(e) => { const o = { ...spc.opts, echo: e.target.checked }; setSpc({ ...spc, opts: o }); runSpc(bytes, o); }} />
+                <span className="note soft"> reverb in the original</span>
+              </label>
+              {spc.info.warnings.length > 0 && <pre className="log">{spc.info.warnings.map((w) => 'note: ' + w).join('\n')}</pre>}
+            </section>}
             {mod && <section className="panel">
               <h2>Module</h2>
               <dl className="kv">
@@ -487,7 +543,7 @@ export function App() {
               <button title="Play or stop the preview (Space)" className="btn primary" onClick={togglePlay} disabled={!out || !!busy}>{playing ? '■ Stop' : '▶ Play'}</button>
               <div className="ab" role="group" aria-label="Source">
                 <button className={source === 'orig' ? 'on' : ''} disabled={!origOk || !mod} onClick={() => pickSource('orig')}
-                  title={!mod ? 'Only for loaded modules' : origOk ? '' : 'Needs the page to be served over http(s) — not available when index.html is opened from disk'}>A · Original</button>
+                  title={!mod ? 'Only for loaded modules and SPC files' : origOk ? '' : 'Needs the page to be served over http(s) — not available when index.html is opened from disk'}>A · Original</button>
                 <button title="The YM2149 version (Tab switches between A and B)" className={source === 'ay' ? 'on' : ''} onClick={() => pickSource('ay')}>B · YM2149</button>
               </div>
               <span className="time">{fmtTime(pos)} / {fmtTime(seconds)}</span>

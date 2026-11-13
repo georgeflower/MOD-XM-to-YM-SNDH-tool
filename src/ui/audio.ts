@@ -26,6 +26,9 @@ export class Preview {
   private ayNode: AudioBufferSourceNode | null = null;
   private ayBuf: AudioBuffer | null = null;
   private modBytes: ArrayBuffer | null = null;
+  /** the original as rendered audio (SPC files): played in sync with the YM version instead of the libopenmpt player */
+  private origBuf: AudioBuffer | null = null;
+  private origNode: AudioBufferSourceNode | null = null;
   private t0 = 0; // context time at which position 0 would have started
   private offset = 0;
   playing = false;
@@ -48,6 +51,7 @@ export class Preview {
   /** load the original module for the "original" side of the A/B switch */
   loadOriginal(bytes: Uint8Array | null) {
     this.stop();
+    this.origBuf = null;
     this.modBytes = bytes ? bytes.slice().buffer : null;
     if (!bytes) return;
     if (!this.orig && !this.origLoading && location.protocol !== 'file:') {
@@ -57,6 +61,19 @@ export class Preview {
         p.onInitialized(() => { this.origReady = true; p.gain.connect(this.origGain); });
       }).catch((e) => console.error('original-module player unavailable', e));
     }
+  }
+
+  /** the original as interleaved stereo int16 (e.g. an SPC rendered by the emulator) */
+  setOriginalPcm(pcm: Int16Array | null, sr: number) {
+    this.stop();
+    this.modBytes = null;
+    if (!pcm) { this.origBuf = null; return; }
+    const n = pcm.length >> 1;
+    const b = this.ctx.createBuffer(2, n, sr);
+    const l = new Float32Array(n), r = new Float32Array(n);
+    for (let i = 0; i < n; i++) { l[i] = pcm[i * 2] / 32768; r[i] = pcm[i * 2 + 1] / 32768; }
+    b.copyToChannel(l, 0); b.copyToChannel(r, 1);
+    this.origBuf = b;
   }
 
   setAy(pcm: Float32Array, sr = 44100) {
@@ -86,6 +103,13 @@ export class Preview {
     this.ayNode.loop = true;
     this.ayNode.connect(this.ayGain);
     this.ayNode.start(0, from);
+    if (this.origBuf) {
+      this.origNode = this.ctx.createBufferSource();
+      this.origNode.buffer = this.origBuf;
+      this.origNode.loop = true;
+      this.origNode.connect(this.origGain);
+      this.origNode.start(0, from % this.origBuf.duration);
+    }
     if (this.orig && this.origReady && this.modBytes) {
       this.orig.play(this.modBytes.slice(0));
       if (from > 0) setTimeout(() => this.orig?.setPos(from), 150);
@@ -96,6 +120,8 @@ export class Preview {
   private stopNodes() {
     try { this.ayNode?.stop(); } catch { /* already stopped */ }
     this.ayNode?.disconnect(); this.ayNode = null;
+    try { this.origNode?.stop(); } catch { /* already stopped */ }
+    this.origNode?.disconnect(); this.origNode = null;
     try { this.orig?.stop(); } catch { /* not playing */ }
   }
 

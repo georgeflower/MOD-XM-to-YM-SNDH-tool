@@ -6,7 +6,7 @@ The **Converter** tab is where a module (or an existing SNDH/YM tune) is loaded,
 
 | Control | What it does |
 |---|---|
-| **Load MOD / XM / SNDH / YM / YMT…** | Opens a file. Accepted: `.mod`, `.xm`, `.sndh` / `.snd` (also ICE!-packed), `.ym` (YM2!, YM3!, YM3b!, YM5!, YM6!, also LHA-packed) and `.ymt`. The type is detected from the file contents, not the extension. |
+| **Load MOD / XM / SNDH / YM / YMT / SPC…** | Opens a file. Accepted: `.mod`, `.xm`, `.sndh` / `.snd` (also ICE!-packed), `.ym` (YM2!, YM3!, YM3b!, YM5!, YM6!, also LHA-packed) `.ymt` and `.spc` (SNES SPC700 snapshot). The type is detected from the file contents, not the extension. |
 | **Drop a file** | Dropping a file anywhere on the page does the same. |
 | **Demo: Omar's Bazaar** | Loads the bundled XM song *Omar's Bazaar* by Qumran. |
 | **Converter / AY pattern editor** tabs | Switch between the two halves of the tool. The loaded module stays in memory when you switch. |
@@ -14,6 +14,7 @@ The **Converter** tab is where a module (or an existing SNDH/YM tune) is loaded,
 What happens after loading depends on the file type:
 
 * **MOD / XM** — converted automatically with default settings. The *Module*, *Conversion*, *Export*, *Preview*, *Instruments*, *Source channels* and *Report* panels appear.
+* **SNES SPC** (`.spc`) — converted like a module. The emulator replays the tune and the 8 SNES voices become channels. The **SNES SPC** panel has **Start** (seconds to skip), **Seconds** (length to convert; default the tune's own length, else 120, maximum 300) and **Echo** (include the SNES reverb in the *original* preview; the YM version never has it). See [Convert an SNES SPC](#howto-spc).
 * **SNDH / YM** — not converted, only *played*: a `.ym` is read as the register dump it is, a `.sndh` is run in a built-in 68000 emulator. You get the *Loaded tune* panel, the preview and the exports. To change the music, press **Edit as AY patterns →** in the *Loaded tune* panel. See [Loading SNDH and YM](#howto-load-sndh) and [Edit an existing SNDH or YM tune](#howto-edit-tune).
 * **YMT** — opens in the AY pattern editor.
 

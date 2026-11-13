@@ -2,11 +2,11 @@
 
 https://qumran.nekoweb.org/apps/xmod-to-ym/
 
-A browser tool that turns **ProTracker `.MOD`** and **FastTracker II `.XM`** modules (linear or Amiga frequency table) into music for the
+A browser tool that turns **ProTracker `.MOD`**, **FastTracker II `.XM`** modules and **SNES `.spc`** music (linear or Amiga frequency table) into music for the
 **Atari ST's YM2149** (one chip: 3 tone voices + noise, 50 Hz). Everything runs client-side — static files, no server.
 
 **Status:** load → auto-convert → A/B listen → export, plus an FT2-style AY pattern editor.  
-**Version 0.4.** Changes: see [`CHANGELOG.md`](CHANGELOG.md). Documentation: open the **Help** link in the app header (`docs/index.html` in the built site — one self-contained page with a manual, how-to recipes, effects reference, tooltip list, architecture and technical specifications), or read the Markdown sources in [`docs/`](docs/).
+**Version 0.5.** Changes: see [`CHANGELOG.md`](CHANGELOG.md). Documentation: open the **Help** link in the app header (`docs/index.html` in the built site — one self-contained page with a manual, how-to recipes, effects reference, tooltip list, architecture and technical specifications), or read the Markdown sources in [`docs/`](docs/).
 
 ## What you get today
 
@@ -49,6 +49,10 @@ voice (stickiness avoids voice jumping, one noise generator is shared, volumes m
   below 200 Hz (median) is the bass; it and the synthetic drums prefer voice B, melody and arpeggios voices A and C, so the three
   voices live in different frequency ranges. A melody note on B makes room when a bass or drum needs it and an outer voice is
   free. Digidrums stay on voice C. Works in the frame converter and in the pattern-editor conversion.
+
+## Loading SNES music (.spc)
+
+A `.spc` file (SPC700 state snapshot, ripped from a SNES game) loads like a module: a built-in SPC700 + S-DSP emulator replays it, the 8 voices become channels and the normal converter, *Manual import…*, A/B preview (the original side is the emulator's own render), exports and *Edit as AY patterns →* apply. The SNES echo and pitch modulation are not reproduced; `.sfc` / `.smc` ROMs are not supported. See the *Convert an SNES SPC* how-to in the docs.
 
 ## Loading .sndh and .ym
 

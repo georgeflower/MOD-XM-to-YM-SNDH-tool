@@ -1,8 +1,8 @@
 # Start here
 
-**MOD/XM → YM2149 · SNDH · game stream — version 0.4**
+**MOD/XM → YM2149 · SNDH · game stream — version 0.5**
 
-A browser tool that turns ProTracker `.mod` and FastTracker II `.xm` modules into music for the **Atari ST's YM2149** sound chip (one chip: three square-wave voices, one noise generator, one envelope generator, updated 50 times a second). It also loads `.sndh`, `.ym`, `.ymt`, maxYMiser and Arkos files, has an FT2-style pattern editor for the chip, and exports to SNDH, YM, a C game kit, maxYMiser, Arkos Tracker 3, Furnace, WAV and raw registers.
+A browser tool that turns ProTracker `.mod` and FastTracker II `.xm` modules into music for the **Atari ST's YM2149** sound chip (one chip: three square-wave voices, one noise generator, one envelope generator, updated 50 times a second). It also loads SNES `.spc` music files, `.sndh`, `.ym`, `.ymt`, maxYMiser and Arkos files, has an FT2-style pattern editor for the chip, and exports to SNDH, YM, a C game kit, maxYMiser, Arkos Tracker 3, Furnace, WAV and raw registers.
 
 Everything runs in your browser. There is no server and none of your files are uploaded; the page only counts page views with GoatCounter (no cookies, no personal data).
 
@@ -15,14 +15,20 @@ Everything runs in your browser. There is no server and none of your files are u
 
 ## Ten-minute quick start
 
-1. Press **Demo: Omar's Bazaar** (or **Load MOD / XM / SNDH / YM / YMT…**, or drop a file anywhere on the page).
+1. Press **Demo: Omar's Bazaar** (or **Load MOD / XM / SNDH / YM / YMT / SPC…**, or drop a file anywhere on the page).
 2. Press **Space** to play. Press **Tab** to flip between the *original* (played by libopenmpt) and the *YM version*. The difference is the conversion.
 3. If the melody gets lost, open **Manual import…**, give the melody channel the priority **Lead**, press **▶ Full preview**, and listen. See [Manual import](#howto-manual-import).
 4. If a drum sounds thin, set the instrument's **AY role** to *digidrum (sample)* (or tick *Percussion as digidrums*).
 5. Choose an export: **SNDH** plays in any Atari ST player; **YM** plays in ST-Sound and similar players.
 6. To keep working on the song by hand, press **Edit as AY patterns →**. This works for a loaded `.sndh` or `.ym` as well: the tune is turned back into notes and instruments (see [Edit an existing SNDH or YM tune](#howto-edit-tune)).
 
-## What's new in 0.4
+## What's new in 0.5
+
+* **SNES music (`.spc`)** — load an SPC700 state snapshot like a module. A built-in SPC700 + S-DSP emulator plays it, the 8 SNES voices become channels, and the usual converter, original-vs-YM preview, *Manual import…*, exports and *Edit as AY patterns →* work on them ([Convert an SNES SPC](#howto-spc)).
+* The SNES *Echo* (reverb) and pitch modulation are not reproduced in the YM version; the panel warns when a tune uses them.
+* `.sfc` / `.smc` ROMs are not supported: they need a full SNES emulator and the game's own sound driver. Use a ripped `.spc` instead.
+
+## What was new in 0.4
 
 * **Edit `.sndh` and `.ym` files as AY patterns** — *Edit as AY patterns →* in the *Loaded tune* panel, or *Load .sndh/.ym…* in the pattern editor. The tempo and the notes are found, every sound becomes a step-table instrument, digidrums and `Q S U` timer effects come along, and the *Import report* says what was found ([Edit an existing SNDH or YM tune](#howto-edit-tune)).
 * **STe DMA samples in SNDH files** (maxYMiser's DMA track and other STe players): the SNDH emulator now behaves like an STe and the sample hits become digidrums on voice C; the *STe samples* checkbox turns this off.
