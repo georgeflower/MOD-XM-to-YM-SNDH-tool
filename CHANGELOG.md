@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 — 2026-11-13
+
+### Added
+- **SNES SPC import.** `.spc` files (SPC700 state snapshots) load like a module. A built-in SPC700 CPU + S-DSP emulator (BRR decoding, Gaussian interpolation, ADSR / GAIN, noise, echo, timers) replays the tune; every BRR sample becomes an instrument, every voice a channel, and the result goes through the normal converter, *Manual import…*, exports and *Edit as AY patterns →*. Pitch is tracked at 50 Hz with fine slides; sample pitch is measured from the BRR loop; noise-enabled voices become noise instruments.
+- **SNES SPC panel** with *Start*, *Seconds* (default: the ID666 length, else 120 s) and *Echo*, plus warnings for echo, pitch modulation, out-of-range notes and dropped instruments (max 128 instruments).
+- **Original side of the preview** for SPC files is the emulator's own 32 kHz stereo render, so it works without libopenmpt and from `file://`.
+- Checked against the snes_spc reference on 17 F-Zero SPCs (RMS within 0.2 %); `tests/spc.test.ts` covers the emulator, module conversion and the converter with a synthetic SPC.
+
+### Limits
+- `.sfc` / `.smc` ROMs are not supported (use a ripped `.spc`). Echo and pitch modulation are not reproduced in the YM version. The SPC loop point is not detected.
+
 ## 0.4.0 — 2026-10-14
 
 ### Added

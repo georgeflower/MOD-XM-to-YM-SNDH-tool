@@ -10,6 +10,10 @@
 | An XM used to be refused with *Amiga-frequency XM files are not supported* | An XM saved with FastTracker 2's **Amiga** frequency table (Instrument/Options: not *Linear*) is now loaded. Notes, samples and tempo are the same as in a linear XM; slides (`1xx 2xx 3xx 5xy E1x E2x X1x X2x`), vibrato and the instrument auto-vibrato act on periods the way FT2 does in that mode, so the same parameter slides high notes faster than low ones. The one remaining difference is that this tool uses exact periods, where FT2 rounds them to its period table (a fraction of a cent to a few cents on very high notes). |
 | "not a MOD or XM file" | The contents were not recognised. Packed or Impulse Tracker / S3M files are not supported. Check the file is not a renamed archive. |
 | A `.sndh` says *did not return* | The tune's init or play routine waits for hardware that is not emulated (for example a busy-wait on a timer data register). Try another subtune or a shorter *Seconds* value. |
+| A `.sfc` or `.smc` ROM is refused | ROMs need a full SNES emulator and the game's own sound driver. Load a `.spc` ripped from the game instead (zophar.net and similar archives have them). |
+| SPC: the YM version sounds dry / thin compared with the original | The SNES echo (reverb) and pitch modulation are not reproduced. Untick **Echo** to hear the original without reverb, which is closer to what the YM can do. |
+| SPC: 8 voices become 3 | The YM2149 has three tone voices. Use **Manual import…** to set the melody to **Lead** and unimportant channels to **Off** or **Low**. |
+| SPC: the conversion stops before the tune loops | **Seconds** defaults to the length in the file's tag (120 s if there is none, maximum 300). Raise **Seconds** or set **Start**. |
 | An `.ym` has the wrong length or no loop | YM files carry their own loop frame; if none is stored the tune plays once. For SNDH the loop is detected; *Seconds* overrides the length. |
 | The demo does not start | Press **Demo: Omar's Bazaar** after the page has fully loaded; the demo is embedded in the page, so no network is needed. |
 

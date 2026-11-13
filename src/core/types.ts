@@ -44,7 +44,7 @@ export interface Cell {
 }
 
 export interface Module {
-  kind: 'xm' | 'mod';
+  kind: 'xm' | 'mod' | 'spc';
   title: string;
   nch: number;
   order: number[];

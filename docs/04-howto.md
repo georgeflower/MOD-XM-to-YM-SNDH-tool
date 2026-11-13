@@ -4,7 +4,7 @@ Each recipe is self-contained. Words in **bold** are buttons or fields; the full
 
 ## Load a MOD or XM {#howto-load}
 
-1. Press **Load MOD / XM / SNDH / YM / YMT…** at the top, or drag the file anywhere onto the page. (To try it first, press **Demo: Omar's Bazaar**.)
+1. Press **Load MOD / XM / SNDH / YM / YMT / SPC…** at the top, or drag the file anywhere onto the page. (To try it first, press **Demo: Omar's Bazaar**.)
 2. The file type is detected from its contents. ProTracker `.mod` (M.K., 4CHN, 6CHN, 8CHN, FLT4/8, OCTA, nnCH and similar tags) and FastTracker II `.xm` are supported. The module is analysed and converted at once; a status text next to the buttons shows *Converting…* and *Rendering…*.
 3. Press **Space** to play the YM version. Press **Tab** to switch to the original and back. If **A · Original** is greyed out, you opened the page from disk — see [Troubleshooting](#troubleshooting).
 4. The **Conversion report** at the bottom lists what the converter did and any warnings.
@@ -156,11 +156,22 @@ Timer effects work in SNDH, YM6, game kit, WAV and maxYMiser exports. They need 
 6. Add patterns with **New pat**, **Clone pat**, **Repeat**. Set the loop point with **Loop here**.
 7. Save with **Ctrl+S**.
 
+## Convert an SNES SPC {#howto-spc}
+
+1. Load a `.spc` file (**Load MOD / XM / SNDH / YM / YMT / SPC…**, or drop it on the page). A `.spc` is a snapshot of the SNES sound CPU, ripped from a game; `.sfc` / `.smc` ROMs cannot be loaded.
+2. The tune is replayed in a built-in SPC700 + DSP emulator. In the **SNES SPC** panel set **Start** and **Seconds** to pick the part you want (a loop of a few bars is often enough); the default is the length in the file's tag.
+3. **A · Original** plays the emulator's own render of the SNES tune (with reverb if **Echo** is ticked); **Y · YM** plays the conversion. Press **Tab** to compare.
+4. Use **Manual import…** exactly as for a module: the 8 SNES voices are channels, and priorities decide which three survive in each 20 ms frame. Give the melody **Lead**.
+5. Kick and snare samples are detected as drums; set the instrument's **AY role** to *digidrum (sample)* for a fuller drum sound.
+6. Export, or press **Edit as AY patterns →**.
+
+Not carried over: the SNES echo / reverb and pitch modulation (the panel lists them as warnings), and the SPC's loop point (the converted song restarts at the beginning).
+
 ## Edit an existing SNDH or YM tune {#howto-edit-tune}
 
 An `.sndh` or `.ym` file is a recording of what the chip did, 50 times a second. It holds no notes, instruments or patterns, so the tool works them out again.
 
-1. Load the file (**Load MOD / XM / SNDH / YM / YMT…**, or drop it on the page). For an SNDH with several subtunes, choose the **Subtune** (and, if the length is wrong, **Seconds**) first.
+1. Load the file (**Load MOD / XM / SNDH / YM / YMT / SPC…**, or drop it on the page). For an SNDH with several subtunes, choose the **Subtune** (and, if the length is wrong, **Seconds**) first.
 2. Press **Edit as AY patterns →** in the *Loaded tune* panel. In the pattern editor you can also press **Load .sndh/.ym…**, which takes subtune 1.
 3. The *Import report* above the song bar says what was found, for example *YM import: 3840 frames -> 481 rows at 8 frames per row … 870 notes -> 255 step-table instruments*.
 4. Press **Space**, then **Right Ctrl** to play it, and compare with the original (Converter tab, preview).

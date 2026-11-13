@@ -7,7 +7,7 @@ Hover over any control for a tooltip. This chapter lists every one of them (gene
 
 | Control | Tooltip |
 |---|---|
-| Load MOD / XM / SNDH / YM / YMT… | Open a MOD, XM, SNDH, YM or YMT file (you can also drop a file anywhere on the page) |
+| Load MOD / XM / SNDH / YM / YMT / SPC… | Open a MOD, XM, SNDH, YM, YMT or SNES SPC file (you can also drop a file anywhere on the page) |
 | Help | Manual, how-to guide, effects reference and technical specifications (opens in a new tab) |
 | Demo: Omar's Bazaar | Load the bundled demo song, Omar's Bazaar by Qumran |
 | Converter | Load, convert, listen and export a module |
@@ -16,6 +16,9 @@ Hover over any control for a tooltip. This chapter lists every one of them (gene
 | Seconds | 0 = use the length from the file's TIME tag |
 | STe samples | This tune plays 8-bit samples through the STe DMA sound chip, which a YM2149 register dump cannot carry. On: each sample becomes a 4-bit digidrum hit on voice C at the same frames (voice C is silent while it plays). Off: the samples are left out. |
 | Edit as AY patterns → | Turn this register dump into an editable pattern song: the tempo and notes are found, every sound becomes a step-table instrument, digidrums and Q/S/U effects come along |
+| Start (s) | Where in the song the reading starts (the emulator runs up to this point first) |
+| Seconds | How much of the song is read, 1–300 s. Empty = the length from the file's tags (at most 4 minutes), or 2 minutes when the file has none. Songs loop forever, so a short section is often all you need. |
+| Echo | The SNES adds reverb (echo) to most music. It is part of the original sound but a YM2149 has no echo. Off: the original preview is played without it, which is closer to what the conversion can reach. |
 | Level | Overall loudness mapped onto the 16 YM volume steps |
 | Drum priority | How strongly kicks/snares/hats win a voice against melody notes |
 | Voice stickiness | Higher = a note stays on the same YM voice (less jumping, fewer clicks) |
