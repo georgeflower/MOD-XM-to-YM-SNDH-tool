@@ -14,7 +14,7 @@
  *    is exact and the song runs at 125 BPM = one tick per frame
  */
 import type { Module, Sample } from '../core/types';
-import { replay, FPS, channelSkipper, type ChanState, type RowLog } from '../core/replay';
+import { replay, FPS, channelSkipper, noteAges, type ChanState, type RowLog } from '../core/replay';
 import { analyseSample, fold, ended, type SampleInfo } from '../core/samples';
 import { DigiExtractor } from '../core/digi';
 import { drumFrames } from '../core/drums';
@@ -93,6 +93,10 @@ interface Voice {
   vol: number;                   // AY channel volume 0..64 as the YM Tracker would hold it
   arp: boolean;
   vibOn: boolean;
+  /** frame the voice's note was triggered on (for the instrument step it is at) */
+  trigFrame: number;
+  /** tone period the YM Tracker holds for the voice (before instrument pitch steps), NaN = not known */
+  per: number;
 }
 
 const log2 = Math.log2;
@@ -143,13 +147,16 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
   const rep = replay(m, { arpOrder: options.arpOrder, skip: channelSkipper(options) });
   const frames = rep.frames;
   const rows = rep.rows.filter((r) => r.len > 0);
+  /** a note starts in this frame (its age went down: at high tempos the first frame can already be tick 1 of the note) */
+  const ages = noteAges(frames);
+  const isStart = (f: number, c: number): boolean => ages[f][c] === 0;
   if (!rows.length) throw new Error('module has no playable rows');
   report.push(`${rows.length} rows played, ${frames.length} frames = ${(frames.length / FPS).toFixed(1)} s`);
 
   const modeOf = (inst: number): InstMap | undefined => options.inst?.[inst];
   const isMuted = (inst: number) => modeOf(inst)?.mode === 'mute';
   /** this source sample is played as a digidrum (not as tone / drum macro) */
-  const isDigi = (st: ChanState): boolean => {
+  const isDigiRaw = (st: ChanState): boolean => {
     const mp = modeOf(st.inst);
     const mode = mp?.mode ?? 'auto';
     if (mode === 'digi') return true;
@@ -164,12 +171,16 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
   const rowOfFrame = new Int32Array(frames.length).fill(-1);
   rows.forEach((r, ri) => { for (let k = 0; k < r.len; k++) if (r.frame + k < frames.length) rowOfFrame[r.frame + k] = ri; });
   const hitAt = new Map<number, { idx: number; cls: number; ch: number }>();
+  /** samples that really became digidrums; any other percussion falls back to a drum macro instead of going silent */
+  const hitKeys = new Set<string>();
+  const isDigi = (st: ChanState): boolean => isDigiRaw(st) && (modeOf(st.inst)?.mode === 'digi' || hitKeys.has(`${st.inst}:${st.ksmp}`));
   if (digiOn || Object.values(options.inst ?? {}).some((x) => x.mode === 'digi')) {
     for (let f = 0; f < frames.length; f++) {
       frames[f].forEach((st, c) => {
-        if (!st || st.age !== 0 || (f > 0 && frames[f - 1].includes(st)) || st.vol <= 0 || isMuted(st.inst) || !isDigi(st)) return;
+        if (!st || !isStart(f, c) || st.vol <= 0 || isMuted(st.inst) || !isDigiRaw(st)) return;
         const h = digi.hit(st);
         if (!h) return;
+        hitKeys.add(`${st.inst}:${st.ksmp}`);
         const p = hitAt.get(f);
         if (!p || h.cls < p.cls) hitAt.set(f, { ...h, ch: c });
       });
@@ -213,6 +224,46 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
   }
   const ref = tl.length ? percentile(tl, o.refPercentile) : 1;
   const aylvl = (x: number) => (x <= 0 ? 0 : clamp(pyRound(15 + 2 * log2(x / ref) + o.gainDb / 3.0103), 0, 15));
+  /** the same level, unrounded and unclamped (-99 = silent) */
+  const aylvlF = (x: number) => (x <= 0 ? -99 : 15 + 2 * log2(x / ref) + o.gainDb / 3.0103);
+  /** the level a source channel is playing at in one frame */
+  const levelOf = (st: ChanState | null): number => { if (!st || st.vol <= 0) return -99; const r = rmsOf(st); return r === null ? -99 : aylvlF(r * st.vol); };
+
+  // ---------- how every note of a sample actually sounds, frame by frame (sample amplitude x volume envelope x volume
+  // changes), relative to its loudness in its first frames: the AY instrument's level steps are made from this, so
+  // envelopes (XM volume envelopes, SNES ADSR) come along instead of only the raw sample
+  const played = new Map<string, number[][]>();
+  for (let c = 0; c < m.nch; c++) {
+    let cur: { key: string; seq: number[]; v0: number } | null = null;
+    const flush = () => {
+      if (cur && cur.seq.length && cur.v0 > 0) { const v0 = cur.v0; (played.get(cur.key) ?? played.set(cur.key, []).get(cur.key)!).push(cur.seq.map((x) => x / v0)); }
+      cur = null;
+    };
+    for (let f = 0; f < frames.length; f++) {
+      const st = frames[f][c];
+      if (st && isStart(f, c)) { flush(); cur = { key: `${st.inst}:${st.ksmp}`, seq: [], v0: 0 }; }
+      if (!cur) continue;
+      if (!st || `${st.inst}:${st.ksmp}` !== cur.key || cur.seq.length >= 160) { flush(); continue; }
+      const r = rmsOf(st);
+      cur.seq.push(r === null ? 0 : r * st.vol);
+      if (cur.seq.length <= 4) cur.v0 = Math.max(cur.v0, st.vol);
+    }
+    flush();
+  }
+  /** contour of the played notes of a sample, near the top of the spread (the volume column can only turn a step down,
+   *  so the steps should rather be too loud than too quiet); null when none were played */
+  const playedContour = (key: string): number[] | null => {
+    const l = played.get(key);
+    if (!l?.length) return null;
+    const need = Math.max(1, Math.ceil(l.length * 0.25));
+    const out: number[] = [];
+    for (let k = 0; k < 160; k++) {
+      const v = l.filter((q) => q.length > k).map((q) => q[k]).sort((a, b) => a - b);
+      if (v.length < need) break;
+      out.push(v[Math.min(v.length - 1, Math.floor(v.length * 0.9))]);
+    }
+    return out.length ? out : null;
+  };
 
   // ---------- drum classification cache + note statistics per (inst:ksmp)
   const drumCache = new Map<string, { kind: DrumKind; rms: number }>();
@@ -223,8 +274,9 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
     return d;
   };
   const noteStats = new Map<string, number[]>();
-  for (let f = 0; f < frames.length; f++) for (const st of frames[f]) {
-    if (!st || st.age !== 0 || (f > 0 && frames[f - 1].includes(st))) continue;
+  for (let f = 0; f < frames.length; f++) for (let c = 0; c < m.nch; c++) {
+    const st = frames[f][c];
+    if (!st || !isStart(f, c)) continue;
     const key = `${st.inst}:${st.ksmp}`;
     (noteStats.get(key) ?? noteStats.set(key, []).get(key)!).push(st.note);
   }
@@ -287,7 +339,10 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
         const off = 12 * log2(h49 / noteToFreq(49));
         kOct += Math.round(off); semiOff = off - Math.round(off);
       }
-      for (let k = 0; k < maxSteps; k++) {
+      const contour = playedContour(key);
+      if (contour) {
+        for (const x of contour) steps.push({ vol: aylvl(x), semi: Math.round(semiOff * 100) / 100, noise: 0, tone: true });
+      } else for (let k = 0; k < maxSteps; k++) {
         if (!looped && pos >= s.data.length) break;
         const w = fold(s, pos, pos + per);
         let sum = 0;
@@ -298,8 +353,8 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
         if (looped && pos > s.ls + s.ll * 2 && k >= 3) break;
       }
       // never end a sustained instrument on a trailing zero, never start silent
-      while (steps.length > 1 && steps[steps.length - 1].vol === 0 && looped) steps.pop();
-      ins = mkSeq(steps, looped ? steps.length - 1 : -1, 3);
+      while (steps.length > 1 && steps[steps.length - 1].vol === 0 && (looped || contour)) steps.pop();
+      ins = mkSeq(steps, looped || (contour && steps.length >= 160) ? steps.length - 1 : -1, 3);
       plan = { ay: instruments.length, kind: 'tone', kOct, sustained: looped };
       // waveform -> buzzer: a saw / triangle / sine-like sample becomes the hardware envelope at the note's pitch.
       // The buzzer has no volume, so it is used for sustained samples (or when asked for) whose typical note is in range.
@@ -356,7 +411,7 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
       const f = rl.frame + k;
       const st = frames[f][c];
       if (!st) continue;
-      if (st.age === 0 && !(f > 0 && frames[f - 1].includes(st)) && !out.trig) out.trig = { off: k, st };
+      if (isStart(f, c) && !out.trig) out.trig = { off: k, st };
       if (st.vol <= 0 || isMuted(st.inst) || isDigi(st)) continue;
       const inf = info.get(`${st.inst}:${st.ksmp}`);
       if (!inf || inf.cls === 'empty') continue;
@@ -365,7 +420,7 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
       let lvl = 0, noise = false, drum: DrumKind | undefined;
       if (mode === 'macro' && mp?.macro) {
         const mac = mp.macro, n = mac.steps.length;
-        let idx = st.age;
+        let idx = ages[f][c];
         if (idx >= n) { if (mac.loopFrom < 0 || mac.loopFrom >= n) continue; idx = mac.loopFrom + ((idx - mac.loopFrom) % (n - mac.loopFrom)); }
         const sp = mac.steps[idx];
         lvl = clamp(pyRound(sp.vol + (mac.velocity ? 2 * log2(Math.max(st.vol, 1e-6)) : 0) + o.gainDb / 3.0103), 0, 15);
@@ -378,8 +433,8 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
         const forced = mode === 'kick' || mode === 'snare' || mode === 'hat' ? mode : undefined;
         const d = drumOf(st, forced);
         const lv = d.kind === 'kick' ? [1.0, 0.8, 0.55, 0.3] : d.kind === 'hat' ? [0.9, 0.5] : [1.0, 0.85, 0.6, 0.3];
-        if (st.age >= lv.length) continue;
-        lvl = aylvl(d.rms * st.vol * lv[st.age]);
+        if (ages[f][c] >= lv.length) continue;
+        lvl = aylvl(d.rms * st.vol * lv[ages[f][c]]);
         noise = d.kind !== 'kick'; drum = d.kind;
       }
       if (lvl <= 0) continue;
@@ -394,8 +449,8 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
   const flat: Cell[][] = Array.from({ length: nRows }, () => [emptyCell(), emptyCell(), emptyCell()]);
   const speedAt: number[] = rows.map((r) => clamp(r.len, 1, 31));
 
-  const voices: Voice[] = Array.from({ length: 3 }, () => ({ owner: null, note: 0, ownerNote: 0, plan: null, vol: 64, arp: false, vibOn: false }));
-  const played = new Array(nch).fill(0), foldedRows = new Array(nch).fill(0), droppedRows = new Array(nch).fill(0);
+  const voices: Voice[] = Array.from({ length: 3 }, () => ({ owner: null, note: 0, ownerNote: 0, plan: null, vol: 64, arp: false, vibOn: false, trigFrame: 0, per: NaN }));
+  const playedRows = new Array(nch).fill(0), foldedRows = new Array(nch).fill(0), droppedRows = new Array(nch).fill(0);
   const lastParam = new Map<string, number>();         // effect memory per source channel (1xx/2xx/3xx/4xy)
   let prevActive = new Array(nch).fill(false);
 
@@ -409,7 +464,31 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
 
   const periodOf = (note: number) => 2_000_000 / (16 * noteToFreq(note));
 
+  /** level of the instrument's step `age` frames after the trigger (velocity-scaled step tables only), null = not a level table */
+  const stepLevel = (plan: Plan, age: number): number | null => {
+    const sq = instruments[plan.ay]?.seq;
+    if (!sq || !sq.velocity || !sq.steps.length || plan.kind !== 'tone') return null;
+    const n = sq.steps.length;
+    let i = Math.max(0, age);
+    if (i >= n) { if (sq.loopFrom < 0 || sq.loopFrom >= n) return 0; i = sq.loopFrom + ((i - sq.loopFrom) % (n - sq.loopFrom)); }
+    return sq.steps[i].vol;
+  };
+  /** channel volume (0..64) that makes the instrument step sound at the played level */
+  const volFor = (plan: Plan, age: number, lvl: number): number | null => {
+    const sl = stepLevel(plan, age);
+    if (sl === null) return null;
+    if (lvl <= -50) return 0;
+    if (sl <= 0) return null;
+    return clamp(Math.round(64 * Math.pow(2, (lvl - sl) / 2)), 0, 64);
+  };
+  /** the pitch a source channel plays, as an AY note with fraction (bends, slides and portamento included) */
+  const pitchOf = (st: ChanState, plan: Plan): number => {
+    const bend = st.noteRate > 0 && st.rate > 0 ? 12 * log2(st.rate / st.noteRate) : 0;
+    return ayNote(st.note, plan) + bend;
+  };
+
   /** translate the source cell's effect for AY voice cell; returns false when the effect cannot be expressed */
+  const closedLoopSlides = true;
   function translateEffect(rl: RowLog, c: number, note: number, cell: Cell, st: ChanState | null): void {
     const src = m.patterns[rl.pat][rl.row][c];
     const eff = src.eff, par = src.par;
@@ -439,6 +518,7 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
         }
         break;
       case 0x1: case 0x2: {
+        if (closedLoopSlides) break;
         let p = par;
         if (!m.amiga) { if (p) lastParam.set(key('s'), p); else p = lastParam.get(key('s')) ?? 0; }
         if (!p) break;
@@ -589,25 +669,50 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
         cell.note = note; cell.instrument = plan.ay;
         if (off > 0 && off < 16 && !cell.effect) { cell.effect = parseEffectChar('E'); cell.param = 0xd0 | off; }
         v.note = note; v.ownerNote = note; v.vol = 64; v.arp = false; v.vibOn = false;
-        if (vol64 !== 64) { cell.volume = 0x10 + clamp(vol64, 0, 64); v.vol = vol64; }
-        played[c]++;
+        v.trigFrame = rl.frame + off; v.per = periodOf(note);
+        const tst = ci.trig?.st ?? ci.st0 ?? st;
+        const fit = volFor(plan, 0, Math.max(levelOf(tst), levelOf(frames[rl.frame + off + 1]?.[c] ?? null)));
+        const want = fit ?? vol64;
+        if (want !== 64) { cell.volume = 0x10 + clamp(want, 0, 64); v.vol = want; }
+        playedRows[c]++;
       } else {
         v.ownerNote = ayNote(ci.stLast!.note, plan);
         // pitch changes without a new note (tone portamento) keep the voice; volume follows the source
-        const vNow = Math.round(clamp(ci.st0!.vol, 0, 1) * 64);
+        const fit = ci.st0 ? volFor(plan, rl.frame - v.trigFrame, levelOf(ci.st0)) : null;
+        const vNow = fit ?? Math.round(clamp(ci.st0!.vol, 0, 1) * 64);
         const stepsDiff = v.vol > 0 && vNow > 0 ? Math.abs(2 * log2(vNow / v.vol)) : (vNow !== v.vol ? 99 : 0);
         if (stepsDiff >= 1) { cell.volume = 0x10 + vNow; v.vol = vNow; }
         const src = m.patterns[rl.pat][rl.row][c];
         if (src.note > 0 && src.note < 97 && (src.eff === 3 || src.eff === 5 || src.vol >= 0xf0)) {
           cell.note = ayNote(src.note, plan); cell.instrument = plan.ay;     // tone-portamento target
           if (!cell.effect) { cell.effect = parseEffectChar('3'); cell.param = 8; }
+          v.per = NaN;
         }
-        played[c]++;
+        playedRows[c]++;
       }
       // vibrato state: the YM Tracker cannot switch vibrato off without a new note, so park it at depth 1
       translateEffect(rl, c, v.note, cell, ci.st0);
       if (cell.effect === parseEffectChar('4')) v.vibOn = true;
       else if (v.vibOn && !trigger && !cell.effect) { cell.effect = parseEffectChar('4'); cell.param = ((lastParam.get(`${c}:vx`) ?? 1) << 4) | 1; v.vibOn = false; }
+      // pitch: slide the voice to where the source is at the end of the row (bends, slides, SNES pitch changes); the
+      // YM Tracker slides on ticks 1.. of a row, a one-tick row gets a fine slide (period units, applied at once)
+      const lastSt = ci.stLast;
+      if (!cell.effect && !v.vibOn && !v.arp && plan.kind === 'tone' && lastSt && Number.isFinite(v.per) && !(m.instruments[lastSt.inst]?.vib[2] ?? 0)) {
+        const target = periodOf(pitchOf(lastSt, plan));
+        const d = target - v.per;                                   // > 0: lower pitch
+        const ticks = speedAt[ri] - 1;
+        if (Math.abs(12 * log2(target / v.per)) >= 0.15) {
+          if (ticks >= 1) {
+            const p = clamp(Math.round(Math.abs(d) / ticks), 1, 255);
+            cell.effect = parseEffectChar(d < 0 ? '1' : '2'); cell.param = p;
+            v.per = clamp(v.per + Math.sign(d) * p * ticks, 1, 4095);
+          } else {
+            const p = clamp(Math.round(Math.abs(d)), 1, 15);
+            cell.effect = parseEffectChar('E'); cell.param = (d < 0 ? 0x10 : 0x20) | p;
+            v.per = clamp(v.per + Math.sign(d) * p, 1, 4095);
+          }
+        }
+      }
     }
 
     // ----- arpeggio fill: overflow tones ride on the voice with the closest pitch
@@ -651,12 +756,12 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
         if (v.note !== base) { cell.note = base; cell.instrument = v.plan!.ay; v.note = base; if (cell.volume === 0 && v.vol !== 64) cell.volume = 0x10 + v.vol; }
         cell.effect = parseEffectChar('0');
         cell.param = (offs[0] << 4) | (offs[1] ?? 0);
-        v.arp = true;
+        v.arp = true; v.per = periodOf(base);
       } else if (v.arp) {
         // arpeggio over: the voice must be back on its owner's own pitch
         v.arp = false;
         if (v.owner !== null && v.note !== v.ownerNote && !cell.note) {
-          cell.note = v.ownerNote; cell.instrument = v.plan!.ay; v.note = v.ownerNote;
+          cell.note = v.ownerNote; cell.instrument = v.plan!.ay; v.note = v.ownerNote; v.per = periodOf(v.ownerNote);
           if (v.vol !== 64) cell.volume = 0x10 + v.vol;
         }
       }
@@ -750,7 +855,7 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
 
   report.push(`${chunks.length} pattern visits -> ${pats.length} patterns after merging, ${order.length} order entries, ${instruments.length - 1} instruments`);
   const sum = (a: number[]) => a.reduce((p, c) => p + c, 0);
-  report.push(`voice rows: ${sum(played)} played, ${sum(foldedRows)} in arpeggios, ${sum(droppedRows)} dropped, ${steals} voice steals, ${noteOffs} key-offs`);
+  report.push(`voice rows: ${sum(playedRows)} played, ${sum(foldedRows)} in arpeggios, ${sum(droppedRows)} dropped, ${steals} voice steals, ${noteOffs} key-offs`);
   if (hasDigi) {
     const bytes = digi.list.reduce((n, d) => n + d.pcm.length, 0);
     report.push(`digidrums: ${digi.list.length} sample(s), ${bytes.toLocaleString()} bytes at ~${digi.rateHz} Hz, ${drumHitsWritten} hit(s) on the drum channel${drumHitsLost ? `, ${drumHitsLost} lost (two hits in one row)` : ''}${digi.skipped ? `, ${digi.skipped} skipped (more than 63 variants)` : ''}`);
@@ -759,5 +864,5 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
   if (timingSlips) report.push(`${timingSlips} tempo changes had to replace an effect`);
   for (const [k, n] of warnCount) warnings.push(`${k} x${n} not translated`);
   void FX;
-  return { song, report, warnings, played, folded: foldedRows, dropped: droppedRows, instMap: instMapOut };
+  return { song, report, warnings, played: playedRows, folded: foldedRows, dropped: droppedRows, instMap: instMapOut };
 }

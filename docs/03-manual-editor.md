@@ -39,6 +39,7 @@ When you arrive from the Converter, or load an SNDH/YM here, a collapsed *Import
 | **Transpose…** | Shifts notes by −48…+48 semitones in the block, track, pattern or whole song; optionally only notes of the current instrument. |
 | **Echo…** | Copies each note a few rows later at lower volume: delay (1–32 rows), volume % (1–100), repeats (1–8). Only empty cells are filled. This is the classic AY *F-A echo*. |
 | **Scale volume…** (Ctrl/Alt/Shift+V) | Multiplies the volume column of every note in the range by a percentage; different start and end values make a fade. |
+| **Arpeggios…** | Lists every arpeggio (`0xy`) of the song with its chord name and how often it is used, and every instrument chord ornament. **Major ↔ minor** swaps the chord (keeping its inversion: `047` ↔ `037`, `038` ↔ `049`, `059` ↔ `058`); or type other x and y and press **Set** (`0 0` removes the arpeggio). Range: block, track, pattern or whole song. See [Change major and minor arpeggios](#howto-arps). |
 
 ## The pattern grid {#manual-editor-grid}
 
@@ -113,6 +114,8 @@ Tick **Drum channel** to add a fourth column. A note there plays a digidrum of t
 # Manual: Instrument editor {#manual-instruments}
 
 Select an instrument in the list and press **Edit…** (or double-click it). Every change is undoable. Hold **Play C-5 (hold)** or press any note key to hear the instrument.
+
+**Replace…** (below the instrument list) swaps an instrument in one step: give it a **preset** sound or the **sound of another instrument** (its notes stay as they are), or **let its notes play another instrument** (in the block, track, pattern or whole song). Undoable. See [Replace an instrument](#howto-replace-inst).
 
 ## Common fields {#manual-instruments-common}
 

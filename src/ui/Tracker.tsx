@@ -24,6 +24,9 @@ import { download } from './download';
 import { NumField, TextField } from './fields';
 import { InstrumentEditor } from './InstrumentEditor';
 import { DrumEditor } from './DrumEditor';
+import { INSTRUMENT_PRESETS, PRESET_GROUPS } from '../tracker/presets';
+import { chordName, flipMajorMinor, arpOffsets, arpParam } from '../tracker/chords';
+import type { Song } from '../tracker/types';
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'song';
 
@@ -80,7 +83,7 @@ const Row = memo(function Row({ r, cells, cur, col, editing, s1, s2, play, hl }:
   );
 });
 
-type Dialog = null | { kind: 'scale'; scope: Scope } | { kind: 'transpose' } | { kind: 'echo' };
+type Dialog = null | { kind: 'scale'; scope: Scope } | { kind: 'transpose' } | { kind: 'echo' } | { kind: 'replace' } | { kind: 'arps' };
 
 export function Tracker({ ed, active, onError, onReport }: { ed: Editor; active: boolean; onError: (m: string) => void; onReport?: (lines: string[]) => void }) {
   const ver = useSyncExternalStore(ed.subscribe, ed.getVersion);
@@ -425,6 +428,7 @@ export function Tracker({ ed, active, onError, onReport }: { ed: Editor; active:
           <button title="Shift notes by semitones in the block, track, pattern or whole song" className="btn" onClick={() => setDialog({ kind: 'transpose' })}>Transpose…</button>
           <button className="btn" onClick={() => setDialog({ kind: 'echo' })} title="Copy notes a few rows later at a lower volume (the AY F-A echo)">Echo…</button>
           <button className="btn" onClick={() => setDialog({ kind: 'scale', scope: sel ? 'block' : 'pattern' })} title="Scale the volume column in the block, track, pattern or song (Ctrl/Alt/Shift+V)">Scale volume…</button>
+          <button className="btn" onClick={() => setDialog({ kind: 'arps' })} title="Every arpeggio (0xy) and chord ornament in the song with its chord: switch major and minor, or set other notes">Arpeggios…</button>
           <span className="time">{ed.playing ? `${toHex2(ed.playOrder)}:${toHex2(ed.playRow)}` : `${secs ? Math.floor(secs / 60) + ':' + String(Math.floor(secs % 60)).padStart(2, '0') : '—'}`}</span>
         </div>
       </section>
@@ -496,6 +500,7 @@ export function Tracker({ ed, active, onError, onReport }: { ed: Editor; active:
             <button title="Show or hide the instrument editor (or double-click an instrument)" className="btn small" onClick={() => setInstOpen((v) => !v)}>{instOpen ? 'Hide editor' : 'Edit…'}</button>
             <button className="btn small" onClick={() => setDrumOpen((v) => !v)} title="Digidrum samples of this instrument">{drumOpen ? 'Hide drums' : 'Drums…'}</button>
             <button className="btn small" onClick={() => ed.addInstrument(song.instruments[ed.instrument])} title="Copy the selected instrument">Duplicate</button>
+            <button className="btn small" onClick={() => setDialog({ kind: 'replace' })} title="Replace the selected instrument: give it the sound of a preset or of another instrument, or let its notes play another instrument">Replace…</button>
             <button title="Add a new default instrument" className="btn small" onClick={() => ed.addInstrument()}>New</button>
           </div>
         </section>
@@ -541,6 +546,12 @@ export function Tracker({ ed, active, onError, onReport }: { ed: Editor; active:
       {dialog?.kind === 'scale' && <ScaleDialog scope={dialog.scope} hasSel={!!sel} onClose={() => setDialog(null)} onApply={(sc, a, b) => { ed.scaleVolume(sc, a, b); setDialog(null); }} />}
       {dialog?.kind === 'echo' && <EchoDialog hasSel={!!sel} onClose={() => setDialog(null)}
         onApply={(sc, d, pct, rep) => { const n = ed.echo(sc, d, pct, rep); setDialog(null); setMsg(n ? `Wrote ${n} echo note${n === 1 ? '' : 's'}.` : 'No echoes written (no notes in range, or the rows after them are not empty).'); }} />}
+      {dialog?.kind === 'replace' && <ReplaceDialog song={song} idx={ed.instrument} hasSel={!!sel} onClose={() => setDialog(null)}
+        onPreset={(i, inst) => { ed.replaceInstrument(inst, i); setDialog(null); setMsg(`Instrument ${toHex2(i)} is now "${inst.name}" (notes unchanged). Undo with Ctrl+Z.`); }}
+        onRemap={(from, to, sc) => { const n = ed.remapInstrument(from, to, sc); setDialog(null); setMsg(n ? `${n} note${n === 1 ? '' : 's'} of instrument ${toHex2(from)} now play instrument ${toHex2(to)}.` : `No notes of instrument ${toHex2(from)} in that range.`); }} />}
+      {dialog?.kind === 'arps' && <ArpDialog song={song} hasSel={!!sel} onClose={() => setDialog(null)}
+        onReplace={(from, to, sc) => { const n = ed.replaceArp(from, to, sc); setMsg(n ? `Changed ${n} arpeggio${n === 1 ? '' : 's'} 0${toHex2(from)} → ${to ? '0' + toHex2(to) : 'none'}.` : 'No such arpeggio in that range.'); }}
+        onMacro={(i, arp) => { ed.updateInstrument({ arpMacro: arp }, i); setMsg(`Instrument ${toHex2(i)}: chord ${arp.join(' ')}${chordName(arp) ? ` (${chordName(arp)})` : ''}.`); }} />}
       {dialog?.kind === 'transpose' && <TransposeDialog hasSel={!!sel} instrument={ed.instrument} onClose={() => setDialog(null)}
         onApply={(sc, n, filt) => { const changed = ed.transpose(sc, n, filt ? ed.instrument : null); setDialog(null); setMsg(changed ? `Transposed ${changed} note${changed === 1 ? '' : 's'}.` : 'Nothing to transpose (no notes in that range).'); }} />}
     </div>
@@ -601,6 +612,97 @@ function TransposeDialog({ hasSel, instrument, onClose, onApply }: { hasSel: boo
       <label className="row"><span className="lbl">Semitones</span><NumField value={n} min={-48} max={48} onCommit={setN} /></label>
       <label className="chk"><input type="checkbox" checked={filt} onChange={(e) => setFilt(e.target.checked)} /> only notes of instrument {toHex2(instrument)}</label>
       <div className="btns"><button type="button" className="btn primary" onClick={() => onApply(scope, n, filt)}>Apply</button><button type="button" className="btn" onClick={onClose}>Cancel</button></div>
+    </Modal>
+  );
+}
+
+const SCOPE_OPTS = (hasSel: boolean) => (<>
+  <option value="block" disabled={!hasSel}>selected block</option><option value="track">this track</option><option value="pattern">this pattern</option><option value="song">whole song</option></>);
+
+/** Replace an instrument: a preset's or another instrument's sound in its slot, or its notes moved to another instrument */
+function ReplaceDialog({ song, idx, hasSel, onClose, onPreset, onRemap }: {
+  song: Song; idx: number; hasSel: boolean; onClose: () => void;
+  onPreset: (i: number, inst: Song['instruments'][number]) => void; onRemap: (from: number, to: number, s: Scope) => void;
+}) {
+  const [from, setFrom] = useState(idx);
+  const [how, setHow] = useState<'preset' | 'copy' | 'remap'>('preset');
+  const [preset, setPreset] = useState(0);
+  const [other, setOther] = useState(idx === 1 ? 2 : 1);
+  const [scope, setScope] = useState<Scope>('song');
+  const list = song.instruments.map((ins, i) => ({ i, name: ins.name || '(unnamed)' })).filter((x) => x.i > 0);
+  const opt = (x: { i: number; name: string }) => <option key={x.i} value={x.i}>{toHex2(x.i)} {x.name}</option>;
+  const go = () => {
+    if (how === 'preset') { const p = INSTRUMENT_PRESETS[preset]; if (p) onPreset(from, p.make()); }
+    else if (how === 'copy') { const src = song.instruments[other]; if (src && other !== from) onPreset(from, { ...structuredClone(src), name: src.name }); }
+    else if (other !== from) onRemap(from, other, scope);
+  };
+  return (
+    <Modal title="Replace instrument" onClose={onClose}>
+      <label className="row"><span className="lbl">Instrument</span><select value={from} onChange={(e) => setFrom(+e.target.value)}>{list.map(opt)}</select></label>
+      <label className="chk blk"><input type="radio" checked={how === 'preset'} onChange={() => setHow('preset')} /> give it a preset sound (the notes stay)</label>
+      {how === 'preset' && <label className="row"><span className="lbl">Preset</span><select value={preset} onChange={(e) => setPreset(+e.target.value)}>
+        {PRESET_GROUPS.map((g) => <optgroup key={g} label={g}>{INSTRUMENT_PRESETS.map((p, k) => p.group === g ? <option key={k} value={k}>{p.name}</option> : null)}</optgroup>)}</select></label>}
+      <label className="chk blk"><input type="radio" checked={how === 'copy'} onChange={() => setHow('copy')} /> give it the sound of another instrument (the notes stay)</label>
+      <label className="chk blk"><input type="radio" checked={how === 'remap'} onChange={() => setHow('remap')} /> let its notes play another instrument</label>
+      {how !== 'preset' && <label className="row"><span className="lbl">Other instrument</span><select value={other} onChange={(e) => setOther(+e.target.value)}>{list.filter((x) => x.i !== from).map(opt)}</select></label>}
+      {how === 'remap' && <label className="row"><span className="lbl">Range</span><select value={scope} onChange={(e) => setScope(e.target.value as Scope)}>{SCOPE_OPTS(hasSel)}</select></label>}
+      <p className="note soft">Undo with Ctrl+Z.</p>
+      <div className="btns"><button type="button" className="btn primary" onClick={go}>Replace</button><button type="button" className="btn" onClick={onClose}>Cancel</button></div>
+    </Modal>
+  );
+}
+
+/** Every arpeggio of the song with its chord name: major <-> minor in one click, or other notes */
+function ArpDialog({ song, hasSel, onClose, onReplace, onMacro }: {
+  song: Song; hasSel: boolean; onClose: () => void;
+  onReplace: (from: number, to: number, s: Scope) => void; onMacro: (i: number, arp: number[]) => void;
+}) {
+  const [scope, setScope] = useState<Scope>('song');
+  const [edit, setEdit] = useState<Record<number, [number, number]>>({});
+  const used = new Map<number, number>();
+  for (const pi of new Set(song.order)) for (const row of song.patterns[pi]?.cells ?? []) for (const c of row) if (c.effect === 1 && c.param) used.set(c.param, (used.get(c.param) ?? 0) + 1);
+  const arps = [...used].sort((a, b) => b[1] - a[1]);
+  const macros = song.instruments.map((ins, i) => ({ i, ins })).filter(({ i, ins }) => i > 0 && ins.arpMacro.length > 1);
+  const label = (offs: number[]) => chordName(offs) || 'other';
+  return (
+    <Modal title="Arpeggios" onClose={onClose}>
+      <p className="note">The arpeggios (effect 0xy: the note, x and y semitones above it) used in the song. <b>Major ↔ minor</b> swaps the chord, keeping its inversion; or type other notes and press <b>Set</b>.</p>
+      <label className="row"><span className="lbl">Range</span><select value={scope} onChange={(e) => setScope(e.target.value as Scope)}>{SCOPE_OPTS(hasSel)}</select></label>
+      {!arps.length && <p className="note soft">No 0xy arpeggios in the song.</p>}
+      {arps.length > 0 && <table className="arptab"><thead><tr><th>Effect</th><th>Chord</th><th>Used</th><th></th><th>Set to</th></tr></thead><tbody>
+        {arps.map(([p, n]) => {
+          const offs = arpOffsets(p), flip = flipMajorMinor(offs);
+          const e = edit[p] ?? (offs as [number, number]);
+          const flipP = flip && flip.every((v) => v >= 0 && v <= 15) ? arpParam(flip) : 0;
+          return (
+            <tr key={p}>
+              <td className="mono">0{toHex2(p)}</td><td>{label([0, ...offs])}</td><td>{n}×</td>
+              <td><button type="button" className="btn tiny" disabled={!flipP} title={flipP ? `0${toHex2(p)} → 0${toHex2(flipP)} (${label([0, ...flip!])})` : 'Not a major or minor chord'} onClick={() => onReplace(p, flipP, scope)}>Major ↔ minor</button></td>
+              <td className="arpset">
+                <NumField value={e[0]} min={0} max={15} onCommit={(v) => setEdit({ ...edit, [p]: [v, e[1]] })} />
+                <NumField value={e[1]} min={0} max={15} onCommit={(v) => setEdit({ ...edit, [p]: [e[0], v] })} />
+                <button type="button" className="btn tiny" title={`Set to 0${toHex2(arpParam(e))} (${label([0, ...e])}); 0 0 removes the arpeggio`} onClick={() => onReplace(p, arpParam(e), scope)}>Set</button>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody></table>}
+      {macros.length > 0 && <>
+        <h3>Chord ornaments (instrument arpeggio)</h3>
+        <table className="arptab"><tbody>
+          {macros.map(({ i, ins }) => {
+            const flip = flipMajorMinor(ins.arpMacro);
+            return (
+              <tr key={i}>
+                <td className="mono">{toHex2(i)}</td><td>{ins.name}</td><td className="mono">{ins.arpMacro.join(' ')}</td><td>{label(ins.arpMacro)}</td>
+                <td><button type="button" className="btn tiny" disabled={!flip} title={flip ? `→ ${flip.join(' ')} (${label(flip)})` : 'Not a major or minor chord'} onClick={() => flip && onMacro(i, flip)}>Major ↔ minor</button></td>
+              </tr>
+            );
+          })}
+        </tbody></table>
+      </>}
+      <p className="note soft">Changes apply at once; undo with Ctrl+Z.</p>
+      <div className="btns"><button type="button" className="btn primary" onClick={onClose}>Close</button></div>
     </Modal>
   );
 }

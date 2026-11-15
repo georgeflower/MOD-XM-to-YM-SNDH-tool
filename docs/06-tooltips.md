@@ -102,6 +102,7 @@ Hover over any control for a tooltip. This chapter lists every one of them (gene
 | Transpose… | Shift notes by semitones in the block, track, pattern or whole song |
 | Echo… | Copy notes a few rows later at a lower volume (the AY F-A echo) |
 | Scale volume… | Scale the volume column in the block, track, pattern or song (Ctrl/Alt/Shift+V) |
+| Arpeggios… | Every arpeggio (0xy) and chord ornament in the song with its chord: switch major and minor, or set other notes |
 | ↻ mark in the order list | the song loops back here |
 | New pat | Insert a new empty pattern after this position |
 | Clone pat | Copy this pattern into a new one |
@@ -116,6 +117,7 @@ Hover over any control for a tooltip. This chapter lists every one of them (gene
 | Edit… / Hide editor | Show or hide the instrument editor (or double-click an instrument) |
 | Drums… / Hide drums | Digidrum samples of this instrument |
 | Duplicate | Copy the selected instrument |
+| Replace… | Replace the selected instrument: give it the sound of a preset or of another instrument, or let its notes play another instrument |
 | New | Add a new default instrument |
 | SNDH (.sndh) | Atari ST music file with a built-in 68000 player |
 | YM (.ym) | YM register dump (YM6 when the song has digidrums or timer effects) |

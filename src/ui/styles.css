@@ -213,3 +213,11 @@ td.name .txt.rn { width: 170px; }
 .seg button:hover { background: #3a4270; }
 .seg button.on { background: var(--accent); color: #0a0d1e; }
 .seg button:first-child.on { background: #ff6b6b; color: #fff; }
+
+.arptab { border-collapse: collapse; margin: 6px 0; width: 100%; }
+.arptab td, .arptab th { padding: 2px 6px; text-align: left; color: var(--ink); }
+.arptab th { opacity: 0.7; font-weight: normal; }
+.dlg .chk.blk { display: flex; margin: 6px 0; }
+.arptab .mono { font-family: inherit; }
+.arptab .arpset { display: flex; gap: 4px; align-items: center; }
+.arptab .arpset input { width: 3.2em; }

@@ -6,6 +6,7 @@ import { loadModule } from '../src/core/load';
 import { moduleToSong } from '../src/tracker/fromModule';
 import { renderSong } from '../src/tracker/render';
 import { NOTE_OFF } from '../src/tracker/types';
+import { chordName, flipMajorMinor } from '../src/tracker/chords';
 
 const fx = (n: string) => new Uint8Array(readFileSync(new URL(`../fixtures/${n}`, import.meta.url)));
 
@@ -119,5 +120,47 @@ describe('.ymt', () => {
     ed.setCell({ note: 60, instrument: 1 }, 0, 0);
     const back = await decodeYmt(await encodeYmt(ed.song, { gzip: false }));
     expect(back.patterns[0].cells[0][0].note).toBe(60);
+  });
+
+  it('replaces instruments: notes to another instrument, or a preset sound in the slot (undoable)', () => {
+    const ed = new Editor();
+    while (ed.song.instruments.length < 4) ed.addInstrument();
+    ed.setCursor(0, 0, 0); ed.instrument = 1; ed.insertNote(49);
+    ed.setCursor(4, 1, 0); ed.instrument = 2; ed.insertNote(52);
+    ed.setCursor(8, 2, 0); ed.instrument = 1; ed.insertNote(56);
+    expect(ed.remapInstrument(1, 3, 'song')).toBe(2);
+    expect(ed.pattern.cells[0][0].instrument).toBe(3);
+    expect(ed.pattern.cells[4][1].instrument).toBe(2);
+    ed.undo();
+    expect(ed.pattern.cells[0][0].instrument).toBe(1);
+    ed.replaceInstrument({ ...ed.song.instruments[2], name: 'Kick' }, 2);
+    expect(ed.song.instruments[2].name).toBe('Kick');
+  });
+
+  it('a pattern played twice is changed once by a whole-song operation', () => {
+    const ed = new Editor();
+    ed.setCursor(0, 0, 0); ed.instrument = 1; ed.insertNote(49);
+    ed.addOrderEntry();
+    ed.setOrderEntry(1, ed.song.order[0]);
+    expect(ed.song.order.filter((p) => p === ed.song.order[0]).length).toBe(2);
+    expect(ed.transpose('song', 12, null)).toBe(1);
+    expect(ed.song.patterns[ed.song.order[0]].cells[0][0].note).toBe(61);
+  });
+
+  it('lists arpeggios and swaps major / minor', () => {
+    const ed = new Editor();
+    const put = (r: number, p: number) => { ed.setCell({ note: 49, instrument: 1, effect: 1, param: p }, r, 0); };
+    put(0, 0x47); put(2, 0x47); put(4, 0x37); put(6, 0x38);
+    expect([...ed.arpeggios()].sort()).toEqual([[0x37, 1], [0x38, 1], [0x47, 2]]);
+    expect(chordName([0, 4, 7])).toBe('Major');
+    expect(chordName([0, 3, 7])).toBe('Minor');
+    expect(flipMajorMinor([4, 7])).toEqual([3, 7]);
+    expect(flipMajorMinor([3, 8])).toEqual([4, 9]);            // first inversion keeps its shape
+    expect(flipMajorMinor([0, 4, 7, 12])).toEqual([0, 3, 7, 12]);
+    expect(flipMajorMinor([7])).toBeNull();
+    expect(ed.replaceArp(0x47, 0x37, 'song')).toBe(2);
+    expect(ed.arpeggios().get(0x37)).toBe(3);
+    expect(ed.replaceArp(0x38, 0, 'pattern')).toBe(1);
+    expect(ed.pattern.cells[6][0]).toMatchObject({ effect: 0, param: 0, note: 49 });
   });
 });

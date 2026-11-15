@@ -48,7 +48,7 @@ Example: a *Lead* note at volume 7 scores 15, the same as a *Normal* note at ful
 | **Converter only** | You want a quick YM/SNDH of a tune and a few tweaks are enough. | Exports are produced directly from the frame converter. |
 | **Edit as AY patterns** | You want to fix things by hand, make your own instruments, add drums, add timer effects, or export to maxYMiser/Arkos/Furnace. | An editable pattern song (3 voices + optional drum column) that you can save as `.ymt`. |
 
-*Edit as AY patterns* uses the same priorities and roles you set in the Converter. The converter is a *rendering* of the module; the pattern song is an *editable approximation* of it, with row-level voice allocation and step-table instruments, and all editor effects available.
+*Edit as AY patterns* uses the same priorities, roles and drum setting you set in the Converter. The converter is a *rendering* of the module; the pattern song is an *editable approximation* of it, with row-level voice allocation and step-table instruments, and all editor effects available. The instruments are measured from the notes as they really play (envelopes included) and the volume column and pitch slides are set every row to follow the source, so it sounds close to the conversion; what can differ is which notes get a voice inside a row (the converter decides every 20 ms, the pattern song once per row).
 
 A loaded `.sndh` or `.ym` can be opened the same way. Its register dump has no notes in it, so the tool works them out again: it finds the tempo, the note starts and the sound of every note, and writes them as patterns whose step-table instruments reproduce what the chip did (see [Edit an existing SNDH or YM tune](#howto-edit-tune)).
 

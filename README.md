@@ -6,7 +6,7 @@ A browser tool that turns **ProTracker `.MOD`**, **FastTracker II `.XM`** module
 **Atari ST's YM2149** (one chip: 3 tone voices + noise, 50 Hz). Everything runs client-side — static files, no server.
 
 **Status:** load → auto-convert → A/B listen → export, plus an FT2-style AY pattern editor.  
-**Version 0.6.** Changes: see [`CHANGELOG.md`](CHANGELOG.md). Documentation: open the **Help** link in the app header (`docs/index.html` in the built site — one self-contained page with a manual, how-to recipes, effects reference, tooltip list, architecture and technical specifications), or read the Markdown sources in [`docs/`](docs/).
+**Version 0.7.** Changes: see [`CHANGELOG.md`](CHANGELOG.md). Documentation: open the **Help** link in the app header (`docs/index.html` in the built site — one self-contained page with a manual, how-to recipes, effects reference, tooltip list, architecture and technical specifications), or read the Markdown sources in [`docs/`](docs/).
 
 ## What you get today
 
@@ -85,8 +85,12 @@ The second tab is a FastTracker 2-style editor for **one YM2149** (three channel
 parameter), same effect letters, same `.ymt` song files in both directions.
 
 * **Start** from scratch (*New*), load a `.ymt`, or press **Edit as AY patterns →** in the converter: the module is turned into
-  patterns with row-level voice allocation, step-table instruments, arpeggios folded into `0xy`, `Fxx` speed changes for exact
-  row timing and slides/vibrato translated by pitch ratio. The conversion report is kept above the editor.
+  patterns with row-level voice allocation, step-table instruments measured from the notes as they play (volume envelopes and
+  SNES ADSR included), a volume column and `1xx`/`2xx` (`E1x`/`E2x` on one-tick rows) set every row to follow the source,
+  arpeggios folded into `0xy`, vibrato translated and `Fxx` speed changes for exact row timing; drums are made as in the
+  converter. The conversion report is kept above the editor.
+* **Replace…** (instrument panel): a preset or another instrument's sound into an instrument slot, or its notes moved to another
+  instrument. **Arpeggios…**: every `0xy` and chord ornament with its chord name, *Major ↔ minor* in one click (`src/tracker/chords.ts`).
 * **Edit an `.sndh` or `.ym`**: *Edit as AY patterns →* in the *Loaded tune* panel (or *Load .sndh/.ym…* in the editor) works the
   notes out of the register dump again — the tempo (frames per row) and the note starts are detected, what each voice did becomes
   a step-table instrument (volume, relative pitch, noise, tone, buzzer; loud and soft versions of a sound share one instrument),
@@ -318,9 +322,10 @@ public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of th
 
 ## Roadmap
 
-Done in 0.5: SNES `.spc` import. Done in 0.6: SPC loop point, echo channels, rows per step, voice mute.
+Done in 0.5: SNES `.spc` import. Done in 0.6: SPC loop point, echo channels, rows per step, voice mute. Done in 0.7: *Edit as AY patterns* follows the conversion (envelopes, closed-loop volume and pitch, note starts at high tempos), *Replace…* instrument, *Arpeggios…* (major ↔ minor).
 
 * More than one timer effect or drum at a time (needs a second timer / mixing engine); timer-driven arpeggio and other handler effects that are not drums or Q/S/U
+* Pattern song: per-frame voice choice inside a row (short notes between drums), as the converter does
 * SNES SPC: the echo feedback tail, tempo changes in *rows per step* (one grid per section), sustain points in the envelopes, best-effort `.sfc` ROM support
 * maxYMiser: the STe DMA track (sampled sound), sequence-switching effects, more than one timer effect on the voices at once
 

@@ -3,7 +3,7 @@
  * AY event (tone period + level, or a drum macro), then picks the best 3 events per frame.
  */
 import type { Module, Sample } from './types';
-import { replay, FPS, channelSkipper, type ChanState } from './replay';
+import { replay, FPS, channelSkipper, noteAges, type ChanState } from './replay';
 import { analyseSample, fold, ended, type SampleInfo } from './samples';
 import { powerSpectrum } from './fft';
 import { DigiExtractor } from './digi';
@@ -240,6 +240,7 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
   // ---- replay
   const rep = replay(m, { arpOrder: options.arpOrder, skip: channelSkipper(options) });
   const nf = rep.frames.length;
+  const ages = noteAges(rep.frames);
   let loopFrame = rep.loopFrame;
   if (options.loopOrder !== undefined) loopFrame = rep.orderFrame.get(options.loopOrder) ?? 0;
   log(`replayed ${nf} frames = ${(nf / FPS).toFixed(2)} s, loop to frame ${loopFrame}`);
@@ -275,7 +276,7 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
       const trans = Math.pow(2, (mp?.transpose ?? 0) / 12);
       if (mode === 'macro' && mp?.macro && mp.macro.steps.length) {
         const mac = mp.macro, n = mac.steps.length;
-        let idx = st.age;
+        let idx = ages[fIdx][ci];
         if (idx >= n) {
           if (mac.loopFrom < 0 || mac.loopFrom >= n) return;
           idx = mac.loopFrom + ((idx - mac.loopFrom) % (n - mac.loopFrom));
@@ -291,7 +292,7 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
       if (digiOn && (mode === 'digi' || (options.digiDrums && !forcedDrum && mode !== 'tone' && inf.cls !== 'tonal'))) {
         const ir = instReports.find((r) => r.inst === st.inst);
         if (ir) ir.digi = true;
-        if (st.age === 0 && !(fIdx > 0 && rep.frames[fIdx - 1].includes(st))) digiHit(fIdx, ci, st);
+        if (ages[fIdx][ci] === 0) digiHit(fIdx, ci, st);
         return;
       }
       if (mode === 'tone' || (inf.cls === 'tonal' && !forcedDrum)) {
@@ -304,7 +305,7 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
         const rms = Math.sqrt(sum / w.length);
         const hz = mode === 'tone' ? noteHz(st.note) * bend * trans : (st.rate / inf.cycle!) * trans;
         const choice: WaveChoice | undefined = mp?.wave ?? (options.waveform ? waveOfClass(waves.get(`${st.inst}:${st.ksmp}`)?.cls ?? 'complex') : undefined);
-        lst.push({ ch: ci, kind: 'tone', per: TONE_HZ / hz, np: null, lvl: rms * st.vol, inst: st.inst, buzz: choice ? BUZZ_SHAPE[choice] : 0, age: st.age });
+        lst.push({ ch: ci, kind: 'tone', per: TONE_HZ / hz, np: null, lvl: rms * st.vol, inst: st.inst, buzz: choice ? BUZZ_SHAPE[choice] : 0, age: ages[fIdx][ci] });
       } else {
         const key = `${st.inst}:${st.ksmp}`;
         let bc = drumCache.get(key);
@@ -315,7 +316,7 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
           const ir = instReports.find((r) => r.inst === st.inst);
           if (ir) ir.drum = bc.kind;
         }
-        const mac = drumMacro(bc.kind, st.age, bc.rms * st.vol * o.drumGain);
+        const mac = drumMacro(bc.kind, ages[fIdx][ci], bc.rms * st.vol * o.drumGain);
         if (mac) lst.push({ ...mac, ch: ci, inst: st.inst, drum: bc.kind });
       }
     });

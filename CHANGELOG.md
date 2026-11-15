@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.7.0 — 2026-11-15
+
+### Changed
+- **Edit as AY patterns follows the conversion much more closely** (measured on F-Zero SPCs and Omar's Bazaar: spectrogram correlation with the converter output 0.86–0.99 → 0.98–0.99).
+  - Note starts are found from the note age going down, not from tick 0: at high tempos (SPC files: 250 BPM, speed 2) the first 50 Hz frame of a note is its tick 1, so notes were never retriggered.
+  - Tonal instruments get their level steps from the played notes (sample x volume envelope x volume changes, 90th percentile over the notes) instead of the raw sample: XM volume envelopes and SNES ADSR come along.
+  - The volume column is set closed-loop against the instrument step the voice is at, and pitch follows the source closed-loop with `1xx` / `2xx` (one-tick rows: `E1x` / `E2x`) instead of copying the source's slides.
+  - Drums: digidrums only when *Percussion as digidrums* is on (as in the converter); a percussion sample that cannot become a digidrum falls back to a drum macro instead of going silent.
+- The converter counts note ages in frames as well (drum macros and step tables at high tempos).
+
+### Added
+- **Replace…** in the editor's instrument panel: a preset sound or another instrument's sound into the slot, or the instrument's notes moved to another instrument (block / track / pattern / song).
+- **Arpeggios…** in the editor: every `0xy` arpeggio and instrument chord ornament with its chord name; *Major ↔ minor* (inversions kept) or custom notes.
+
+### Fixed
+- Whole-song *Transpose* / *Scale volume* applied twice to a pattern that appears twice in the order.
+
 ## 0.6.0 — 2026-11-13
 
 ### Added

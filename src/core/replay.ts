@@ -322,3 +322,24 @@ export function replay(m: Module, opts: ReplayOptions = {}): ReplayResult {
     else if (c.period < c.tpTarget) c.period = Math.min(c.tpTarget, c.period + step);
   }
 }
+
+/**
+ * Frames since each channel's note started (-1 = silent). A note starts where the replayer's tick age goes down (or a
+ * new snapshot has age 0): at high tempos the first 50 Hz frame of a note can already be its tick 1, and at low tempos
+ * one tick spans several frames, so the tick age is not a frame count.
+ */
+export function noteAges(frames: (ChanState | null)[][]): Int32Array[] {
+  const out: Int32Array[] = [];
+  for (let f = 0; f < frames.length; f++) {
+    const row = frames[f], a = new Int32Array(row.length);
+    for (let c = 0; c < row.length; c++) {
+      const st = row[c];
+      if (!st) { a[c] = -1; continue; }
+      const p = f > 0 ? frames[f - 1][c] : null;
+      const start = !p || (p !== st && (st.age < p.age || st.age === 0));
+      a[c] = start || f === 0 || out[f - 1][c] < 0 ? 0 : out[f - 1][c] + 1;
+    }
+    out.push(a);
+  }
+  return out;
+}

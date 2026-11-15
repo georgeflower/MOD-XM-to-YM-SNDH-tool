@@ -350,8 +350,11 @@ export class Editor {
       const total = lens.reduce((a, b) => a + b, 0);
       const patterns = s.patterns.slice();
       let acc = 0;
+      const done = new Set<number>();
       s.order.forEach((pi, oi) => {
-        const p = patterns[pi]; if (!p) { acc += lens[oi]; return; }
+        // a pattern that is played more than once is changed once (its first visit)
+        const p = patterns[pi]; if (!p || done.has(pi)) { acc += lens[oi]; return; }
+        done.add(pi);
         const cells = p.cells.map((row, r) => row.map((c) => fn(c, acc + r, total) ?? c));
         patterns[pi] = { ...p, cells }; acc += lens[oi];
       });
@@ -411,6 +414,32 @@ export class Editor {
     });
     return n;
   }
+  /** notes of instrument `from` play instrument `to` instead; returns how many cells changed */
+  remapInstrument(from: number, to: number, scope: Scope): number {
+    if (from === to) return 0;
+    let n = 0;
+    this.forScope(scope, (c) => { if (c.instrument !== from) return null; n++; return { ...c, instrument: to }; });
+    return n;
+  }
+  /** arpeggio effects (0xy) used in the song: parameter -> number of cells */
+  arpeggios(): Map<number, number> {
+    const out = new Map<number, number>();
+    for (const pi of new Set(this.song.order)) for (const row of this.song.patterns[pi]?.cells ?? []) for (const c of row) {
+      if (c.effect === 1 && c.param) out.set(c.param, (out.get(c.param) ?? 0) + 1);
+    }
+    return out;
+  }
+  /** every 0xy arpeggio with parameter `from` becomes `to` (0 = no arpeggio); returns how many cells changed */
+  replaceArp(from: number, to: number, scope: Scope): number {
+    let n = 0;
+    this.forScope(scope, (c) => {
+      if (c.effect !== 1 || c.param !== from || from === to) return null;
+      n++;
+      return to ? { ...c, param: to & 255 } : { ...c, effect: 0, param: 0 };
+    });
+    return n;
+  }
+
   /** FT2 volume scaling, linear ramp from startPct to endPct over the scope */
   scaleVolume(scope: Scope, startPct: number, endPct: number) {
     this.forScope(scope, (c, i, n) => {

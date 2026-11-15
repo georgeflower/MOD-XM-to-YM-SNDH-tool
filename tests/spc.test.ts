@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { isSpc, spcTags, SpcPlayer } from '../src/import/spc';
 import { spcToModule, findLoop, findStep } from '../src/import/spcModule';
 import { replay } from '../src/core/replay';
+import { moduleToSong } from '../src/tracker/fromModule';
+import { renderSong } from '../src/tracker/render';
 import { convert } from '../src/core/convert';
 import { loadModule } from '../src/core/load';
 
@@ -215,5 +217,20 @@ describe('SNES SPC import', () => {
     const rp = replay(m, {});
     const v = rp.frames.map((f) => f[0]?.vol ?? 0).filter((x) => x > 0);
     expect(v[0]).toBeCloseTo(20 / 64, 3);
+  });
+
+  it('"Edit as AY patterns" of an SPC (one row per frame, 250 BPM) plays the same notes as the conversion', () => {
+    const r = spcToModule(buildSpc(), { seconds: 3.5, loop: false });
+    const song = moduleToSong(r.module, { prio: r.prio }).song;
+    const notes: number[] = [];
+    for (const pi of song.order) for (const row of song.patterns[pi].cells) for (const c of row.slice(0, 3)) if (c.note > 0 && c.note < 97) notes.push(c.note);
+    expect(notes.length).toBeGreaterThanOrEqual(5);                   // every key-on starts a note (the first frame of a note is tick 1 here)
+    const out = convert(r.module, {}), ed = renderSong(song, { maxFrames: out.nframes });
+    const per = (regs: Uint8Array, f: number) => [0, 1, 2].filter((v) => regs[f * 14 + 8 + v] & 15).map((v) => regs[f * 14 + 2 * v] | ((regs[f * 14 + 2 * v + 1] & 15) << 8));
+    for (const f of [40, 70, 95, 120, 150]) {
+      const a = per(out.regs, f), b = per(ed.regs, f);
+      expect(b.length).toBeGreaterThan(0);
+      expect(b.some((p) => a.some((q) => Math.abs(p - q) <= Math.max(2, q * 0.01)))).toBe(true);
+    }
   });
 });

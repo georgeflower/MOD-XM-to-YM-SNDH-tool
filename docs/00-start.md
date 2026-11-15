@@ -1,6 +1,6 @@
 # Start here
 
-**MOD/XM → YM2149 · SNDH · game stream — version 0.6**
+**MOD/XM → YM2149 · SNDH · game stream — version 0.7**
 
 A browser tool that turns ProTracker `.mod` and FastTracker II `.xm` modules into music for the **Atari ST's YM2149** sound chip (one chip: three square-wave voices, one noise generator, one envelope generator, updated 50 times a second). It also loads SNES `.spc` music files, `.sndh`, `.ym`, `.ymt`, maxYMiser and Arkos files, has an FT2-style pattern editor for the chip, and exports to SNDH, YM, a C game kit, maxYMiser, Arkos Tracker 3, Furnace, WAV and raw registers.
 
@@ -22,7 +22,14 @@ Everything runs in your browser. There is no server and none of your files are u
 5. Choose an export: **SNDH** plays in any Atari ST player; **YM** plays in ST-Sound and similar players.
 6. To keep working on the song by hand, press **Edit as AY patterns →**. This works for a loaded `.sndh` or `.ym` as well: the tune is turned back into notes and instruments (see [Edit an existing SNDH or YM tune](#howto-edit-tune)).
 
-## What's new in 0.6
+## What's new in 0.7
+
+* **Edit as AY patterns sounds like the conversion.** The instruments are built from how the notes really play (volume envelopes and the SNES envelopes included), the volume column and slides follow the source every row, notes at high tempos (SPC files) start where they should, and the drums are made the same way as in the conversion (digidrums only with *Percussion as digidrums*).
+* **Replace…** in the instrument panel: give an instrument a preset sound or another instrument's sound, or let its notes play another instrument ([Replace an instrument](#howto-replace-inst)).
+* **Arpeggios…** in the editor: every arpeggio of the song with its chord name; *Major ↔ minor* in one click, or set other notes ([Change major and minor arpeggios](#howto-arps)).
+* Whole-song *Transpose* / *Scale volume* changed a pattern that is played twice twice; now once.
+
+## What was new in 0.6
 
 * **SPC loop point** — the song is played until it repeats itself; the converted song ends at the loop end and jumps back to the loop start (YM, SNDH and game-kit exports loop there too, and so does the preview).
 * **Echo notes** — the SNES echo becomes extra *echo channels* (a delayed, quieter copy of each echoed voice) with the priority *Low*, so they fill YM voices the other channels leave free.
@@ -47,7 +54,7 @@ Everything runs in your browser. There is no server and none of your files are u
 ## What was new in 0.3
 
 * **Manual import dialog** — per-channel priority (*Off / Low / Normal / High / Lead*), *▶ Solo* for each channel, *▶ Full preview* that updates while you change priorities, click-to-seek on every channel's activity graph, instrument renaming, and *Suggest*.
-* **Automatic drum channel** — *Edit as AY patterns* adds the drum column (digidrum samples) by itself when the module has percussion.
+* **Automatic drum channel** — *Edit as AY patterns* adds the drum column (digidrum samples) by itself when the module has percussion. (0.7: when *Percussion as digidrums* is on, as in the conversion.)
 * **Arkos Tracker 3** export and import (`.aks`), with release tails, fractional pitch and vibrato.
 * **Furnace** export (`.fur`) with exact vibrato and buzzer envelopes.
 * **Demo song** replaced by *Omar's Bazaar* (Qumran).

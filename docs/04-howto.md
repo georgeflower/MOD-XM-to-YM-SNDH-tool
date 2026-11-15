@@ -89,7 +89,7 @@ Digidrums need a timer interrupt: they work in SNDH, YM6, the game kit and maxYM
 
 ## Change an instrument in the editor {#howto-change-inst}
 
-*To use a different instrument for existing notes:* put the cursor on the note's instrument column and type the new two-digit instrument number. To change many notes at once, select a block and use **Transpose…** with *only notes of instrument …* to move just one instrument's notes.
+*To use a different instrument for existing notes:* put the cursor on the note's instrument column and type the new two-digit instrument number. To change all notes of an instrument at once, use **Replace…** (see [Replace an instrument](#howto-replace-inst)).
 
 *To change how an instrument sounds:*
 
@@ -97,6 +97,25 @@ Digidrums need a timer interrupt: they work in SNDH, YM6, the game kit and maxYM
 2. Press **Edit…**. Hold **Play C-5 (hold)** to hear it while you work.
 3. Change what you need — everything is undoable with **Ctrl+Z**. Changes apply everywhere the instrument is used, in the pattern playback and in all exports.
 4. Use **Duplicate** first if you want to keep the old version as well, then point the notes you want to change at the copy.
+
+## Replace an instrument {#howto-replace-inst}
+
+1. Click the instrument in the **Instruments** list and press **Replace…**.
+2. Choose what happens:
+   * **give it a preset sound** — pick a preset (chord ornaments, drums, basses). The notes stay; the instrument now sounds like the preset. Good for swapping a converted drum for a real AY kick or snare.
+   * **give it the sound of another instrument** — copies that instrument's sound into this slot. The notes stay.
+   * **let its notes play another instrument** — every note of this instrument (in the block, track, pattern or whole song) now uses the other one; this instrument is left as it was.
+3. Press **Replace**, then play the song. **Ctrl+Z** undoes it.
+
+## Change major and minor arpeggios {#howto-arps}
+
+1. Press **Arpeggios…** in the song bar. You get every arpeggio of the song (`0xy`: the note, x and y semitones above it), with its chord name — *Major*, *Minor*, their inversions, *Sus4*, *Power* … — and how often it is used.
+2. **Major ↔ minor** turns all of them into the other chord, keeping the shape: `047` ↔ `037`, `038` ↔ `049`, `059` ↔ `058`.
+3. Or type other x and y values and press **Set** (`0 0` removes the arpeggio).
+4. Choose the **Range** first to change only the block, track or pattern instead of the whole song.
+5. Chord ornaments of instruments (their arpeggio macro, e.g. `0 4 7 12`) are listed below with their own **Major ↔ minor** button.
+
+Changes apply at once; **Ctrl+Z** undoes them. Arpeggios from a conversion come from *Arpeggio fill* (several source notes folded onto one voice) or from the module's own `0xy` effects.
 
 ## Create a new instrument {#howto-new-inst}
 
