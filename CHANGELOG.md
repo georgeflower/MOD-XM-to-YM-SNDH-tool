@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.2 — 2026-11-15
+
+### Changed
+- *Demo: Omar's Bazaar* loads with *Percussion as digidrums* on (the conversion, its exports and *Edit as AY patterns* get the digidrum channel).
+
 ## 0.8.1 — 2026-11-15
 
 ### Added

@@ -187,6 +187,7 @@ export function App() {
   const loadDemo = async () => {
     const r = await fetch(demoUrl); // embedded data: URL, works from file:// too
     loadBytes(DEMO, new Uint8Array(await r.arrayBuffer()));
+    setOpts({ ...DEFAULT_OPTS, digi: true });        // the demo shows off the digidrums
   };
 
   // ---- conversion (debounced; runs on the main thread, ~1-3 s for a long song)
@@ -350,7 +351,7 @@ export function App() {
             <input type="file" accept=".mod,.xm,.sndh,.snd,.ym,.ymt,.spc,.MOD,.XM,.SNDH,.SND,.YM,.YMT,.SPC" hidden onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
           </label>
           <a className="btn" href="./docs/index.html" target="_blank" rel="noopener" title="Manual, how-to guide, effects reference and technical specifications (opens in a new tab)">Help</a>
-          <button title="Load the bundled demo song, Omar's Bazaar by Qumran" className="btn" onClick={loadDemo}>Demo: Omar's Bazaar</button>
+          <button title="Load the bundled demo song, Omar's Bazaar by Qumran (with its drums as digidrums)" className="btn" onClick={loadDemo}>Demo: Omar's Bazaar</button>
         </div>
       </header>
 

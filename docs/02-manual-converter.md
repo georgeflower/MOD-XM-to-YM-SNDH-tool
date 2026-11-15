@@ -8,7 +8,7 @@ The **Converter** tab is where a module (or an existing SNDH/YM tune) is loaded,
 |---|---|
 | **Load MOD / XM / SNDH / YM / YMT / SPC…** | Opens a file. Accepted: `.mod`, `.xm`, `.sndh` / `.snd` (also ICE!-packed), `.ym` (YM2!, YM3!, YM3b!, YM5!, YM6!, also LHA-packed) `.ymt` and `.spc` (SNES SPC700 snapshot). The type is detected from the file contents, not the extension. |
 | **Drop a file** | Dropping a file anywhere on the page does the same. |
-| **Demo: Omar's Bazaar** | Loads the bundled XM song *Omar's Bazaar* by Qumran. |
+| **Demo: Omar's Bazaar** | Loads the bundled XM song *Omar's Bazaar* by Qumran, with *Percussion as digidrums* on. |
 | **Converter / AY pattern editor** tabs | Switch between the two halves of the tool. The loaded module stays in memory when you switch. |
 
 What happens after loading depends on the file type:

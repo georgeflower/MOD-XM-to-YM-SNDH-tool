@@ -9,7 +9,7 @@ Hover over any control for a tooltip. This chapter lists every one of them (gene
 |---|---|
 | Load MOD / XM / SNDH / YM / YMT / SPC… | Open a MOD, XM, SNDH, YM, YMT or SNES SPC file (you can also drop a file anywhere on the page) |
 | Help | Manual, how-to guide, effects reference and technical specifications (opens in a new tab) |
-| Demo: Omar's Bazaar | Load the bundled demo song, Omar's Bazaar by Qumran |
+| Demo: Omar's Bazaar | Load the bundled demo song, Omar's Bazaar by Qumran (with its drums as digidrums) |
 | Converter | Load, convert, listen and export a module |
 | AY pattern editor | Edit a song as patterns for one YM2149 (FastTracker 2 style) |
 | Subtune | Which subtune of the SNDH file to run |
