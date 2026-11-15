@@ -10,10 +10,13 @@ import { PRIO_OFF } from './replay';
 export interface Opts {
   gainDb: number; drumBonus: number; sticky: number; arpOrder: 'xy' | 'yx'; arpFill: number; arpMinVol: number;
   digi: boolean; digiRate: number; digiMaxMs: number; middle: boolean; waveform: boolean;
+  /** AY-composer touches (see core/convert Enhance) */
+  free: 'off' | 'chorus' | 'echo'; chorusCents: number; echoFrames: number; leadFx: 'off' | 'soft' | 'sid'; soft: boolean;
 }
 export const DEFAULT_OPTS: Opts = {
   gainDb: 0, drumBonus: 3, sticky: 1.5, arpOrder: 'xy', arpFill: 0, arpMinVol: 3,
   digi: false, digiRate: 8000, digiMaxMs: 500, middle: false, waveform: false,
+  free: 'off', chorusCents: 8, echoFrames: 9, leadFx: 'off', soft: false,
 };
 
 export const MAPPING_FORMAT = 'mod-xm-to-ym-mapping';
@@ -67,6 +70,8 @@ export function parseMapping(text: string, mod?: MappingModuleInfo): ParsedMappi
     arpOrder: o.arpOrder === 'yx' ? 'yx' : 'xy', arpFill: int(o.arpFill, 0, 3, d.arpFill), arpMinVol: int(o.arpMinVol, 1, 12, d.arpMinVol),
     digi: o.digi === true, digiRate: int(o.digiRate, 2000, 24000, d.digiRate), digiMaxMs: int(o.digiMaxMs, 50, 1500, d.digiMaxMs),
     middle: o.middle === true, waveform: o.waveform === true,
+    free: o.free === 'chorus' || o.free === 'echo' ? o.free : 'off', chorusCents: num(o.chorusCents, 1, 50, d.chorusCents), echoFrames: int(o.echoFrames, 1, 50, d.echoFrames),
+    leadFx: o.leadFx === 'soft' || o.leadFx === 'sid' ? o.leadFx : 'off', soft: o.soft === true,
   };
   const prio: Record<number, number> = {};
   if (isObj(j.prio)) for (const [k, v] of Object.entries(j.prio)) { const c = Number(k); if (Number.isInteger(c) && c >= 0 && c < 64 && typeof v === 'number' && Number.isFinite(v)) prio[c] = v <= PRIO_OFF ? PRIO_OFF : Math.max(-10, Math.min(10, v)); }

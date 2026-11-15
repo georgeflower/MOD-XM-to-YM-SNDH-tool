@@ -74,6 +74,8 @@ const NAMES: [RegExp, string][] = [
   [/^Play the whole conversion with the priorities/, '▶ Full preview (YM2149)'],
   [/^Play this channel alone on the chip/, 'Solo ▶ (channel table)'],
   [/^Mute SNES voices/, 'Voices (SNES SPC panel)'],
+  [/^Melodic notes fade in/, 'Soft note starts and ends'],
+  [/^Tricks AY composers/, 'AY touches'],
 ];
 
 export function extractTips(): Tip[] {

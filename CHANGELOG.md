@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.0 — 2026-11-15
+
+### Added
+- **Echo / delay channel detection** (`src/core/echo.ts`): per channel the note starts are compared with every other channel's at the delay with the most notes in common; a channel whose notes are mostly copies (60 %+) of another's at one delay is an echo. Shown as *echo of ch X, N rows later* in *Source channels* and *Manual import…*; echo channels get the priority *Low* on load, *Suggest* and *Reset to auto*.
+- **AY touches** (converter options, saved with the mapping), after MmcM / Scavenger:
+  - *Free voices*: chorus (the lead a few cents higher, at least one period step, 2 levels quieter) or echo (the lead again N frames later, 4 levels quieter) on voices nobody needs.
+  - *Lead sound*: sinus-SID (soft; up to ~310 Hz, else on the bass) or SID voice (filter sweep) on the lead voice, as a timer-effect track (SNDH / YM6 / game kit). The timer runs at twice the note frequency (both effects modulate at half the timer rate).
+  - *Soft note starts and ends*: melodic notes start 4 / 2 levels down and fade out over a few frames on a voice that stays free.
+
 ## 0.7.0 — 2026-11-15
 
 ### Changed

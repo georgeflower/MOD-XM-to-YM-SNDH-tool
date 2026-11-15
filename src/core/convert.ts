@@ -9,6 +9,7 @@ import { powerSpectrum } from './fft';
 import { DigiExtractor } from './digi';
 import { analyseWave, waveOfClass, BUZZ_SHAPE, BUZZ_MIN_LEVEL, buzzPeriod, buzzable, type WaveChoice, type WaveClass, type WaveInfo } from './waveform';
 import { type DrumTrack, MAX_DRUMS, drumFrames, prepareDrum, silenceDrumVoices, trigCode } from './drums';
+import { type FxTrack, FX_SID, FX_SINUS, SINUS_STEPS, MAX_FX_HZ, fxSettingHz, packFx } from './fx';
 
 export const YM_CLOCK = 2_000_000;
 export const TONE_HZ = YM_CLOCK / 16.0; // period 1 -> 125 kHz
@@ -95,6 +96,27 @@ export interface ConvertOptions {
   waveform?: boolean;
   /** AY level a note needs to be played as a buzzer instead of a square wave (the buzzer has no volume), default 12 */
   buzzMinLevel?: number;
+  /** AY-composer touches (MmcM / Scavenger style), see Enhance */
+  enhance?: Enhance;
+}
+
+/**
+ * Touches AY composers add by hand to make three square waves sound wider and softer:
+ *  - free: a voice nobody needs doubles the lead, either detuned by a few cents (chorus: the two squares beat slowly
+ *    against each other, which sounds like a stereo / chorus effect) or a few frames later and quieter (echo)
+ *  - leadFx: a timer effect on the lead voice: sinus-SID at the note frequency (a rounder, softer tone) or SID voice
+ *    slightly off the note frequency (the slowly sweeping "filter" sound)
+ *  - soft: notes fade in over two frames and fade out over a few frames on a voice that is free afterwards
+ */
+export interface Enhance {
+  free?: 'off' | 'chorus' | 'echo';
+  /** chorus detune, cents (default 8) */
+  chorusCents?: number;
+  /** echo delay, frames (default 9) and how many AY levels quieter (default 4) */
+  echoFrames?: number;
+  echoDrop?: number;
+  leadFx?: 'off' | 'soft' | 'sid';
+  soft?: boolean;
 }
 
 const DEFAULTS = { drumBonus: 3.0, drumGain: 1.0, gainDb: 0.0, sticky: 1.5, refPercentile: 97.0 };
@@ -202,6 +224,10 @@ export interface ConvertResult {
   warnings: string[];
   /** digidrum samples + one trigger per frame (voice C), when any instrument was converted to digidrums */
   drums?: DrumTrack;
+  /** timer effects (the lead's sinus-SID / SID voice), when enhance.leadFx is on */
+  fx?: FxTrack;
+  /** the channel taken as the lead (-1 = none) */
+  leadCh: number;
 }
 
 export function convert(m: Module, options: ConvertOptions = {}): ConvertResult {
@@ -430,6 +456,61 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
     alloc.push(nw);
   });
 
+  // ---- the lead: the most important pitched channel that is not bass or drums
+  const enh = options.enhance ?? {};
+  let leadCh = -1;
+  {
+    const toneN = new Map<number, number>(), drumN = new Map<number, number>();
+    for (const fr of cand) for (const c of fr) {
+      if (c.drum || c.kind === 'noise' || c.np != null) drumN.set(c.ch, (drumN.get(c.ch) ?? 0) + 1);
+      else toneN.set(c.ch, (toneN.get(c.ch) ?? 0) + 1);
+    }
+    let best = Infinity;
+    for (const [ch, n] of toneN) {
+      if (bassCh.has(ch) || (drumN.get(ch) ?? 0) > n || (prio[ch] ?? 0) <= -3) continue;
+      const r = rank.get(ch) ?? 0;
+      if (r < best) { best = r; leadCh = ch; }
+    }
+  }
+  const isLeadItem = (it: Item | null): it is Item => !!it && !it.arp && it.c.kind === 'tone' && it.c.np == null && !it.c.drum && it.c.per != null;
+  const leadItem = (row: (Item | null)[]): Item | null => {
+    const l = row.find((it) => isLeadItem(it) && it!.c.ch === leadCh);
+    if (l) return l;
+    let best: Item | null = null;
+    for (const it of row) if (isLeadItem(it) && !bassCh.has(it.c.ch) && (!best || it.v > best.v)) best = it;
+    return best;
+  };
+
+  // ---- free voices double the lead: detuned (chorus) or later (echo)
+  let fillFrames = 0;
+  if (enh.free === 'chorus' || enh.free === 'echo') {
+    const cents = enh.chorusCents ?? 8, delay = Math.max(1, Math.round(enh.echoFrames ?? 9)), drop = enh.echoDrop ?? 4;
+    const orig = alloc.map((row) => row.slice());
+    for (let f = 0; f < nf; f++) {
+      const freeSlots = busy[f] ? [0, 1] : [0, 1, 2];
+      const free = freeSlots.filter((i) => alloc[f][i] === null);
+      if (!free.length) continue;
+      let src: Item | null = null, v = 0, per = 0;
+      if (enh.free === 'chorus') {
+        src = leadItem(orig[f]);
+        if (src) {
+          v = src.v - 2;
+          per = src.c.per! * Math.pow(2, -cents / 1200);
+          // at least one period step apart, or the two voices would just add up instead of beating
+          if (Math.round(per) >= Math.round(src.c.per!)) per = Math.round(src.c.per!) - 1;
+        }
+      } else if (f >= delay) {
+        src = leadItem(orig[f - delay]);
+        if (src) { v = src.v - drop; per = src.c.per!; }
+      }
+      if (!src || v < 1) continue;
+      // the copy takes the free voice nearest to the lead's own voice side (C, then B, then A)
+      const i = free[free.length - 1];
+      alloc[f][i] = { v, c: { ...src.c, per, buzz: 0, ch: -1 - src.c.ch } };
+      fillFrames++;
+    }
+  }
+
   // ---- registers
   const regs = new Uint8Array(nf * NREGS);
   const prevPer = [1000, 1000, 1000];
@@ -503,6 +584,70 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
   }
   if (!buzzFrames) for (let f = 0; f < nf; f++) regs[f * NREGS + 13] = 0;
 
+  // ---- soft envelopes: fade in over two frames, fade out on a voice that falls silent and stays free
+  if (enh.soft) {
+    for (let i = 0; i < 3; i++) {
+      for (let f = 1; f < nf; f++) {
+        const b = f * NREGS, pb = b - NREGS;
+        const v = regs[b + 8 + i], pv = regs[pb + 8 + i];
+        if (v & 16 || pv & 16) continue;
+        const noise = !(regs[b + 7] & (8 << i)) || !(regs[pb + 7] & (8 << i));
+        if (noise) continue;
+        // only melodic notes: drums keep their hard attack
+        const it = alloc[f][i] ?? alloc[f - 1][i];
+        if (!it || it.c.drum || it.c.kind !== 'tone' || it.c.np != null) continue;
+        if (v > 0 && pv === 0 && v > 4) {
+          regs[b + 8 + i] = v - 4;                               // attack: -4, -2, full
+          if (f + 1 < nf && regs[b + NREGS + 8 + i] === v) regs[b + NREGS + 8 + i] = v - 2;
+        } else if (v === 0 && pv > 3 && !(regs[pb + 7] & (1 << i))) {
+          // release tail on the same period, while the voice stays unused
+          let t = pv;
+          for (let g = f; g < nf && g < f + 5; g++) {
+            const gb = g * NREGS;
+            t -= 3;
+            if (t <= 0 || regs[gb + 8 + i] !== 0 || regs[gb + 2 * i] !== regs[pb + 2 * i] || regs[gb + 2 * i + 1] !== regs[pb + 2 * i + 1]) break;
+            regs[gb + 8 + i] = t;
+            regs[gb + 7] &= ~(1 << i);
+          }
+        }
+      }
+    }
+    log('soft envelopes: notes fade in over two frames and out over a few');
+  }
+
+  // ---- timer effect on the lead voice (one MFP timer: one voice at a time)
+  let fx: FxTrack | undefined;
+  if (enh.leadFx === 'soft' || enh.leadFx === 'sid') {
+    const t = new Uint32Array(nf) as FxTrack;
+    let n = 0;
+    // the effects modulate the volume at half their timer rate (SID: one toggle per tick, sinus: 64 steps per two timer
+    // periods), so the timer runs at twice the note frequency; the sinus-SID engine needs 64 interrupts per note cycle,
+    // which the ST manages up to about 310 Hz: above that the soft sound goes to the most important lower voice (bass)
+    const voiceHz = (f: number, i: number): number => {
+      const b = f * NREGS, vol = regs[b + 8 + i];
+      if (!vol || vol & 16 || (busy[f] && i === 2) || !isLeadItem(alloc[f][i])) return 0;
+      const per = regs[b + 2 * i] | ((regs[b + 2 * i + 1] & 15) << 8);
+      return per ? TONE_HZ / per : 0;
+    };
+    const sinusMax = MAX_FX_HZ / (2 * SINUS_STEPS);
+    for (let f = 0; f < nf; f++) {
+      const lead = leadItem(alloc[f]);
+      let i = lead ? alloc[f].indexOf(lead) : -1;
+      let hz = i >= 0 ? voiceHz(f, i) : 0;
+      if (enh.leadFx === 'soft' && !(hz > 0 && hz <= sinusMax)) {
+        i = -1; hz = 0;
+        let bestV = 0;
+        alloc[f].forEach((it, k) => { const h = voiceHz(f, k); if (h > 0 && h <= sinusMax && it!.v > bestV) { bestV = it!.v; i = k; hz = h; } });
+      }
+      if (i < 0 || !hz) continue;
+      const st = enh.leadFx === 'soft' ? fxSettingHz(FX_SINUS, i, 2 * hz) : fxSettingHz(FX_SID, i, 2 * hz * 1.006);
+      if (!st) continue;
+      t[f] = packFx(st); n++;
+    }
+    if (n) { fx = t; log(`${enh.leadFx === 'soft' ? 'sinus-SID (soft sound) on the lead, or the bass where the lead is too high,' : 'SID voice (filter-like lead) on the lead'} in ${n} frame(s) (lead = channel ${leadCh + 1})`); }
+  }
+  if (fillFrames) log(`${enh.free === 'chorus' ? 'chorus (detuned double of the lead)' : 'echo of the lead'} on free voices in ${fillFrames} frame(s)`);
+
   if (buzzFrames) {
     log(`buzzer: ${buzzFrames} frame(s) played as a hardware-envelope sawtooth / triangle voice`);
     for (const r of instReports) if (buzzInst.has(r.inst)) r.buzz = true;
@@ -522,5 +667,5 @@ export function convert(m: Module, options: ConvertOptions = {}): ConvertResult 
     if (digi.skipped) warnings.push(`${digi.skipped} digidrum hit(s) skipped: more than ${MAX_DRUMS} sample variants`);
   } else if (digiOn) log('digidrums: no percussion hits found');
 
-  return { regs, nframes: nf, loopFrame, report, instruments: instReports, played, dropped, folded, dropPerFrame, arpPerFrame, warnings, drums: digiTrack };
+  return { regs, nframes: nf, loopFrame, report, instruments: instReports, played, dropped, folded, dropPerFrame, arpPerFrame, warnings, drums: digiTrack, fx, leadCh };
 }

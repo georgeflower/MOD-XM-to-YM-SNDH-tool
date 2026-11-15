@@ -26,6 +26,10 @@ import { decodeYmt, isYmt } from '../tracker/ymt';
 import { Tracker } from './Tracker';
 import { download } from './download';
 import { DEFAULT_OPTS, mappingToJson, parseMapping, cleanName, type Opts } from '../core/mapping';
+import { detectEchoes, echoLabel, type EchoInfo } from '../core/echo';
+
+/** echo channels get Low (-3) unless the priorities already say otherwise */
+const echoPrio = (echoes: EchoInfo[], base: Record<number, number>) => { const p = { ...base }; for (const e of echoes) if (p[e.ch] === undefined) p[e.ch] = -3; return p; };
 import { TextField } from './fields';
 import { AyRoll } from './AyRoll';
 import { ImportDialog } from './ImportDialog';
@@ -63,6 +67,8 @@ export function App() {
   const [error, setError] = useState('');
   const [opts, setOpts] = useState<Opts>(DEFAULT_OPTS);
   const [prio, setPrio] = useState<Record<number, number>>({});
+  /** echo / delay channels of the loaded module (they get the Low priority on load) */
+  const [echoes, setEchoes] = useState<EchoInfo[]>([]);
   const [instMap, setInstMap] = useState<Record<number, InstMap>>({});
   /** custom instrument names (instrument number -> name); empty = the module's own */
   const [names, setNames] = useState<Record<number, string>>({});
@@ -97,6 +103,14 @@ export function App() {
     if (t === tab) return;
     if (t === 'ed') { previewRef.current?.stop(); setPlaying(false); getEd(); } else edRef.current?.stop();
     setTab(t);
+  };
+
+  /** find the echo / delay channels of a freshly loaded module and give them the Low priority */
+  const findEchoes = (m: Module, base: Record<number, number>) => {
+    setEchoes([]);
+    setTimeout(() => {
+      try { const e = detectEchoes(m); setEchoes(e); if (e.length) setPrio((p) => echoPrio(e, { ...base, ...p })); } catch { /* analysis only */ }
+    }, 0);
   };
 
   // ---- loading: modules are converted, .sndh/.ym are register dumps that are played/imported as they are
@@ -134,6 +148,7 @@ export function App() {
       }
       const m = loadModule(data);
       setTune(null); setSpc(null); setMod(m);
+      findEchoes(m, {});
       preview().loadOriginal(data);
     } catch (e) {
       setError(String((e as Error).message ?? e));
@@ -146,6 +161,7 @@ export function App() {
       try {
         const r = spcToModule(data, o);
         setMod(r.module); setAuthor(r.info.artist);
+        findEchoes(r.module, r.prio);
         setSpc({ info: r.info, opts: o });
         preview().setOriginalPcm(r.pcm, 32000, r.pcmLoop);
         preview().setSource('ay'); setSource('ay');
@@ -174,7 +190,7 @@ export function App() {
   };
 
   // ---- conversion (debounced; runs on the main thread, ~1-3 s for a long song)
-  const convOpts = useMemo<ConvertOptions>(() => ({ gainDb: opts.gainDb, drumBonus: opts.drumBonus, sticky: opts.sticky, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, waveform: opts.waveform, prio, inst: instMap }), [opts, prio, instMap]);
+  const convOpts = useMemo<ConvertOptions>(() => ({ gainDb: opts.gainDb, drumBonus: opts.drumBonus, sticky: opts.sticky, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, waveform: opts.waveform, prio, inst: instMap, enhance: { free: opts.free, chorusCents: opts.chorusCents, echoFrames: opts.echoFrames, leadFx: opts.leadFx, soft: opts.soft } }), [opts, prio, instMap]);
   useEffect(() => {
     if (!mod) return;
     setBusy('Converting to YM2149 registers…');
@@ -185,7 +201,7 @@ export function App() {
         setBusy('Rendering the YM2149 preview…');
         setTimeout(() => {
           // an SPC with a found loop jumps back to the loop start, like the YM export does
-          preview().setAy(renderYm(r.regs, r.nframes, 44100, 50, 4, r.drums), 44100, mod.kind === 'spc' && r.loopFrame > 0 ? r.loopFrame / 50 : 0);
+          preview().setAy(renderYm(r.regs, r.nframes, 44100, 50, 4, r.drums, r.fx), 44100, mod.kind === 'spc' && r.loopFrame > 0 ? r.loopFrame / 50 : 0);
           setBusy('');
         }, 20);
       } catch (e) {
@@ -346,7 +362,7 @@ export function App() {
       {error && <div className="panel err">{error}</div>}
 
       {importOpen && mod && (
-        <ImportDialog mod={mod} names={names} rename={rename} mainPos={pos} mainDur={seconds} seekMain={(sec) => { const pv = preview(); void pv.play(sec); setPos(sec); setPlaying(true); }} convOpts={convOpts} prio={prio} setPrio={setPrio} mainPlaying={playing} mainSource={source} hasOrig={origOk}
+        <ImportDialog mod={mod} echoes={echoes} names={names} rename={rename} mainPos={pos} mainDur={seconds} seekMain={(sec) => { const pv = preview(); void pv.play(sec); setPos(sec); setPlaying(true); }} convOpts={convOpts} prio={prio} setPrio={setPrio} mainPlaying={playing} mainSource={source} hasOrig={origOk}
           playMain={playMain} stopMain={stopMain} busy={busy} onClose={() => setImportOpen(false)}
           onEdit={() => { setImportOpen(false); toPatterns(); }} />
       )}
@@ -507,6 +523,30 @@ export function App() {
               <label className="chk" title="How AY composers lay out the three voices: bass and the synthetic drums on the middle voice (B), melody and arpeggios on A and C, so the voices sit in different frequency ranges. Digidrums stay on voice C.">
                 <input type="checkbox" checked={opts.middle} onChange={(e) => setOpts({ ...opts, middle: e.target.checked })} /> Bass + drums on the middle voice
               </label>
+              <h3 title="Tricks AY composers such as MmcM and Scavenger use by hand to make three square waves sound wider and softer">AY touches</h3>
+              <label className="row" title="What a voice that no channel needs does. Chorus: it plays the lead a few cents off, so the two square waves beat slowly against each other (a wide, stereo-like chorus). Echo: it plays the lead again a few frames later and quieter (a delay).">
+                <span className="lbl">Free voices</span>
+                <select value={opts.free} onChange={(e) => setOpts({ ...opts, free: e.target.value as Opts['free'] })}>
+                  <option value="off">stay silent</option>
+                  <option value="chorus">chorus — the lead, detuned (wide)</option>
+                  <option value="echo">echo — the lead, later and quieter</option>
+                </select>
+              </label>
+              {opts.free === 'chorus' && <Slider label="Detune" value={opts.chorusCents} min={2} max={25} step={1} unit=" cents" onChange={(v) => setOpts({ ...opts, chorusCents: v })}
+                hint="How far the chorus voice is off the lead: a few cents beat slowly (wide), more cents beat fast (thick, out of tune)" />}
+              {opts.free === 'echo' && <Slider label="Echo delay" value={opts.echoFrames} min={2} max={30} step={1} unit=" frames" onChange={(v) => setOpts({ ...opts, echoFrames: v })}
+                hint="How much later the echo plays (one frame = 20 ms)" />}
+              <label className="row" title="A timer effect on the lead voice (one voice at a time, an MFP timer interrupt like the digidrums; plays in the SNDH, YM6 and game-kit exports). Soft: sinus-SID at the note frequency, a rounder, softer tone (the ST manages it up to about 310 Hz: above that it goes to the bass). SID: SID voice slightly off the note frequency, the slowly sweeping filter-like sound.">
+                <span className="lbl">Lead sound</span>
+                <select value={opts.leadFx} onChange={(e) => setOpts({ ...opts, leadFx: e.target.value as Opts['leadFx'] })}>
+                  <option value="off">plain square</option>
+                  <option value="soft">soft — sinus-SID</option>
+                  <option value="sid">filter sweep — SID voice</option>
+                </select>
+              </label>
+              <label className="chk" title="Melodic notes fade in over two frames (no click) and fade out over a few frames when their voice is free afterwards, instead of stopping dead. Drums keep their hard attack.">
+                <input type="checkbox" checked={opts.soft} onChange={(e) => setOpts({ ...opts, soft: e.target.checked })} /> Soft note starts and ends
+              </label>
               <label className="row" title="Order in which an arpeggio cycles its notes">
                 <span className="lbl">Arpeggio</span>
                 <select value={opts.arpOrder} onChange={(e) => setOpts({ ...opts, arpOrder: e.target.value as 'xy' | 'yx' })}>
@@ -537,7 +577,7 @@ export function App() {
                 <Slider label="Drum length" value={opts.digiMaxMs} min={50} max={1500} step={50} unit=" ms" onChange={(v) => setOpts({ ...opts, digiMaxMs: v })}
                   hint="Longest digidrum; longer samples are cut (with a short fade)" />
               </>}
-              <button title="Back to the automatic settings: options, priorities, instrument roles and names" className="btn small" onClick={() => { setOpts(DEFAULT_OPTS); setPrio({}); setInstMap({}); setNames({}); setMacroSel(null); }}>Reset to auto</button>
+              <button title="Back to the automatic settings: options, priorities (echo channels Low), instrument roles and names" className="btn small" onClick={() => { setOpts(DEFAULT_OPTS); setPrio(echoPrio(echoes, {})); setInstMap({}); setNames({}); setMacroSel(null); }}>Reset to auto</button>
               <button className="btn small" onClick={saveMapping} title="Save the instrument mapping, channel priorities and these options as a .json file">Save mapping</button>
               <label className="btn small" title="Load a mapping saved earlier (for this module or a similar one)">Load mapping…<input type="file" accept=".json,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadMapping(f); e.target.value = ''; }} /></label>
               <button className="btn small primary" onClick={() => setImportOpen(true)} title="Choose which channels matter most, listen to each channel alone and to the full preview">Manual import…</button>
@@ -632,7 +672,7 @@ export function App() {
             <section className="panel">
               <h2>Source channels → 3 voices</h2>
               <table>
-                <thead><tr><th>Ch</th><th>Played</th>{opts.arpFill > 1 && <th>In arp</th>}<th>Dropped</th><th>Priority</th></tr></thead>
+                <thead><tr><th>Ch</th><th>Played</th>{opts.arpFill > 1 && <th>In arp</th>}<th>Dropped</th><th>Priority</th><th></th></tr></thead>
                 <tbody>
                   {res && res.played.map((pl, ch) => {
                     const dr = res.dropped[ch], fo = res.folded[ch], tot = pl + dr + fo;
@@ -647,6 +687,7 @@ export function App() {
                           <span className="pv">{prio[ch] ?? 0}</span>
                           <button title="Raise this channel's priority by 1" className="btn tiny" onClick={() => setPrio({ ...prio, [ch]: (prio[ch] ?? 0) + 1 })}>+</button>
                         </td>
+                        <td className="soft">{(() => { const e = echoes.find((x) => x.ch === ch); return e ? <span title={`Repeats channel ${e.of + 1} ${e.frames} frames later at ${Math.round(e.level * 100)} % loudness: an echo / delay track. It gets the Low priority, so it only plays when a voice is free.`}>{echoLabel(e)}</span> : null; })()}</td>
                       </tr>
                     );
                   })}

@@ -28,13 +28,19 @@ Hover over any control for a tooltip. This chapter lists every one of them (gene
 | Voice stickiness | Higher = a note stays on the same YM voice (less jumping, fewer clicks) |
 | Sample waveform → buzzer | Match the sample's waveform: sawtooth, triangle and sine-like tones become the YM's hardware-envelope buzzer (one voice at a time, bass range, loud notes) instead of a square wave. Square and complex samples stay square tones. Each instrument can be set by hand in the table. |
 | Bass + drums on the middle voice | How AY composers lay out the three voices: bass and the synthetic drums on the middle voice (B), melody and arpeggios on A and C, so the voices sit in different frequency ranges. Digidrums stay on voice C. |
+| AY touches | Tricks AY composers such as MmcM and Scavenger use by hand to make three square waves sound wider and softer |
+| Free voices | What a voice that no channel needs does. Chorus: it plays the lead a few cents off, so the two square waves beat slowly against each other (a wide, stereo-like chorus). Echo: it plays the lead again a few frames later and quieter (a delay). |
+| Detune | How far the chorus voice is off the lead: a few cents beat slowly (wide), more cents beat fast (thick, out of tune) |
+| Echo delay | How much later the echo plays (one frame = 20 ms) |
+| Lead sound | A timer effect on the lead voice (one voice at a time, an MFP timer interrupt like the digidrums; plays in the SNDH, YM6 and game-kit exports). Soft: sinus-SID at the note frequency, a rounder, softer tone (the ST manages it up to about 310 Hz: above that it goes to the bass). SID: SID voice slightly off the note frequency, the slowly sweeping filter-like sound. |
+| Soft note starts and ends | Melodic notes fade in over two frames (no click) and fade out over a few frames when their voice is free afterwards, instead of stopping dead. Drums keep their hard attack. |
 | Arpeggio | Order in which an arpeggio cycles its notes |
 | Arp fill | Notes that would be dropped (more channels than YM voices) share a voice and alternate every 20 ms, like a chiptune chord |
 | Min. volume | Dropped notes quieter than this AY volume are not worth an arpeggio slot |
 | Percussion as digidrums | Percussion samples (not the tonal ones) are played as real 4-bit samples through a voice's volume register, driven by an MFP timer interrupt. They take voice C while they play. |
 | Drum rate | Sample rate of the digidrums; the ST can only make some rates, the nearest one is used. Higher = clearer but costs more CPU and memory. |
 | Drum length | Longest digidrum; longer samples are cut (with a short fade) |
-| Reset to auto | Back to the automatic settings: options, priorities, instrument roles and names |
+| Reset to auto | Back to the automatic settings: options, priorities (echo channels Low), instrument roles and names |
 | Save mapping | Save the instrument mapping, channel priorities and these options as a .json file |
 | Load mapping… | Load a mapping saved earlier (for this module or a similar one) |
 | Manual import… | Choose which channels matter most, listen to each channel alone and to the full preview |

@@ -37,6 +37,29 @@ Tips:
 * If two channels fight for the lead role, make one **High** and the other **Normal**: the difference decides who wins a contested voice.
 * The priorities are part of the mapping file — see [Save and reuse a conversion](#howto-mapping).
 
+## Echo and delay channels {#howto-echo}
+
+Many modules have a track that copies another track a few rows later at a lower volume — a hand-made echo or delay. The tool finds them when a module is loaded: a channel is an echo when most of its notes repeat another channel's notes at the same delay.
+
+* *Source channels* and **Manual import…** say *echo of ch X, N rows later* next to it (hover for the delay in frames and how loud it is).
+* It gets the priority **Low**: on three voices the echo plays only where a voice is free, and the melody it repeats always wins.
+* Want it louder in the mix? Set it to **Normal** in *Manual import…*. Want no echo at all? Set it to **Off**.
+* No echo track in the module but you want one: *Free voices → echo* in the conversion options (see [Make it sound wider and softer](#howto-touches)).
+
+SPC files: the SNES echo becomes such channels already (*Echo notes*), and they are marked the same way.
+
+## Make it sound wider and softer {#howto-touches}
+
+The *AY touches* in the conversion options are what AY composers such as MmcM and Scavenger do by hand. Try them one at a time and listen with **Y · YM**:
+
+1. **Free voices → chorus** — whenever a voice is not needed, it plays the lead a few cents higher. Two square waves that are almost in tune beat slowly against each other: a wide, chorus- or stereo-like sound on a mono chip. Raise **Detune** for a thicker, faster beat.
+2. **Free voices → echo** — the free voice plays the lead again **Echo delay** frames later, 4 levels quieter.
+3. **Lead sound → soft (sinus-SID)** — the lead's volume follows a sine wave at the note frequency: a rounder, softer tone. The ST manages this up to about 310 Hz; for higher leads it goes to the bass instead.
+4. **Lead sound → filter sweep (SID voice)** — the lead's volume is switched on and off slightly off the note frequency: the slowly sweeping sound of the SID voice.
+5. **Soft note starts and ends** — melodic notes fade in over two frames and out over a few, instead of clicking on and off.
+
+The lead is the most important pitched channel (give a channel *Lead* in **Manual import…** to choose it). The lead sound uses the MFP timer, so it plays in the SNDH, YM6 and game-kit exports (YM5 cannot hold it). The touches are part of the conversion only; *Edit as AY patterns* does not copy them — use the editor's `S`, `Q` and *Echo…* there.
+
 ## Change how a module instrument is played {#howto-instruments-convert}
 
 In the **Instruments → AY role** table:

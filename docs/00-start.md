@@ -1,6 +1,6 @@
 # Start here
 
-**MOD/XM → YM2149 · SNDH · game stream — version 0.7**
+**MOD/XM → YM2149 · SNDH · game stream — version 0.8**
 
 A browser tool that turns ProTracker `.mod` and FastTracker II `.xm` modules into music for the **Atari ST's YM2149** sound chip (one chip: three square-wave voices, one noise generator, one envelope generator, updated 50 times a second). It also loads SNES `.spc` music files, `.sndh`, `.ym`, `.ymt`, maxYMiser and Arkos files, has an FT2-style pattern editor for the chip, and exports to SNDH, YM, a C game kit, maxYMiser, Arkos Tracker 3, Furnace, WAV and raw registers.
 
@@ -22,7 +22,15 @@ Everything runs in your browser. There is no server and none of your files are u
 5. Choose an export: **SNDH** plays in any Atari ST player; **YM** plays in ST-Sound and similar players.
 6. To keep working on the song by hand, press **Edit as AY patterns →**. This works for a loaded `.sndh` or `.ym` as well: the tune is turned back into notes and instruments (see [Edit an existing SNDH or YM tune](#howto-edit-tune)).
 
-## What's new in 0.7
+## What's new in 0.8
+
+* **Echo / delay channels are found** — a channel that plays another channel's melody again a little later (usually quieter) is marked *echo of ch X, N rows later* in *Source channels* and *Manual import…*, and gets the priority *Low*, so it only plays when a voice is free ([Echo and delay channels](#howto-echo)).
+* **AY touches** in the converter options, the tricks AY composers such as MmcM and Scavenger use by hand ([Make it sound wider and softer](#howto-touches)):
+  * *Free voices*: a voice nobody needs doubles the lead, **detuned** (chorus — a wide, stereo-like sound) or **later and quieter** (echo).
+  * *Lead sound*: **sinus-SID** (a softer, rounder tone) or **SID voice** (the slowly sweeping filter sound) on the lead voice.
+  * *Soft note starts and ends*: melodic notes fade in and out instead of clicking on and off.
+
+## What was new in 0.7
 
 * **Edit as AY patterns sounds like the conversion.** The instruments are built from how the notes really play (volume envelopes and the SNES envelopes included), the volume column and slides follow the source every row, notes at high tempos (SPC files) start where they should, and the drums are made the same way as in the conversion (digidrums only with *Percussion as digidrums*).
 * **Replace…** in the instrument panel: give an instrument a preset sound or another instrument's sound, or let its notes play another instrument ([Replace an instrument](#howto-replace-inst)).

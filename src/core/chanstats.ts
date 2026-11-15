@@ -3,7 +3,7 @@
  * which instruments it plays, so the user can tell the melody from the bass and the drums.
  */
 import type { Module } from './types';
-import { replay } from './replay';
+import { replay, noteAges } from './replay';
 
 export interface ChanStat {
   ch: number;
@@ -24,6 +24,7 @@ export const noteLabel = (n: number) => `${NAMES[(n - 1) % 12]}${Math.floor((n -
 
 export function channelStats(m: Module, buckets = 96): ChanStat[] {
   const rep = replay(m);
+  const ages = noteAges(rep.frames);
   const n = rep.frames.length, nch = m.nch;
   const act = new Array<number>(nch).fill(0), notes = new Array<number>(nch).fill(0);
   const sum = Array.from({ length: nch }, () => new Float64Array(buckets));
@@ -36,7 +37,7 @@ export function channelStats(m: Module, buckets = 96): ChanStat[] {
     rep.frames[f].forEach((st, c) => {
       if (!st || st.vol <= 0) return;
       act[c]++;
-      if (st.age === 0) notes[c]++;
+      if (ages[f][c] === 0) notes[c]++;
       sum[c][b] += Math.min(1, st.vol);
       if (f % 4 === 0) pitch[c].push(st.note);
       inst[c].set(st.inst, (inst[c].get(st.inst) ?? 0) + 1);

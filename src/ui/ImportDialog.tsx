@@ -3,6 +3,7 @@ import type { Module } from '../core/types';
 import { convert, type ConvertOptions } from '../core/convert';
 import { PRIO_OFF } from '../core/replay';
 import { channelStats, suggestPriorities, noteLabel, type ChanStat } from '../core/chanstats';
+import { echoLabel, type EchoInfo } from '../core/echo';
 import { renderYm } from '../export/ymemu';
 import { Preview, type Source } from './audio';
 import { TextField } from './fields';
@@ -37,6 +38,8 @@ interface Props {
   mainPos: number;
   mainDur: number;
   seekMain: (sec: number) => void;
+  /** echo / delay channels found in the module */
+  echoes: EchoInfo[];
 }
 
 export function ImportDialog(p: Props) {
@@ -82,7 +85,7 @@ export function ImportDialog(p: Props) {
         let pcm = cache.current.get(key);
         if (!pcm) {
           const r = convert(mod, { ...convOpts, solo: ch });
-          pcm = renderYm(r.regs, r.nframes, 44100, 50, 4, r.drums);
+          pcm = renderYm(r.regs, r.nframes, 44100, 50, 4, r.drums, r.fx);
           if (cache.current.size >= 2) cache.current.delete(cache.current.keys().next().value!);
           cache.current.set(key, pcm);
         }
@@ -119,7 +122,7 @@ export function ImportDialog(p: Props) {
     setPrio(next);
   };
   const suggest = () => {
-    if (stats) setPrio(suggestPriorities(stats, { low: -3, normal: 0, lead: 8 }));
+    if (stats) { const s = suggestPriorities(stats, { low: -3, normal: 0, lead: 8 }); for (const e of p.echoes) if (s[e.ch] === undefined || s[e.ch] > -3) s[e.ch] = -3; setPrio(s); }
   };
   const off = Object.values(prio).filter((v) => v <= PRIO_OFF).length;
 
@@ -150,7 +153,7 @@ export function ImportDialog(p: Props) {
                 const preset = LEVELS.some((l) => l.value === v);
                 return (
                   <tr key={s.ch} className={v <= PRIO_OFF ? 'offrow' : ''}>
-                    <td>{s.ch + 1}</td>
+                    <td>{s.ch + 1}{(() => { const e = p.echoes.find((x) => x.ch === s.ch); return e ? <small className="echo" title={`Channel ${s.ch + 1} repeats channel ${e.of + 1} ${e.frames} frames (${e.rows} row${e.rows === 1 ? '' : 's'}) later at ${Math.round(e.level * 100)} % of its loudness (${Math.round(e.match * 100)} % of its notes). An echo is the first thing to give up on three voices: it is set to Low.`}><br />{echoLabel(e)}</small> : null; })()}</td>
                     <td>
                       <div className={`act${s.activeFrac ? ' seekable' : ''}`} role="slider" aria-label={`Listen to channel ${s.ch + 1} from here`} aria-valuemin={0} aria-valuemax={100}
                         aria-valuenow={Math.round(100 * (soloCh === s.ch ? soloPos / (solo.current?.duration || 1) : p.mainPlaying && soloCh === null && p.mainDur ? p.mainPos / p.mainDur : 0))}

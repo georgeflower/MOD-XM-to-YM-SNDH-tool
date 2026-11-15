@@ -46,6 +46,11 @@ All conversion controls re-render the preview automatically: the change is appli
 | **Arp fill** | off | Notes that would be dropped are folded into a 2- or 3-note fast arpeggio on the voice with the closest pitch. |
 | **Min. volume** | 1…12, 3 | (Shown with Arp fill.) Dropped notes quieter than this AY volume are not worth an arpeggio slot. |
 | **Percussion as digidrums** | off | Percussion samples are played as real 4-bit samples through a timer interrupt instead of a noise/tone macro. |
+| **Free voices** (AY touches) | stay silent | What a voice that no channel needs does. *Chorus*: it plays the lead a few cents higher, so the two square waves beat slowly — a wide, stereo-like chorus. *Echo*: it plays the lead again later and 4 levels quieter. |
+| **Detune** | 2…25 cents, 8 | (Shown with chorus.) A few cents beat slowly (wide); more cents beat fast (thick). At least one period step. |
+| **Echo delay** | 2…30 frames, 9 | (Shown with echo.) How much later the echo plays (one frame = 20 ms). |
+| **Lead sound** (AY touches) | plain square | A timer effect on the lead voice (one voice at a time, like the digidrums an MFP timer interrupt; plays in the SNDH, YM6 and game-kit exports). *Soft*: sinus-SID at the note frequency — rounder and softer; the ST manages it up to about 310 Hz, above that it goes to the bass. *Filter sweep*: SID voice slightly off the note frequency — the slowly sweeping, filter-like sound. |
+| **Soft note starts and ends** (AY touches) | off | Melodic notes start 4 and 2 levels down before full volume and fade out over a few frames when their voice is free afterwards. Drums keep their hard attack. |
 | **Drum rate** | 4…16 kHz, 8 | (Shown with digidrums.) Sample rate of the drums. Higher is clearer but costs CPU time and memory. |
 | **Drum length** | 50…1500 ms, 500 | (Shown with digidrums.) Longer drums are cut with a short fade. |
 
@@ -92,7 +97,7 @@ Appears below the tables when an instrument is set to *custom macro* and you pre
 
 ## Source channels → 3 voices {#manual-channels}
 
-For each source channel: **Played** (share of its events that got a voice), **In arp** (share folded into arpeggios, when *Arp fill* is on), **Dropped** (share lost; shown in red above 10 %) and a **Priority** value with −/+ buttons (steps of 1). These are the same priority values the [manual import dialog](#manual-import) sets with its five levels.
+For each source channel: **Played** (share of its events that got a voice), **In arp** (share folded into arpeggios, when *Arp fill* is on), **Dropped** (share lost; shown in red above 10 %) and a **Priority** value with −/+ buttons (steps of 1). These are the same priority values the [manual import dialog](#manual-import) sets with its five levels. A channel that repeats another channel's melody a little later (an echo / delay track) says *echo of ch X, N rows later*; it gets the priority *Low* when the module is loaded (see [Echo and delay channels](#howto-echo)).
 
 ## Manual import dialog {#manual-import}
 
@@ -102,7 +107,7 @@ Opened with **Manual import…**. Use it when the automatic result loses a part 
 |---|---|
 | **▶ Full preview (YM2149)** | Plays the whole conversion with the priorities currently set. You can keep changing priorities while it plays: after a short delay (0.25 s plus 1–3 s of conversion for a long song; the status text next to the buttons shows *Converting…*) the new version replaces the old one. |
 | **▶ Original** | Plays the original module for comparison (only when original playback is available — see [Troubleshooting](#troubleshooting)). |
-| **Suggest** | First guess: the busiest pitched channel becomes *Lead*, nearly silent channels (active < 5 % of the song) become *Low*, the rest *Normal*. |
+| **Suggest** | First guess: the busiest pitched channel becomes *Lead*, nearly silent channels (active < 5 % of the song) and echo channels become *Low*, the rest *Normal*. |
 | **Reset** | Removes all priorities. |
 | **Channel table** | One row per source channel: **Activity over the song** (a loudness bar chart in 96 slices; *click it to listen from that point*), **Active** (% of frames sounding), **Notes** (number of note starts), **Pitch** (median note), **Main instruments** (up to three, with their numbers; the names are text fields you can rename). |
 | **Priority** | A five-way switch per channel — see below. |
