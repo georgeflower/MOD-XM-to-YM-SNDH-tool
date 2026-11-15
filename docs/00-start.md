@@ -29,6 +29,7 @@ Everything runs in your browser. There is no server and none of your files are u
   * *Free voices*: a voice nobody needs doubles the lead, **detuned** (chorus — a wide, stereo-like sound) or **later and quieter** (echo).
   * *Lead sound*: **sinus-SID** (a softer, rounder tone) or **SID voice** (the slowly sweeping filter sound) on the lead voice.
   * *Soft note starts and ends*: melodic notes fade in and out instead of clicking on and off.
+  * 0.8.1: *Edit as AY patterns* takes them along as editable pattern content (chorus notes with `E1x`, `S` / `Q` on the lead's notes, softer instruments).
 
 ## What was new in 0.7
 

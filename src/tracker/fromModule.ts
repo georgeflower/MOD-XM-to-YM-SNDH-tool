@@ -19,7 +19,8 @@ import { analyseSample, fold, ended, type SampleInfo } from '../core/samples';
 import { DigiExtractor } from '../core/digi';
 import { drumFrames } from '../core/drums';
 import { analyseWave, waveOfClass, BUZZ_SHAPE, buzzable, type WaveChoice } from '../core/waveform';
-import { classifyDrum, drumMacro, pyRound, TONE_HZ, type DrumKind, type InstMap, type MacroStep } from '../core/convert';
+import { classifyDrum, drumMacro, pyRound, TONE_HZ, type DrumKind, type InstMap, type MacroStep, type Enhance } from '../core/convert';
+import { fxParamForHz, SINUS_STEPS, MAX_FX_HZ } from '../core/fx';
 import { amigaPeriodOf, xmAmigaPeriodOf, PT_NOTE_BASE } from '../core/pitch';
 import {
   type Song, type Cell, type Instrument, type Pattern,
@@ -54,6 +55,11 @@ export interface SongConvertOptions {
   bassHz?: number;
   /** sawtooth / triangle / sine-like sustained samples become hardware-envelope buzzer instruments where the pitch allows (see core/waveform) */
   waveform?: boolean;
+  /** the converter's AY touches, written as pattern effects: chorus / echo on free voices (notes + E1x detune), the
+   *  lead sound as S / Q effects on the lead's notes, soft starts and ends in the instruments */
+  enhance?: Enhance;
+  /** the lead channel for the AY touches (the converter's choice, so both agree); default: found here */
+  leadCh?: number;
 }
 
 export interface SongConvertResult {
@@ -450,6 +456,8 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
   const speedAt: number[] = rows.map((r) => clamp(r.len, 1, 31));
 
   const voices: Voice[] = Array.from({ length: 3 }, () => ({ owner: null, note: 0, ownerNote: 0, plan: null, vol: 64, arp: false, vibOn: false, trigFrame: 0, per: NaN }));
+  const snaps: { owner: number | null; note: number; inst: number; kind: Plan['kind'] | null; vol: number; arp: boolean; trig: boolean; free: boolean }[][] = [];
+  const importance: number[] = [], pitchHz: number[][] = [];
   const playedRows = new Array(nch).fill(0), foldedRows = new Array(nch).fill(0), droppedRows = new Array(nch).fill(0);
   const lastParam = new Map<string, number>();         // effect memory per source channel (1xx/2xx/3xx/4xy)
   let prevActive = new Array(nch).fill(false);
@@ -780,6 +788,142 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
     }
 
     prevActive = infos.map((x) => x.active);
+    // what every voice holds after this row (for the AY touches below)
+    snaps.push(voices.map((v, i) => ({ owner: v.owner, note: v.note, inst: v.plan?.ay ?? 0, kind: v.plan?.kind ?? null, vol: v.vol, arp: v.arp, trig: cells[i].note > 0 && cells[i].note < NOTE_OFF, free: v.owner === null && allowed.includes(i) })));
+    for (let c = 0; c < nch; c++) {
+      const ci = infos[c];
+      if (!ci.active || ci.drum || ci.noise) continue;
+      importance[c] = (importance[c] ?? 0) + ci.lvl;
+      const st = ci.trig?.st ?? ci.stLast;
+      if (st) (pitchHz[c] ??= []).push((c4Hz.get(st.inst) ?? 261.6255653) * Math.pow(2, (st.note - 49) / 12));
+    }
+  }
+
+  // ---------- AY touches (the converter's enhance options) as pattern content
+  const enh = options.enhance ?? {};
+  const touchReport: string[] = [];
+  {
+    // the lead: the most important pitched channel that is not the bass (priorities first)
+    const bassOf = (c: number) => { const h = (pitchHz[c] ?? []).slice().sort((a, b) => a - b); return h.length > 0 && h[h.length >> 1] < (o.bassHz ?? 200); };
+    let leadCh = options.leadCh ?? -1, best = options.leadCh !== undefined && options.leadCh >= 0 ? Infinity : -Infinity;
+    for (let c = 0; c < nch; c++) {
+      if (!importance[c] || bassOf(c) || (prio[c] ?? 0) <= -3) continue;
+      const sc = importance[c] + 1000 * (prio[c] ?? 0);
+      if (sc > best) { best = sc; leadCh = c; }
+    }
+    const leadVoice = (ri: number) => snaps[ri].findIndex((v) => v.owner === leadCh && !v.arp && v.kind === 'tone');
+    const E = parseEffectChar('E');
+
+    // lead notes that hold one arpeggio all along: the arpeggio moves into a copy of the instrument (arpeggio macro), so
+    // the effect column is free for the timer effect / detune and the doubling voice plays the chord too
+    const ARP = parseEffectChar('0'), arpInst = new Map<string, number>();
+    let arpMoved = 0;
+    if (leadCh >= 0 && (enh.free === 'chorus' || enh.free === 'echo' || enh.leadFx === 'soft' || enh.leadFx === 'sid')) {
+      for (let ri = 0; ri < nRows; ri++) {
+        const want = leadVoice(ri), sn = snaps[ri];
+        if (want < 0 || !sn[want].trig) continue;
+        // (the macro steps from tick 1 on, the effect from tick 0: x y 0 keeps them in step after the first tick)
+        if (flat[ri][want].effect === ARP && flat[ri][want].param) {
+          const p = flat[ri][want].param;
+          let end = ri + 1;
+          while (end < nRows && !snaps[end][want].trig && snaps[end][want].owner === sn[want].owner && flat[end][want].effect === ARP && flat[end][want].param === p) end++;
+          const noteEnds = end >= nRows || snaps[end][want].trig || snaps[end][want].owner !== sn[want].owner;
+          const inst = flat[ri][want].instrument;
+          if (noteEnds && inst && instruments.length < 255) {
+            const key = `${inst}:${p}`;
+            let ai = arpInst.get(key);
+            if (ai === undefined) {
+              const base = instruments[inst];
+              const x = (p >> 4) & 15, y = p & 15;
+              instruments.push({ ...structuredClone(base), name: `${base.name.slice(0, 24)} 0${x.toString(16).toUpperCase()}${y.toString(16).toUpperCase()}`, arpMacro: [x, y, 0], arpSpeed: 1 });
+              ai = instruments.length - 1; arpInst.set(key, ai);
+            }
+            flat[ri][want].instrument = ai;
+            for (let r = ri; r < end; r++) { flat[r][want].effect = 0; flat[r][want].param = 0; }
+            arpMoved++;
+          }
+        }
+      }
+      if (arpMoved) touchReport.push(`${arpMoved} arpeggio note(s) of the lead moved into ${arpInst.size} instrument copies with an arpeggio macro`);
+    }
+    /** the instrument a voice's note was started with in a row (after the arpeggio move) */
+    const instAt = (ri: number, v: number, fallback: number) => flat[ri][v].instrument || fallback;
+
+    // free voices double the lead: chorus (same time, a few cents higher, 2 levels quieter) or echo (later, 4 quieter)
+    if ((enh.free === 'chorus' || enh.free === 'echo') && leadCh >= 0) {
+      const cents = enh.chorusCents ?? 8, delay = Math.max(1, Math.round(enh.echoFrames ?? 9));
+      const k = enh.free === 'chorus' ? 0.5 : 0.25;          // 2 / 4 AY levels (velocity: 2 * log2)
+      let cv = -1, cNote = 0, cInst = 0, cVol = -1, nFill = 0;
+      let src = 0, leadInst = 0, srcInst = 0;
+      for (let ri = 0; ri < nRows; ri++) {
+        let S: { note: number; inst: number; vol: number; trig: boolean } | null = null;
+        if (enh.free === 'chorus') { const li = leadVoice(ri); if (li >= 0) { S = { ...snaps[ri][li] }; if (S.trig) leadInst = instAt(ri, li, S.inst); S.inst = leadInst || S.inst; } }
+        else {
+          const want = rows[ri].frame - delay;
+          while (src + 1 < ri && rows[src + 1].frame <= want) src++;
+          if (rows[src].frame <= want) { const li = leadVoice(src); if (li >= 0) { S = { ...snaps[src][li] }; if (S.trig) srcInst = instAt(src, li, S.inst); S.inst = srcInst || S.inst; if (rows[ri - 1] && rows[ri - 1].frame - delay >= rows[src].frame) S.trig = false; } }
+        }
+        const free = [0, 1, 2].filter((i) => snaps[ri][i].free);
+        const target = free.includes(cv) ? cv : free.length ? free[free.length - 1] : -1;
+        if (cv >= 0 && cv !== target && snaps[ri][cv].free && !flat[ri][cv].note) flat[ri][cv].note = NOTE_OFF;
+        if (!S || target < 0) { cv = -1; continue; }
+        const cell = flat[ri][target];
+        const vol = clamp(Math.round(S.vol * k), 1, 64);
+        if (target !== cv || S.trig || S.note !== cNote || S.inst !== cInst) {
+          cell.note = S.note; cell.instrument = S.inst; cell.volume = 0x10 + vol;
+          if (enh.free === 'chorus' && !cell.effect) {
+            const P = periodOf(S.note);
+            cell.effect = E; cell.param = 0x10 | clamp(Math.round(P * (1 - Math.pow(2, -cents / 1200))), 1, 15);
+          }
+          cNote = S.note; cInst = S.inst;
+        } else if (vol !== cVol) cell.volume = 0x10 + vol;
+        cv = target; cVol = vol; nFill++;
+      }
+      if (nFill) touchReport.push(`${enh.free === 'chorus' ? 'chorus' : 'echo'} of the lead (channel ${leadCh + 1}) on free voices in ${nFill} row(s)`);
+    }
+
+    // lead sound: S (sinus-SID) / Q (SID voice) on the lead's notes; the timer runs at twice the note frequency
+    if ((enh.leadFx === 'soft' || enh.leadFx === 'sid') && leadCh >= 0) {
+      const code = parseEffectChar(enh.leadFx === 'soft' ? 'S' : 'Q');
+      const sinusMax = MAX_FX_HZ / (2 * SINUS_STEPS);
+      let fv = -1, n = 0;
+      for (let ri = 0; ri < nRows; ri++) {
+        const sn = snaps[ri];
+        if (fv >= 0 && sn[fv].trig && flat[ri][fv].effect !== code) fv = -1;      // a new note ended it
+        let want = -1, hz = 0;
+        const li = leadVoice(ri);
+        if (li >= 0 && sn[li].trig) { hz = noteToFreq(sn[li].note); want = li; }
+        if (enh.leadFx === 'soft' && want >= 0 && hz > sinusMax) {
+          // too high for the sinus engine: the bass takes it when it starts a note here
+          want = -1;
+          for (let i = 0; i < 3; i++) if (sn[i].trig && sn[i].kind === 'tone' && sn[i].owner !== null && !sn[i].arp && noteToFreq(sn[i].note) <= sinusMax) { want = i; hz = noteToFreq(sn[i].note); }
+        }
+        if (want < 0) continue;
+        // the effect column of the note's row may hold a slide: then the first free one while the note lasts
+        let at = ri;
+        while (at < nRows && flat[at][want].effect && (at === ri || !snaps[at][want].trig) && at - ri < 16) at++;
+        if (at >= nRows || flat[at][want].effect || (at > ri && snaps[at][want].trig)) continue;
+        if (fv >= 0 && fv !== want) { if (flat[at][fv].effect) continue; flat[at][fv].effect = code; flat[at][fv].param = 0; }
+        flat[at][want].effect = code;
+        flat[at][want].param = fxParamForHz(enh.leadFx === 'soft' ? 2 * hz : 2 * hz * 1.006);
+        fv = want; n++;
+      }
+      if (n) touchReport.push(`${enh.leadFx === 'soft' ? 'S (sinus-SID)' : 'Q (SID voice)'} on ${n} lead note(s) (channel ${leadCh + 1})`);
+    }
+
+    // soft starts and ends: the tonal instruments start 4 and 2 levels down and fade out over 4 frames on key-off
+    if (enh.soft) {
+      let n = 0;
+      for (const [, plan] of plans) {
+        const sq = instruments[plan.ay]?.seq;
+        if (plan.kind !== 'tone' || !sq || plan.buzz) continue;
+        if (sq.steps[0] && sq.steps[0].vol > 4) sq.steps[0] = { ...sq.steps[0], vol: sq.steps[0].vol - 4 };
+        if (sq.steps[1] && sq.steps[1].vol > 2) sq.steps[1] = { ...sq.steps[1], vol: sq.steps[1].vol - 2 };
+        sq.release = Math.max(sq.release, 4);
+        n++;
+      }
+      if (n) touchReport.push(`soft starts and ends in ${n} instrument(s)`);
+    }
   }
 
   // ---------- timing: Fxx wherever the row length changes
@@ -862,6 +1006,7 @@ export function moduleToSong(m: Module, options: SongConvertOptions = {}): SongC
     if (digi.skipped) warnings.push(`${digi.skipped} digidrum hit(s) skipped: more than 63 sample variants`);
   } else if (digiOn) report.push('digidrums: no percussion hits found');
   if (timingSlips) report.push(`${timingSlips} tempo changes had to replace an effect`);
+  for (const t of touchReport) report.push(`AY touches: ${t}`);
   for (const [k, n] of warnCount) warnings.push(`${k} x${n} not translated`);
   void FX;
   return { song, report, warnings, played: playedRows, folded: foldedRows, dropped: droppedRows, instMap: instMapOut };

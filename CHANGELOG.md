@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1 — 2026-11-15
+
+### Added
+- **AY touches in *Edit as AY patterns*** (same options and the converter's lead channel): chorus / echo of the lead as notes on free voices (chorus: `E1x` fine slide for the detune, half the volume; echo: the lead's notes N frames later, a quarter of the volume, with key-offs where the voice is needed again); the lead sound as `S` / `Q` on the lead's notes (timer at twice the note frequency, sinus-SID handed to the bass above ~310 Hz, `S00` / `Q00` when it moves to another voice); soft starts (-4 / -2 levels) and a 4-frame release in the tonal step tables. A lead note that holds one `0xy` all along gets an instrument copy with that arpeggio as its macro, freeing the effect column.
+
 ## 0.8.0 — 2026-11-15
 
 ### Added

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MOD/XM to YM2149 Help</title>
-<meta name="description" content="Manual, how-to guide, effects reference, architecture and technical specifications of the MOD/XM to YM2149 tool, version 0.8.0.">
+<meta name="description" content="Manual, how-to guide, effects reference, architecture and technical specifications of the MOD/XM to YM2149 tool, version 0.8.1.">
 <style>
 :root { --bg:#fbfbfd; --ink:#1b1f2a; --dim:#5a6074; --line:#d9dce6; --accent:#2c5fd4; --side:#f0f2f8; --code:#eef0f6; --mark:#fff3b0; --head:#1d2342; --headink:#fff; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#10131f; --ink:#dfe3f1; --dim:#9aa2bd; --line:#2a3050; --accent:#7ea8ff; --side:#161a2c; --code:#1b2037; --mark:#5b4c00; --head:#0a0d1e; } }
@@ -69,7 +69,7 @@ footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top
 <body>
 <header class="top">
   <button id="menu" aria-label="Contents">☰</button>
-  <h1>MOD/XM → YM2149 <small>Help · v0.8.0</small></h1>
+  <h1>MOD/XM → YM2149 <small>Help · v0.8.1</small></h1>
   <input id="q" type="search" placeholder="Search the documentation  ( / )" aria-label="Search the documentation">
   <span class="sp"></span>
   <button id="theme" title="Switch between light and dark">◐</button>
@@ -115,6 +115,7 @@ footer { color: var(--dim); font-size: 13px; padding: 20px 28px 40px; border-top
 <li><em>Free voices</em>: a voice nobody needs doubles the lead, <strong>detuned</strong> (chorus — a wide, stereo-like sound) or <strong>later and quieter</strong> (echo).</li>
 <li><em>Lead sound</em>: <strong>sinus-SID</strong> (a softer, rounder tone) or <strong>SID voice</strong> (the slowly sweeping filter sound) on the lead voice.</li>
 <li><em>Soft note starts and ends</em>: melodic notes fade in and out instead of clicking on and off.</li>
+<li>0.8.1: <em>Edit as AY patterns</em> takes them along as editable pattern content (chorus notes with <code>E1x</code>, <code>S</code> / <code>Q</code> on the lead&#39;s notes, softer instruments).</li>
 </ul>
 </li>
 </ul>
@@ -1457,7 +1458,7 @@ lower row:   S   D       G   H   J       L
 <li><strong>Lead sound → filter sweep (SID voice)</strong> — the lead&#39;s volume is switched on and off slightly off the note frequency: the slowly sweeping sound of the SID voice.</li>
 <li><strong>Soft note starts and ends</strong> — melodic notes fade in over two frames and out over a few, instead of clicking on and off.</li>
 </ol>
-<p>The lead is the most important pitched channel (give a channel <em>Lead</em> in <strong>Manual import…</strong> to choose it). The lead sound uses the MFP timer, so it plays in the SNDH, YM6 and game-kit exports (YM5 cannot hold it). The touches are part of the conversion only; <em>Edit as AY patterns</em> does not copy them — use the editor&#39;s <code>S</code>, <code>Q</code> and <em>Echo…</em> there.</p>
+<p>The lead is the most important pitched channel (give a channel <em>Lead</em> in <strong>Manual import…</strong> to choose it). The lead sound uses the MFP timer, so it plays in the SNDH, YM6 and game-kit exports (YM5 cannot hold it). <em>Edit as AY patterns</em> takes the touches along as pattern content you can edit: the chorus / echo as notes on the free voice (the chorus with an <code>E1x</code> fine slide for the detune, at a lower volume), the lead sound as an <code>S</code> or <code>Q</code> effect on the lead&#39;s notes, and the soft starts and ends in the instruments&#39; step tables (and a 4-frame release). A lead note that holds one arpeggio all along gets a copy of its instrument with that arpeggio as its arpeggio macro, so the effect column is free for the <code>S</code> / <code>Q</code> and the chorus plays the chord too.</p>
 </section>
 <section class="sec" id="howto-instruments-convert"><h2>Change how a module instrument is played<a class="anchor" href="#howto-instruments-convert" aria-label="link">#</a></h2><p>In the <strong>Instruments → AY role</strong> table:</p>
 <ol>
@@ -4036,7 +4037,7 @@ then one data byte per set mask bit, in register order
 <p id="none" class="none hidden">Nothing found.</p>
 </main>
 </div>
-<footer>MOD/XM → YM2149 · SNDH · game stream — version 0.8.0. Runs entirely in your browser; this page is a single file and works offline.</footer>
+<footer>MOD/XM → YM2149 · SNDH · game stream — version 0.8.1. Runs entirely in your browser; this page is a single file and works offline.</footer>
 <script>
 (function () {
   var q = document.getElementById('q'), secs = [].slice.call(document.querySelectorAll('section.sec, section.chapter > .intro')), none = document.getElementById('none');

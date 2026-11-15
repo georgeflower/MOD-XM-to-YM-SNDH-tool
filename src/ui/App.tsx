@@ -279,7 +279,7 @@ export function App() {
     setBusy('Converting to AY patterns…');
     setTimeout(() => {
       try {
-        const r = moduleToSong(mod, { prio, inst: instMap, drumBonus: opts.drumBonus, sticky: opts.sticky, gainDb: opts.gainDb, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, waveform: opts.waveform, names });
+        const r = moduleToSong(mod, { prio, inst: instMap, drumBonus: opts.drumBonus, sticky: opts.sticky, gainDb: opts.gainDb, arpOrder: opts.arpOrder, arpFill: opts.arpFill, arpMinVol: opts.arpMinVol, digiDrums: opts.digi, digiRate: opts.digiRate, digiMaxMs: opts.digiMaxMs, middleLayout: opts.middle, waveform: opts.waveform, names, enhance: convOpts.enhance, leadCh: res?.leadCh });
         e.loadSong(r.song, fileName);
         setSongReport([...r.report, ...r.warnings.map((w) => 'warning: ' + w)]);
         setTab('ed');

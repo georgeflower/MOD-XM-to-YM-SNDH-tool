@@ -54,7 +54,8 @@ voice (stickiness avoids voice jumping, one noise generator is shared, volumes m
 * **AY touches** (options, after MmcM / Scavenger): *free voices* double the lead **detuned** (chorus, a wide stereo-like beat) or
   **later and quieter** (echo); *lead sound* puts **sinus-SID** (softer; up to ~310 Hz, else on the bass) or **SID voice**
   (filter sweep) on the lead as a timer-effect track (SNDH / YM6 / game kit); *soft note starts and ends* fade melodic notes in
-  and out. Converter output only, not the pattern song.
+  and out. *Edit as AY patterns* carries them as pattern content: chorus / echo notes on the free voice (`E1x` detune), `S` / `Q`
+  on the lead's notes (a constant arpeggio moves into an instrument copy's arpeggio macro to free the effect column), softer step tables.
 
 ## Loading SNES music (.spc)
 
@@ -328,10 +329,10 @@ public/vendor   chiptune3 / libopenmpt (MIT / BSD) for the "original" side of th
 
 ## Roadmap
 
-Done in 0.5: SNES `.spc` import. Done in 0.6: SPC loop point, echo channels, rows per step, voice mute. Done in 0.7: *Edit as AY patterns* follows the conversion (envelopes, closed-loop volume and pitch, note starts at high tempos), *Replace…* instrument, *Arpeggios…* (major ↔ minor). Done in 0.8: echo / delay channels found and marked (Low priority), *AY touches* (chorus or echo on free voices, sinus-SID / SID-voice lead, soft note starts and ends).
+Done in 0.5: SNES `.spc` import. Done in 0.6: SPC loop point, echo channels, rows per step, voice mute. Done in 0.7: *Edit as AY patterns* follows the conversion (envelopes, closed-loop volume and pitch, note starts at high tempos), *Replace…* instrument, *Arpeggios…* (major ↔ minor). Done in 0.8: echo / delay channels found and marked (Low priority), *AY touches* (chorus or echo on free voices, sinus-SID / SID-voice lead, soft note starts and ends), also in *Edit as AY patterns* (0.8.1).
 
 * More than one timer effect or drum at a time (needs a second timer / mixing engine); timer-driven arpeggio and other handler effects that are not drums or Q/S/U
-* Pattern song: per-frame voice choice inside a row (short notes between drums), as the converter does; the AY touches (chorus, lead timer effect) in the pattern song
+* Pattern song: per-frame voice choice inside a row (short notes between drums), as the converter does
 * SNES SPC: the echo feedback tail, tempo changes in *rows per step* (one grid per section), sustain points in the envelopes, best-effort `.sfc` ROM support
 * maxYMiser: the STe DMA track (sampled sound), sequence-switching effects, more than one timer effect on the voices at once
 

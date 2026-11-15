@@ -58,7 +58,7 @@ The *AY touches* in the conversion options are what AY composers such as MmcM an
 4. **Lead sound → filter sweep (SID voice)** — the lead's volume is switched on and off slightly off the note frequency: the slowly sweeping sound of the SID voice.
 5. **Soft note starts and ends** — melodic notes fade in over two frames and out over a few, instead of clicking on and off.
 
-The lead is the most important pitched channel (give a channel *Lead* in **Manual import…** to choose it). The lead sound uses the MFP timer, so it plays in the SNDH, YM6 and game-kit exports (YM5 cannot hold it). The touches are part of the conversion only; *Edit as AY patterns* does not copy them — use the editor's `S`, `Q` and *Echo…* there.
+The lead is the most important pitched channel (give a channel *Lead* in **Manual import…** to choose it). The lead sound uses the MFP timer, so it plays in the SNDH, YM6 and game-kit exports (YM5 cannot hold it). *Edit as AY patterns* takes the touches along as pattern content you can edit: the chorus / echo as notes on the free voice (the chorus with an `E1x` fine slide for the detune, at a lower volume), the lead sound as an `S` or `Q` effect on the lead's notes, and the soft starts and ends in the instruments' step tables (and a 4-frame release). A lead note that holds one arpeggio all along gets a copy of its instrument with that arpeggio as its arpeggio macro, so the effect column is free for the `S` / `Q` and the chorus plays the chord too.
 
 ## Change how a module instrument is played {#howto-instruments-convert}
 

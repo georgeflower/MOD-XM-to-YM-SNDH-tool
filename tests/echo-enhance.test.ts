@@ -7,6 +7,9 @@ import { PRIO_OFF } from '../src/core/replay';
 import { fxKindOf, fxVoiceOf, fxHzOf, FX_SID, FX_SINUS } from '../src/core/fx';
 import { mappingToJson, parseMapping, DEFAULT_OPTS } from '../src/core/mapping';
 import { emptyCell, type Module } from '../src/core/types';
+import { moduleToSong } from '../src/tracker/fromModule';
+import { renderSong } from '../src/tracker/render';
+import { parseEffectChar } from '../src/tracker/types';
 
 const fx = (n: string) => new Uint8Array(readFileSync(new URL(`../fixtures/${n}`, import.meta.url)));
 
@@ -121,5 +124,27 @@ describe('AY touches', () => {
     const opts = { ...DEFAULT_OPTS, free: 'chorus' as const, chorusCents: 12, leadFx: 'sid' as const, soft: true, echoFrames: 7 };
     const back = parseMapping(mappingToJson({ opts, prio: {}, inst: {} }, { title: 't', kind: 'xm', channels: 4, instruments: 1 }));
     expect(back.opts).toMatchObject({ free: 'chorus', chorusCents: 12, leadFx: 'sid', soft: true, echoFrames: 7 });
+  });
+
+  it('Edit as AY patterns carries the touches: chorus notes with E1x, S / Q on lead notes, soft instruments', () => {
+    const lead = convert(m, {}).leadCh;
+    const notesOf = (song: ReturnType<typeof moduleToSong>['song']) => song.order.flatMap((pi) => song.patterns[pi].cells);
+    const plain = moduleToSong(m, { leadCh: lead });
+    const ch = moduleToSong(m, { leadCh: lead, enhance: { free: 'chorus' } });
+    const E = parseEffectChar('E');
+    const detuned = notesOf(ch.song).flat().filter((c) => c.note > 0 && c.note < 97 && c.effect === E && (c.param >> 4) === 1).length;
+    expect(detuned).toBeGreaterThan(20);
+    expect(ch.report.some((l) => /chorus of the lead \(channel 4\)/.test(l))).toBe(true);
+    const sid = moduleToSong(m, { leadCh: lead, enhance: { leadFx: 'sid' } });
+    const Q = parseEffectChar('Q');
+    expect(notesOf(sid.song).flat().filter((c) => c.effect === Q && c.param).length).toBeGreaterThan(50);
+    const r = renderSong(sid.song);
+    expect(r.fx && Array.from(r.fx).filter(Boolean).length).toBeGreaterThan(500);
+    expect(r.warnings.join()).not.toMatch(/several voices/);
+    const soft = moduleToSong(m, { leadCh: lead, enhance: { soft: true } });
+    const i = soft.song.instruments.findIndex((x, k) => k > 0 && x.seq && x.seq.steps.length > 2 && plain.song.instruments[k]?.seq?.steps[0].vol! > 4);
+    expect(i).toBeGreaterThan(0);
+    expect(soft.song.instruments[i].seq!.steps[0].vol).toBe(plain.song.instruments[i].seq!.steps[0].vol - 4);
+    expect(soft.song.instruments[i].seq!.release).toBeGreaterThanOrEqual(4);
   });
 });
